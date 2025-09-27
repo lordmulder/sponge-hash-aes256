@@ -1,5 +1,8 @@
 [package]
 name = "sponge-hash-aes256"
+description = "A sponge-based secure hash function that uses AES-256 as its internal PRF"
+license = "0BSD"
+repository = "https://github.com/lordmulder/sponge-hash-aes256/"
 version = "1.0.0"
 edition = "2024"
 
