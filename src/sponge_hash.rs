@@ -1,11 +1,42 @@
 // SPDX-License-Identifier: 0BSD
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use crate::crypto::{BLOCK_SIZE, aes256_encrypt};
+use crate::utilities::{BLOCK_SIZE, aes256_encrypt, xor_arrays};
 use zeroize::Zeroize;
 
+#[cfg(feature = "logging")]
+use log;
+
 /// Default digest size, in bytes
+///
+/// The default digest size is currently defined as 32 bytes, i.e., 256 bits.
 pub const DEFAULT_DIGEST_SIZE: usize = 2usize * BLOCK_SIZE;
+
+/// The number of permutation rounds to be performed
+const PERMUTE_ROUNDS: usize = 3usize;
+
+// ---------------------------------------------------------------------------
+// Logging
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "logging")]
+macro_rules! log {
+    ($self:tt, $arg:tt) => {
+        log::trace!(
+            "SpongeHash256@{:p}: {} --> {:02x?} {:02x?} {:02x?}",
+            &$self,
+            $arg,
+            &$self.state0,
+            &$self.state1,
+            &$self.state2
+        );
+    };
+}
+
+#[cfg(not(feature = "logging"))]
+macro_rules! log {
+    ($self:tt, $arg:tt) => {};
+}
 
 // ---------------------------------------------------------------------------
 // Digest size validator
@@ -15,16 +46,45 @@ pub const DEFAULT_DIGEST_SIZE: usize = 2usize * BLOCK_SIZE;
 struct ValidDigestSize<const N: usize>;
 
 impl<const N: usize> ValidDigestSize<N> {
-    const OK: () = assert!((N > 0) && (N <= 64), "Digest size must be in the [0..=64] range!");
+    const OK: () = assert!((N > 0) && (N <= 2048), "Digest size must be in the [0..=2048] range!");
 }
 
 // ---------------------------------------------------------------------------
 // Streaming API
 // ---------------------------------------------------------------------------
 
-/// # SpongeHash-AES256
+#[allow(clippy::needless_doctest_main)]
+/// This struct encapsulates the state for a “streaming” (incremental) SpongeHash-AES256 computation.
 ///
-/// The **`SpongeHash256`** struct encapsulates the state for a “streaming” (incremental) SpongeHash-AES256 computation.
+/// ### Usage Example
+///
+/// The **`SpongeHash256`** struct is used as follows:
+///
+/// ```rust
+/// use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, SpongeHash256};
+///
+/// fn main() {
+///     // Create new hash instance
+///     let mut hash = SpongeHash256::new();
+///
+///     // Process message
+///     hash.update(b"The quick brown fox jumps over the lazy dog");
+///
+///     // Retrieve the final digest
+///     let digest = hash.digest::<DEFAULT_DIGEST_SIZE>();
+///
+///     // Print result
+///     println!("{:02X?}", &digest)
+/// }
+/// ```
+///
+/// &nbsp;
+///
+/// <div class="warning">
+///
+/// The [`compute()`] and [`compute_to_slice()`] convenience functions may be used as an alternative to working with the `SpongeHash256` struct directly. This is especially useful, if *all* data to be hashed is available at once.
+///
+/// </div>
 pub struct SpongeHash256 {
     state0: [u8; BLOCK_SIZE],
     state1: [u8; BLOCK_SIZE],
@@ -34,7 +94,7 @@ pub struct SpongeHash256 {
 
 impl SpongeHash256 {
     /// Creates a new SpongeHash-AES256 instance and initializes the hash computation.
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             state0: [0x00u8; BLOCK_SIZE],
             state1: [0x36u8; BLOCK_SIZE],
@@ -43,27 +103,30 @@ impl SpongeHash256 {
         }
     }
 
-    /// Processes the next message chunk, as given by the slice referred to by `message_chunk`.
+    /// Processes the next message chunk, as given by the slice referenced by `message_chunk`.
     ///
     /// The internal state of the hash computation is updated by this function.
-    pub fn update(&mut self, message_chunk: &[u8]) -> &Self {
+    pub fn update(&mut self, message_chunk: &[u8]) {
+        log!(self, "update::enter");
+
         for byte in message_chunk {
             self.state0[self.offset] ^= byte;
             self.offset += 1usize;
+
             if self.offset >= BLOCK_SIZE {
-                self.iterate();
+                self.permute();
                 self.offset = 0usize;
             }
         }
 
-        self
+        log!(self, "update::leave");
     }
 
     /// Concludes the hash computation and returns the final digest.
     ///
     /// The hash value (digest) of the concatenation of all processed message chunks is returned as an new array of size `N`.
     ///
-    /// **Note:** The digest size `N`, in bytes, shall be in the 1 to 64 (inclusive) range.
+    /// **Note:** The digest size `N`, in bytes, shall be in the 1 to 2048 (inclusive) range.
     pub fn digest<const N: usize>(self) -> [u8; N] {
         let () = ValidDigestSize::<N>::OK;
         let mut digest = [0u8; N];
@@ -73,12 +136,14 @@ impl SpongeHash256 {
 
     /// Concludes the hash computation and returns the final digest.
     ///
-    /// The hash value (digest) of the concatenation of all processed message chunks is written into the slice of size `N` referred to by `digest`.
+    /// The hash value (digest) of the concatenation of all processed message chunks is written into the slice referenced by `digest`.
     ///
-    /// **Note:** The digest size `N`, in bytes, shall be in the 1 to 64 (inclusive) range.
-    pub fn digest_to_slice<const N: usize>(mut self, digest: &mut [u8; N]) {
+    /// **Note:** The digest size `N`, in bytes, shall be in the 1 to 2048 (inclusive) range.
+    pub fn digest_to_slice<const N: usize>(mut self, digest_out: &mut [u8; N]) {
         let () = ValidDigestSize::<N>::OK;
         assert!(self.offset < BLOCK_SIZE);
+
+        log!(self, "digest::enter");
 
         let padding = (BLOCK_SIZE - self.offset) as u8;
         while self.offset < BLOCK_SIZE {
@@ -89,30 +154,36 @@ impl SpongeHash256 {
         let mut pos = 0usize;
         while pos < N {
             let copy_len = BLOCK_SIZE.min(N - pos);
-            self.iterate();
-            digest[pos..(pos + copy_len)].copy_from_slice(&self.state0[..copy_len]);
+            self.permute();
+            digest_out[pos..(pos + copy_len)].copy_from_slice(&self.state0[..copy_len]);
             pos += copy_len;
         }
+
+        log!(self, "digest::leave");
     }
 
-    fn iterate(&mut self) {
+    fn permute(&mut self) {
+        log!(self, "permfn::enter");
+
         let mut temp0 = [0u8; BLOCK_SIZE];
         let mut temp1 = [0u8; BLOCK_SIZE];
         let mut temp2 = [0u8; BLOCK_SIZE];
 
-        aes256_encrypt(&mut temp0, &self.state0, &self.state1, &self.state2);
-        aes256_encrypt(&mut temp1, &self.state1, &self.state2, &self.state0);
-        aes256_encrypt(&mut temp2, &self.state2, &self.state0, &self.state1);
+        for _ in 0..PERMUTE_ROUNDS {
+            aes256_encrypt(&mut temp0, &self.state0, &self.state1, &self.state2);
+            aes256_encrypt(&mut temp1, &self.state1, &self.state2, &self.state0);
+            aes256_encrypt(&mut temp2, &self.state2, &self.state0, &self.state1);
 
-        for pos in 0..BLOCK_SIZE {
-            self.state0[pos] ^= temp0[pos];
-            self.state1[pos] ^= temp1[pos];
-            self.state2[pos] ^= temp2[pos];
+            xor_arrays(&mut self.state0, &temp0);
+            xor_arrays(&mut self.state1, &temp1);
+            xor_arrays(&mut self.state2, &temp2);
         }
 
         temp0.zeroize();
         temp1.zeroize();
         temp2.zeroize();
+
+        log!(self, "permfn::leave");
     }
 }
 
@@ -134,24 +205,75 @@ impl Drop for SpongeHash256 {
 // One-Shot API
 // ---------------------------------------------------------------------------
 
-/// Convenience function for “sone-shot” SpongeHash-AES256 computation.
+#[allow(clippy::needless_doctest_main)]
+/// Convenience function for “one-shot” SpongeHash-AES256 computation.
 ///
 /// The hash value (digest) of the given `message` is returned as an new array of size `N`.
 ///
-/// **Note:** The digest size `N`, in bytes, shall be in the 1 to 64 (inclusive) range.
+/// **Note:** The digest size `N`, in bytes, shall be in the 1 to 2048 (inclusive) range.
+///
+/// ### Usage Example
+///
+/// The **`compute()`** function is used as follows:
+///
+/// ```rust
+/// use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, compute};
+///
+/// fn main() {
+///     // Compute digest using the “one-shot” function
+///     let digest = compute::<DEFAULT_DIGEST_SIZE>(b"The quick brown fox jumps over the lazy dog");
+///
+///     // Print result
+///     println!("{:02X?}", &digest)
+/// }
+/// ```
+///
+/// &nbsp;
+///
+/// <div class="warning">
+///
+/// Applications that need to process *large* messages are recommended to use the [streaming API](SpongeHash256), which does **not** require *all* message data to be held in memory at once and which allows for an *incremental* hash computation.
+///
+/// </div>
 pub fn compute<const N: usize>(message: &[u8]) -> [u8; N] {
     let mut state = SpongeHash256::new();
     state.update(message);
     state.digest()
 }
 
-/// Convenience function for “sone-shot” SpongeHash-AES256 computation.
+#[allow(clippy::needless_doctest_main)]
+/// Convenience function for “one-shot” SpongeHash-AES256 computation.
 ///
-/// The hash value (digest) of the given `message` is written into the slice of size `N` referred to by `digest`.
+/// The hash value (digest) of the given `message` is written into the slice of size `N` referenced by `digest`.
 ///
-/// **Note:** The digest size `N`, in bytes, shall be in the 1 to 64 (inclusive) range.
-pub fn compute_to_slice<const N: usize>(digest: &mut [u8; N], message: &[u8]) {
+/// **Note:** The digest size `N`, in bytes, shall be in the 1 to 2048 (inclusive) range.
+///
+/// ### Usage Example
+///
+/// The **`compute()`** function is used as follows:
+///
+/// ```rust
+/// use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, compute_to_slice};
+///
+/// fn main() {
+///     // Compute digest using the “one-shot” function
+///     let mut digest = [0u8; DEFAULT_DIGEST_SIZE];
+///     compute_to_slice(&mut digest, b"The quick brown fox jumps over the lazy dog");
+///
+///     // Print result
+///     println!("{:02X?}", &digest)
+/// }
+/// ```
+///
+/// &nbsp;
+///
+/// <div class="warning">
+///
+/// Applications that need to process *large* messages are recommended to use the [streaming API](SpongeHash256), which does **not** require *all* message data to be held in memory at once and which allows for an *incremental* hash computation.
+///
+/// </div>
+pub fn compute_to_slice<const N: usize>(digest_out: &mut [u8; N], message: &[u8]) {
     let mut state = SpongeHash256::new();
     state.update(message);
-    state.digest_to_slice(digest);
+    state.digest_to_slice(digest_out);
 }
