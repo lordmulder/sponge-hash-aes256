@@ -21,5 +21,5 @@ fn main() {
     let digest = hash.digest::<DEFAULT_DIGEST_SIZE>();
 
     // Print result
-    println!("{:02X?}", &digest)
+    println!("{:02X?}", &digest);
 }

@@ -12,8 +12,10 @@ use log;
 /// The default digest size is currently defined as 32 bytes, i.e., 256 bits.
 pub const DEFAULT_DIGEST_SIZE: usize = 2usize * BLOCK_SIZE;
 
-/// The number of permutation rounds to be performed
-const PERMUTE_ROUNDS: usize = 3usize;
+/// Default number of permutation rounds to be performed
+///
+/// The default number of permutation rounds is currently defined as 3.
+pub const DEFAULT_PERMUTE_ROUNDS: usize = 3usize;
 
 // ---------------------------------------------------------------------------
 // Logging
@@ -53,7 +55,6 @@ impl<const N: usize> ValidDigestSize<N> {
 // Streaming API
 // ---------------------------------------------------------------------------
 
-#[allow(clippy::needless_doctest_main)]
 /// This struct encapsulates the state for a “streaming” (incremental) SpongeHash-AES256 computation.
 ///
 /// ### Usage Example
@@ -74,7 +75,7 @@ impl<const N: usize> ValidDigestSize<N> {
 ///     let digest = hash.digest::<DEFAULT_DIGEST_SIZE>();
 ///
 ///     // Print result
-///     println!("{:02X?}", &digest)
+///     println!("{:02X?}", &digest);
 /// }
 /// ```
 ///
@@ -89,16 +90,31 @@ pub struct SpongeHash256 {
     state0: [u8; BLOCK_SIZE],
     state1: [u8; BLOCK_SIZE],
     state2: [u8; BLOCK_SIZE],
+    rounds: usize,
     offset: usize,
 }
 
 impl SpongeHash256 {
     /// Creates a new SpongeHash-AES256 instance and initializes the hash computation.
+    ///
+    /// This function creates a hash instance that uses [`DEFAULT_PERMUTE_ROUNDS`] permutation rounds.
     pub fn new() -> Self {
+        Self::with_rounds(DEFAULT_PERMUTE_ROUNDS)
+    }
+
+    /// Creates a new SpongeHash-AES256 instance and initializes the hash computation.
+    ///
+    /// This function creates a hash instance that uses `rounds` permutation rounds, which must be a *positive* value. A greater value slows down the hash calculation, which helps to increase the security in some usage scenarios, e.g., password hashing.
+    pub fn with_rounds(rounds: usize) -> Self {
+        if rounds < 1usize {
+            panic!("Number of permutation rounds must be a positive value!")
+        }
+
         Self {
             state0: [0x00u8; BLOCK_SIZE],
             state1: [0x36u8; BLOCK_SIZE],
             state2: [0x5Cu8; BLOCK_SIZE],
+            rounds,
             offset: 0usize,
         }
     }
@@ -126,7 +142,7 @@ impl SpongeHash256 {
     ///
     /// The hash value (digest) of the concatenation of all processed message chunks is returned as an new array of size `N`.
     ///
-    /// **Note:** The digest size `N`, in bytes, shall be in the 1 to 2048 (inclusive) range.
+    /// **Note:** The digest size `N`, in bytes, shall be in the 1 to 2048 (inclusive) range &#x1F6A8;
     pub fn digest<const N: usize>(self) -> [u8; N] {
         let () = ValidDigestSize::<N>::OK;
         let mut digest = [0u8; N];
@@ -138,7 +154,7 @@ impl SpongeHash256 {
     ///
     /// The hash value (digest) of the concatenation of all processed message chunks is written into the slice referenced by `digest`.
     ///
-    /// **Note:** The digest size `N`, in bytes, shall be in the 1 to 2048 (inclusive) range.
+    /// **Note:** The digest size `N`, in bytes, shall be in the 1 to 2048 (inclusive) range &#x1F6A8;
     pub fn digest_to_slice<const N: usize>(mut self, digest_out: &mut [u8; N]) {
         let () = ValidDigestSize::<N>::OK;
         assert!(self.offset < BLOCK_SIZE);
@@ -169,7 +185,7 @@ impl SpongeHash256 {
         let mut temp1 = [0u8; BLOCK_SIZE];
         let mut temp2 = [0u8; BLOCK_SIZE];
 
-        for _ in 0..PERMUTE_ROUNDS {
+        for _ in 0..self.rounds {
             aes256_encrypt(&mut temp0, &self.state0, &self.state1, &self.state2);
             aes256_encrypt(&mut temp1, &self.state1, &self.state2, &self.state0);
             aes256_encrypt(&mut temp2, &self.state2, &self.state0, &self.state1);
@@ -205,12 +221,13 @@ impl Drop for SpongeHash256 {
 // One-Shot API
 // ---------------------------------------------------------------------------
 
-#[allow(clippy::needless_doctest_main)]
 /// Convenience function for “one-shot” SpongeHash-AES256 computation.
 ///
 /// The hash value (digest) of the given `message` is returned as an new array of size `N`.
 ///
-/// **Note:** The digest size `N`, in bytes, shall be in the 1 to 2048 (inclusive) range.
+/// This function uses [`DEFAULT_PERMUTE_ROUNDS`] permutation rounds.
+///
+/// **Note:** The digest size `N`, in bytes, shall be in the 1 to 2048 (inclusive) range &#x1F6A8;
 ///
 /// ### Usage Example
 ///
@@ -224,7 +241,7 @@ impl Drop for SpongeHash256 {
 ///     let digest = compute::<DEFAULT_DIGEST_SIZE>(b"The quick brown fox jumps over the lazy dog");
 ///
 ///     // Print result
-///     println!("{:02X?}", &digest)
+///     println!("{:02X?}", &digest);
 /// }
 /// ```
 ///
@@ -241,12 +258,13 @@ pub fn compute<const N: usize>(message: &[u8]) -> [u8; N] {
     state.digest()
 }
 
-#[allow(clippy::needless_doctest_main)]
 /// Convenience function for “one-shot” SpongeHash-AES256 computation.
 ///
 /// The hash value (digest) of the given `message` is written into the slice of size `N` referenced by `digest`.
 ///
-/// **Note:** The digest size `N`, in bytes, shall be in the 1 to 2048 (inclusive) range.
+/// This function uses [`DEFAULT_PERMUTE_ROUNDS`] permutation rounds.
+///
+/// **Note:** The digest size `N`, in bytes, shall be in the 1 to 2048 (inclusive) range &#x1F6A8;
 ///
 /// ### Usage Example
 ///
@@ -261,7 +279,7 @@ pub fn compute<const N: usize>(message: &[u8]) -> [u8; N] {
 ///     compute_to_slice(&mut digest, b"The quick brown fox jumps over the lazy dog");
 ///
 ///     // Print result
-///     println!("{:02X?}", &digest)
+///     println!("{:02X?}", &digest);
 /// }
 /// ```
 ///

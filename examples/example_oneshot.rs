@@ -15,5 +15,5 @@ fn main() {
     let digest = compute::<DEFAULT_DIGEST_SIZE>(b"The quick brown fox jumps over the lazy dog");
 
     // Print result
-    println!("{:02X?}", &digest)
+    println!("{:02X?}", &digest);
 }
