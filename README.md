@@ -1,8 +1,10 @@
 # SpongeHash-AES256
 
-[![Crates.io](https://img.shields.io/crates/v/sponge-hash-aes256.svg)](https://crates.io/crates/sponge-hash-aes256)
+[![no_std](https://img.shields.io/badge/rust-no__std-orchid?logo=rust)](https://docs.rust-embedded.org/book/intro/no-std.html)
+[![Crates.io](https://img.shields.io/crates/v/sponge-hash-aes256)](https://crates.io/crates/sponge-hash-aes256)
+[![Downloads](https://img.shields.io/crates/d/sponge-hash-aes256)](https://crates.io/crates/sponge-hash-aes256)
 [![Release Date](https://img.shields.io/github/release-date/lordmulder/sponge-hash-aes256)](https://crates.io/crates/sponge-hash-aes256/versions)
-[![Docs.rs](https://img.shields.io/docsrs/sponge-hash-aes256.svg)](https://docs.rs/sponge-hash-aes256/latest/)
+[![Docs.rs](https://img.shields.io/docsrs/sponge-hash-aes256)](https://docs.rs/sponge-hash-aes256/latest/)
 [![License](https://img.shields.io/crates/l/sponge-hash-aes256)](https://opensource.org/license/0BSD)
 
 A [**sponge**](https://en.wikipedia.org/wiki/Sponge_function)-based secure hash function that uses [AES-256](https://docs.rs/aes/latest/aes/index.html) as its internal [PRF](https://en.wikipedia.org/wiki/Pseudorandom_permutation).
