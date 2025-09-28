@@ -4,17 +4,20 @@ description = "A sponge-based secure hash function that uses AES-256 as its inte
 license = "0BSD"
 repository = "https://github.com/lordmulder/sponge-hash-aes256/"
 readme = "README.crates.md"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2024"
 
 [dependencies]
 aes = { version = "0.8.4", default-features = false }
 cipher = { version = "0.4.4", default-features = false }
+constant_time_eq = { version = "0.4.2", default-features = false }
 log = { version = "0.4.28", default-features = false, optional = true }
 zeroize = { version = "1.8.1", default-features = false }
 
 [dev-dependencies]
-hex-literal = "1.0.0"
+criterion = "0.7.0"
+hex = { version = "0.4.3", default-features = false, features = [ "alloc" ] }
+hex-literal = { version = "1.0.0", default-features = false }
 simple_logger = { version = "5.0.0", default-features = false }
 
 [features]
@@ -25,3 +28,7 @@ logging = ["dep:log"]
 opt-level = 3
 lto = "fat"
 codegen-units = 1
+
+[[bench]]
+name = "stress_test"
+harness = false

@@ -6,7 +6,7 @@ A [**sponge**](https://en.wikipedia.org/wiki/Sponge_function)-based secure hash 
 
 ```
 [dependencies]
-sponge-hash-aes256 = "1.0.0"
+sponge-hash-aes256 = "1.0.2"
 ```
 
 ## Usage

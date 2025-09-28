@@ -17,7 +17,7 @@ In order to use this crate, you have to add it under `[dependencies]` to your **
 
 ```
 [dependencies]
-sponge-hash-aes256 = "1.0.1"
+sponge-hash-aes256 = "1.0.2"
 ```
 
 ## Usage

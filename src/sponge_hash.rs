@@ -2,6 +2,7 @@
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use crate::utilities::{BLOCK_SIZE, aes256_encrypt, xor_arrays};
+use constant_time_eq::constant_time_eq;
 use zeroize::Zeroize;
 
 #[cfg(feature = "logging")]
@@ -193,6 +194,11 @@ impl SpongeHash256 {
             xor_arrays(&mut self.state0, &temp0);
             xor_arrays(&mut self.state1, &temp1);
             xor_arrays(&mut self.state2, &temp2);
+
+            if constant_time_eq(&self.state1, &self.state2) {
+                self.state1[0usize] &= 0x7Fu8;
+                self.state2[0usize] |= 0x80u8;
+            }
         }
 
         temp0.zeroize();
