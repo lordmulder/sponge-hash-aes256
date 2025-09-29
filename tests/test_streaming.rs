@@ -75,7 +75,7 @@ include!("include/common.rs");
 #[test]
 pub fn test_case_6() {
     do_test_n(
-        &hex!("029d9ba8074b2bdd2b67f261bf354d16a9fbd5c0e13bf302f98f9ca3478044b9"),
+        &hex!("a652b744ad50095643ba2234c1ad052ac20b96c90d8ba04703a7865b5fe846b8"),
         16777216usize,
         "aabcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno",
     )

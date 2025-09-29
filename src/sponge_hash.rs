@@ -144,17 +144,13 @@ impl<const R: usize> SpongeHash256<R> {
     /// **Note:** The digest output size `N`, in bytes, must be a *positive* value! &#x1F6A8;
     pub fn digest_to_slice<const N: usize>(mut self, digest_out: &mut [u8; N]) {
         let () = NoneZeroArg::<N>::OK;
-        assert!(self.offset < BLOCK_SIZE);
+        debug_assert!(self.offset < BLOCK_SIZE);
 
         trace!(self, "digest::enter");
 
-        let padding = (BLOCK_SIZE - self.offset) as u8;
-        while self.offset < BLOCK_SIZE {
-            self.state0[self.offset] ^= padding;
-            self.offset += 1usize;
-        }
-
+        self.state0[self.offset] ^= 0x80u8;
         let mut pos = 0usize;
+
         while pos < N {
             let copy_len = BLOCK_SIZE.min(N - pos);
             self.permute();
