@@ -8,7 +8,7 @@
 //!
 //! A [**sponge**](https://en.wikipedia.org/wiki/Sponge_function)-based secure hash function that uses [AES-256](https://docs.rs/aes/latest/aes/index.html) as its internal [PRF](https://en.wikipedia.org/wiki/Pseudorandom_permutation).
 //!
-//! This hash function has a *variable* output size and can produce outputs of *any* size up to 16,384 (inclusive) bits.
+//! This hash function has a *variable* output size and can produce outputs of *any* non-zero size (up to [`usize::MAX`]).
 //!
 //! Please see the [`SpongeHash256`] struct for details!
 //!
@@ -24,3 +24,4 @@ mod sponge_hash;
 mod utilities;
 
 pub use sponge_hash::{DEFAULT_DIGEST_SIZE, DEFAULT_PERMUTE_ROUNDS, SpongeHash256, compute, compute_to_slice};
+pub use utilities::version;

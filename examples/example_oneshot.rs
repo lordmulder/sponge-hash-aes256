@@ -3,12 +3,12 @@
 
 use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, compute};
 
-#[cfg(feature = "logging")]
+#[cfg(feature = "tracing")]
 use simple_logger::SimpleLogger;
 
 fn main() {
     // Initialize the logging sub-system
-    #[cfg(feature = "logging")]
+    #[cfg(feature = "tracing")]
     SimpleLogger::new().init().unwrap();
 
     // Compute digest using the “sone-shot” function

@@ -3,13 +3,13 @@
 
 #[test]
 pub fn test_case_1() {
-    do_test(&hex!("1640eed024950214ee2378fa0e0ec14ba84ee84a231d4991634c6f698bd5ee79"), "")
+    do_test(&hex!("d1c9cc837cdff9096cbb96ef1aa539508fc152e49e7ce32f754e5298cbac2c40"), "")
 }
 
 #[test]
 pub fn test_case_2() {
     do_test(
-        &hex!("52fa77818e480fa57a05f4b0eb939204c292b074ab44002624ed02f159bfecf3"),
+        &hex!("22eeabfbd328997670b7d791d806c93113d9727ba1949bb1dff837b3dcea44f7"),
         "abc",
     )
 }
@@ -17,7 +17,7 @@ pub fn test_case_2() {
 #[test]
 pub fn test_case_3() {
     do_test(
-        &hex!("6963ccbaf468003edf4ff2aed285e87245f22623687c8d9bdfcca78a2e45389c"),
+        &hex!("f8a7116886fd9d4cdf23cbbb183ff334304b24bc1c91f2525ae09b9befd3306e"),
         "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
     )
 }
@@ -25,7 +25,7 @@ pub fn test_case_3() {
 #[test]
 pub fn test_case_4() {
     do_test(
-        &hex!("e5d782b4faee1d7e68ef22de4d676790e67ab99f61b850cfaa89f8926425fa9b"),
+        &hex!("3a60559daa1ccaea56211f0f691044b09c2bf388cb2a99db0100f97aced564d6"),
         "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
     )
 }
@@ -33,7 +33,7 @@ pub fn test_case_4() {
 #[test]
 pub fn test_case_5() {
     do_test(
-        &hex!("095ea698657c59cb1ea408a603f5a74a7b56cad391cef4f818ed306e0a02060c"),
+        &hex!("66088eea4ce8377017d0170a6e219fcaa7282c57152f06cdcacfa6466c3778ff"),
         str::from_utf8(&[0x61u8; 1000000usize]).unwrap(),
     )
 }

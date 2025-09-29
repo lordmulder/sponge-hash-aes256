@@ -2,11 +2,7 @@
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use crate::utilities::{BLOCK_SIZE, aes256_encrypt, xor_arrays};
-use constant_time_eq::constant_time_eq;
 use zeroize::Zeroize;
-
-#[cfg(feature = "logging")]
-use log;
 
 /// Default digest size, in bytes
 ///
@@ -15,15 +11,15 @@ pub const DEFAULT_DIGEST_SIZE: usize = 2usize * BLOCK_SIZE;
 
 /// Default number of permutation rounds to be performed
 ///
-/// The default number of permutation rounds is currently defined as 3.
+/// The default number of permutation rounds is currently defined as `3usize`.
 pub const DEFAULT_PERMUTE_ROUNDS: usize = 3usize;
 
 // ---------------------------------------------------------------------------
-// Logging
+// Tracing
 // ---------------------------------------------------------------------------
 
-#[cfg(feature = "logging")]
-macro_rules! log {
+#[cfg(feature = "tracing")]
+macro_rules! trace {
     ($self:tt, $arg:tt) => {
         log::trace!(
             "SpongeHash256@{:p}: {} --> {:02x?} {:02x?} {:02x?}",
@@ -36,20 +32,20 @@ macro_rules! log {
     };
 }
 
-#[cfg(not(feature = "logging"))]
-macro_rules! log {
+#[cfg(not(feature = "tracing"))]
+macro_rules! trace {
     ($self:tt, $arg:tt) => {};
 }
 
 // ---------------------------------------------------------------------------
-// Digest size validator
+// Non-zero argument constraint
 // ---------------------------------------------------------------------------
 
-/// Validates that the digest size, in bytes, is within the allowed range.
-struct ValidDigestSize<const N: usize>;
+/// Validates that the const generic parameter is non-zero
+struct NoneZeroArg<const N: usize>;
 
-impl<const N: usize> ValidDigestSize<N> {
-    const OK: () = assert!((N > 0) && (N <= 2048), "Digest size must be in the [0..=2048] range!");
+impl<const N: usize> NoneZeroArg<N> {
+    const OK: () = assert!(N > 0, "Const generic argument must be a non-zero value!");
 }
 
 // ---------------------------------------------------------------------------
@@ -57,6 +53,8 @@ impl<const N: usize> ValidDigestSize<N> {
 // ---------------------------------------------------------------------------
 
 /// This struct encapsulates the state for a “streaming” (incremental) SpongeHash-AES256 computation.
+///
+/// The const generic parameter `R` specifies the number of permutation rounds to be performed, which must be a *positive* value. The default number of permutation rounds is given by [`DEFAULT_PERMUTE_ROUNDS`]. Using a greater value slows down the hash calculation, which helps to increase the security in some usage scenarios, e.g., password hashing.
 ///
 /// ### Usage Example
 ///
@@ -67,7 +65,7 @@ impl<const N: usize> ValidDigestSize<N> {
 ///
 /// fn main() {
 ///     // Create new hash instance
-///     let mut hash = SpongeHash256::new();
+///     let mut hash = SpongeHash256::default();
 ///
 ///     // Process message
 ///     hash.update(b"The quick brown fox jumps over the lazy dog");
@@ -87,35 +85,24 @@ impl<const N: usize> ValidDigestSize<N> {
 /// The [`compute()`] and [`compute_to_slice()`] convenience functions may be used as an alternative to working with the `SpongeHash256` struct directly. This is especially useful, if *all* data to be hashed is available at once.
 ///
 /// </div>
-pub struct SpongeHash256 {
+pub struct SpongeHash256<const R: usize = DEFAULT_PERMUTE_ROUNDS> {
     state0: [u8; BLOCK_SIZE],
     state1: [u8; BLOCK_SIZE],
     state2: [u8; BLOCK_SIZE],
-    rounds: usize,
     offset: usize,
 }
 
-impl SpongeHash256 {
+impl<const R: usize> SpongeHash256<R> {
+    const BIT_MASK_0: [u8; BLOCK_SIZE] = [0x5Cu8; BLOCK_SIZE];
+    const BIT_MASK_1: [u8; BLOCK_SIZE] = [0x36u8; BLOCK_SIZE];
+
     /// Creates a new SpongeHash-AES256 instance and initializes the hash computation.
-    ///
-    /// This function creates a hash instance that uses [`DEFAULT_PERMUTE_ROUNDS`] permutation rounds.
     pub fn new() -> Self {
-        Self::with_rounds(DEFAULT_PERMUTE_ROUNDS)
-    }
-
-    /// Creates a new SpongeHash-AES256 instance and initializes the hash computation.
-    ///
-    /// This function creates a hash instance that uses `rounds` permutation rounds, which must be a *positive* value. A greater value slows down the hash calculation, which helps to increase the security in some usage scenarios, e.g., password hashing.
-    pub fn with_rounds(rounds: usize) -> Self {
-        if rounds < 1usize {
-            panic!("Number of permutation rounds must be a positive value!")
-        }
-
+        let () = NoneZeroArg::<R>::OK;
         Self {
-            state0: [0x00u8; BLOCK_SIZE],
-            state1: [0x36u8; BLOCK_SIZE],
-            state2: [0x5Cu8; BLOCK_SIZE],
-            rounds,
+            state0: [0u8; BLOCK_SIZE],
+            state1: [0u8; BLOCK_SIZE],
+            state2: [0u8; BLOCK_SIZE],
             offset: 0usize,
         }
     }
@@ -124,7 +111,7 @@ impl SpongeHash256 {
     ///
     /// The internal state of the hash computation is updated by this function.
     pub fn update(&mut self, message_chunk: &[u8]) {
-        log!(self, "update::enter");
+        trace!(self, "update::enter");
 
         for byte in message_chunk {
             self.state0[self.offset] ^= byte;
@@ -136,16 +123,15 @@ impl SpongeHash256 {
             }
         }
 
-        log!(self, "update::leave");
+        trace!(self, "update::leave");
     }
 
     /// Concludes the hash computation and returns the final digest.
     ///
     /// The hash value (digest) of the concatenation of all processed message chunks is returned as an new array of size `N`.
     ///
-    /// **Note:** The digest size `N`, in bytes, shall be in the 1 to 2048 (inclusive) range &#x1F6A8;
+    /// **Note:** The digest output size `N`, in bytes, must be a *positive* value! &#x1F6A8;
     pub fn digest<const N: usize>(self) -> [u8; N] {
-        let () = ValidDigestSize::<N>::OK;
         let mut digest = [0u8; N];
         self.digest_to_slice(&mut digest);
         digest
@@ -155,12 +141,12 @@ impl SpongeHash256 {
     ///
     /// The hash value (digest) of the concatenation of all processed message chunks is written into the slice referenced by `digest`.
     ///
-    /// **Note:** The digest size `N`, in bytes, shall be in the 1 to 2048 (inclusive) range &#x1F6A8;
+    /// **Note:** The digest output size `N`, in bytes, must be a *positive* value! &#x1F6A8;
     pub fn digest_to_slice<const N: usize>(mut self, digest_out: &mut [u8; N]) {
-        let () = ValidDigestSize::<N>::OK;
+        let () = NoneZeroArg::<N>::OK;
         assert!(self.offset < BLOCK_SIZE);
 
-        log!(self, "digest::enter");
+        trace!(self, "digest::enter");
 
         let padding = (BLOCK_SIZE - self.offset) as u8;
         while self.offset < BLOCK_SIZE {
@@ -176,17 +162,17 @@ impl SpongeHash256 {
             pos += copy_len;
         }
 
-        log!(self, "digest::leave");
+        trace!(self, "digest::leave");
     }
 
     fn permute(&mut self) {
-        log!(self, "permfn::enter");
+        trace!(self, "permfn::enter");
 
         let mut temp0 = [0u8; BLOCK_SIZE];
         let mut temp1 = [0u8; BLOCK_SIZE];
         let mut temp2 = [0u8; BLOCK_SIZE];
 
-        for _ in 0..self.rounds {
+        for _ in 0..R {
             aes256_encrypt(&mut temp0, &self.state0, &self.state1, &self.state2);
             aes256_encrypt(&mut temp1, &self.state1, &self.state2, &self.state0);
             aes256_encrypt(&mut temp2, &self.state2, &self.state0, &self.state1);
@@ -195,17 +181,15 @@ impl SpongeHash256 {
             xor_arrays(&mut self.state1, &temp1);
             xor_arrays(&mut self.state2, &temp2);
 
-            if constant_time_eq(&self.state1, &self.state2) {
-                self.state1[0usize] &= 0x7Fu8;
-                self.state2[0usize] |= 0x80u8;
-            }
+            xor_arrays(&mut self.state1, &Self::BIT_MASK_0);
+            xor_arrays(&mut self.state2, &Self::BIT_MASK_1);
         }
 
         temp0.zeroize();
         temp1.zeroize();
         temp2.zeroize();
 
-        log!(self, "permfn::leave");
+        trace!(self, "permfn::leave");
     }
 }
 
@@ -215,7 +199,7 @@ impl Default for SpongeHash256 {
     }
 }
 
-impl Drop for SpongeHash256 {
+impl<const R: usize> Drop for SpongeHash256<R> {
     fn drop(&mut self) {
         self.state0.zeroize();
         self.state1.zeroize();
@@ -231,9 +215,7 @@ impl Drop for SpongeHash256 {
 ///
 /// The hash value (digest) of the given `message` is returned as an new array of size `N`.
 ///
-/// This function uses [`DEFAULT_PERMUTE_ROUNDS`] permutation rounds.
-///
-/// **Note:** The digest size `N`, in bytes, shall be in the 1 to 2048 (inclusive) range &#x1F6A8;
+/// **Note:** The digest output size `N`, in bytes, must be a *positive* value! &#x1F6A8;
 ///
 /// ### Usage Example
 ///
@@ -259,7 +241,7 @@ impl Drop for SpongeHash256 {
 ///
 /// </div>
 pub fn compute<const N: usize>(message: &[u8]) -> [u8; N] {
-    let mut state = SpongeHash256::new();
+    let mut state = SpongeHash256::default();
     state.update(message);
     state.digest()
 }
@@ -268,9 +250,7 @@ pub fn compute<const N: usize>(message: &[u8]) -> [u8; N] {
 ///
 /// The hash value (digest) of the given `message` is written into the slice of size `N` referenced by `digest`.
 ///
-/// This function uses [`DEFAULT_PERMUTE_ROUNDS`] permutation rounds.
-///
-/// **Note:** The digest size `N`, in bytes, shall be in the 1 to 2048 (inclusive) range &#x1F6A8;
+/// **Note:** The digest output size `N`, in bytes, must be a *positive* value! &#x1F6A8;
 ///
 /// ### Usage Example
 ///
@@ -297,7 +277,7 @@ pub fn compute<const N: usize>(message: &[u8]) -> [u8; N] {
 ///
 /// </div>
 pub fn compute_to_slice<const N: usize>(digest_out: &mut [u8; N], message: &[u8]) {
-    let mut state = SpongeHash256::new();
+    let mut state = SpongeHash256::default();
     state.update(message);
     state.digest_to_slice(digest_out);
 }

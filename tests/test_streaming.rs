@@ -11,7 +11,7 @@ use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, SpongeHash256};
 fn do_test(expected: &[u8; DEFAULT_DIGEST_SIZE], message: &str) {
     // SpongeHash256::digest()
     {
-        let mut hash = SpongeHash256::new();
+        let mut hash = SpongeHash256::default();
         hash.update(message.as_bytes());
         let digest = hash.digest();
         assert_eq!(
@@ -23,7 +23,7 @@ fn do_test(expected: &[u8; DEFAULT_DIGEST_SIZE], message: &str) {
 
     // SpongeHash256::digest_to_slice()
     {
-        let mut hash = SpongeHash256::new();
+        let mut hash = SpongeHash256::default();
         hash.update(message.as_bytes());
         let mut digest = [0u8; DEFAULT_DIGEST_SIZE];
         hash.digest_to_slice(&mut digest);
@@ -38,7 +38,7 @@ fn do_test(expected: &[u8; DEFAULT_DIGEST_SIZE], message: &str) {
 fn do_test_n(expected: &[u8; DEFAULT_DIGEST_SIZE], count: usize, message: &str) {
     // SpongeHash256::digest()
     {
-        let mut hash = SpongeHash256::new();
+        let mut hash = SpongeHash256::default();
         for _ in 0..count {
             hash.update(message.as_bytes());
         }
@@ -52,7 +52,7 @@ fn do_test_n(expected: &[u8; DEFAULT_DIGEST_SIZE], count: usize, message: &str) 
 
     // SpongeHash256::digest_to_slice()
     {
-        let mut hash = SpongeHash256::new();
+        let mut hash = SpongeHash256::default();
         for _ in 0..count {
             hash.update(message.as_bytes());
         }
@@ -75,7 +75,7 @@ include!("include/common.rs");
 #[test]
 pub fn test_case_6() {
     do_test_n(
-        &hex!("0ffb1ef98ef5a8fe5f85c42f12ef1b58ce4b7e7911043ebadb84d71fc2cec7b8"),
+        &hex!("029d9ba8074b2bdd2b67f261bf354d16a9fbd5c0e13bf302f98f9ca3478044b9"),
         16777216usize,
         "aabcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno",
     )

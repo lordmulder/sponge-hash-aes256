@@ -43,12 +43,12 @@ fn stress_test() {
                     if (!success) || (counter % UPDATE_CYCLE == 0u64) {
                         if encode_to_slice(&digest, &mut hex_buffer).is_ok() {
                             let digest_string = unsafe { str::from_utf8_unchecked(&hex_buffer) };
-                            println!("[{:0>8}] {} << \"{}\"", counter, digest_string, item);
+                            println!("[{:0>8}] {} << {:?}", counter, digest_string, item);
                         }
                     }
                     if !success {
                         eprintln!("Colission has been detected!");
-                        eprintln!("The value that caused the colission is: \"{}\"", item);
+                        eprintln!("The value that caused the colission is: {:?}", item);
                         process::exit(1);
                     }
                 }

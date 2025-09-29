@@ -3,16 +3,16 @@
 
 use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, SpongeHash256};
 
-#[cfg(feature = "logging")]
+#[cfg(feature = "tracing")]
 use simple_logger::SimpleLogger;
 
 fn main() {
     // Initialize the logging sub-system
-    #[cfg(feature = "logging")]
+    #[cfg(feature = "tracing")]
     SimpleLogger::new().init().unwrap();
 
     // Create new hash instance
-    let mut hash = SpongeHash256::new();
+    let mut hash = SpongeHash256::default();
 
     // Process message
     hash.update(b"The quick brown fox jumps over the lazy dog");

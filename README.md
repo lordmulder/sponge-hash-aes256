@@ -9,7 +9,7 @@
 
 A [**sponge**](https://en.wikipedia.org/wiki/Sponge_function)-based secure hash function that uses [AES-256](https://docs.rs/aes/latest/aes/index.html) as its internal [PRF](https://en.wikipedia.org/wiki/Pseudorandom_permutation).
 
-This hash function has a *variable* output size and can produce outputs of *any* size up to 16,384 (inclusive) bits.
+This hash function has a *variable* output size and can produce outputs of *any* non-zero size.
 
 Please see the [documentation](https://docs.rs/sponge-hash-aes256/latest/) for details! &#x1F4A1;
 
@@ -19,7 +19,7 @@ In order to use this crate, you have to add it under `[dependencies]` to your **
 
 ```
 [dependencies]
-sponge-hash-aes256 = "1.0.2"
+sponge-hash-aes256 = "1.1.0"
 ```
 
 ## Usage
@@ -31,7 +31,7 @@ use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, SpongeHash256};
 
 fn main() {
     // Create new hash instance
-    let mut hash = SpongeHash256::new();
+    let mut hash = SpongeHash256::default();
 
     // Process message
     hash.update(b"The quick brown fox jumps over the lazy dog");
