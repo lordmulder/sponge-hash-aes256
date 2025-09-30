@@ -19,7 +19,7 @@ In order to use this crate, you have to add it under `[dependencies]` to your **
 
 ```
 [dependencies]
-sponge-hash-aes256 = "1.1.0"
+sponge-hash-aes256 = "1.2.0"
 ```
 
 ## Usage
@@ -27,6 +27,7 @@ sponge-hash-aes256 = "1.1.0"
 Here is a simple example that demonstrates how to use SpongeHash-AES256 in your code:
 
 ```rust
+use hex::encode_to_slice;
 use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, SpongeHash256};
 
 fn main() {
@@ -39,8 +40,12 @@ fn main() {
     // Retrieve the final digest
     let digest = hash.digest::<DEFAULT_DIGEST_SIZE>();
 
-    // Print result
-    println!("{:02X?}", &digest);
+    // Encode to hex
+    let mut hex_buffer = [0u8; 2usize * DEFAULT_DIGEST_SIZE];
+    encode_to_slice(&digest, &mut hex_buffer).unwrap();
+
+    // Print the digest (hex format)
+    println!("0x{}", str::from_utf8(&hex_buffer).unwrap());
 }
 ```
 
