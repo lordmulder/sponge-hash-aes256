@@ -1,0 +1,11 @@
+[package]
+name = "sponge256sum"
+description = "A sponge-based secure hash function that uses AES-256 as its internal PRF"
+license = "0BSD"
+repository = "https://github.com/lordmulder/sponge-hash-aes256/"
+readme = "../README.crates.md"
+version = "1.2.0"
+edition = "2024"
+
+[dependencies]
+sponge-hash-aes256 = { path = "../lib" }
