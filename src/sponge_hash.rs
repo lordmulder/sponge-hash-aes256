@@ -42,9 +42,9 @@ macro_rules! trace {
 // ---------------------------------------------------------------------------
 
 /// Validates that the const generic parameter is non-zero
-struct NoneZeroArg<const N: usize>;
+struct NoneZero<const N: usize>;
 
-impl<const N: usize> NoneZeroArg<N> {
+impl<const N: usize> NoneZero<N> {
     const OK: () = assert!(N > 0, "Const generic argument must be a non-zero value!");
 }
 
@@ -58,9 +58,10 @@ impl<const N: usize> NoneZeroArg<N> {
 ///
 /// ### Usage Example
 ///
-/// The **`SpongeHash256`** struct is used as follows:
+/// The easiest way to use the **`SpongeHash256`** structure is as follows:
 ///
 /// ```rust
+/// use hex::encode_to_slice;
 /// use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, SpongeHash256};
 ///
 /// fn main() {
@@ -73,11 +74,28 @@ impl<const N: usize> NoneZeroArg<N> {
 ///     // Retrieve the final digest
 ///     let digest = hash.digest::<DEFAULT_DIGEST_SIZE>();
 ///
-///     // Print result
-///     println!("{:02X?}", &digest);
+///     // Encode to hex
+///     let mut hex_buffer = [0u8; 2usize * DEFAULT_DIGEST_SIZE];
+///     encode_to_slice(&digest, &mut hex_buffer).unwrap();
+///
+///     // Print the digest (hex format)
+///     println!("0x{}", str::from_utf8(&hex_buffer).unwrap());
 /// }
 /// ```
+/// &nbsp;
 ///
+/// Optionally, additional “context” information may be provided via the `info` parameter:
+///
+/// ```rust
+/// use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, SpongeHash256};
+///
+/// fn main() {
+///     // Create new hash instance with “info”
+///     let mut hash: SpongeHash256 = SpongeHash256::with_info("my_application");
+///
+///     /* ... */
+/// }
+/// ```
 /// &nbsp;
 ///
 /// <div class="warning">
@@ -97,23 +115,51 @@ impl<const R: usize> SpongeHash256<R> {
     const BIT_MASK_1: [u8; BLOCK_SIZE] = [0x36u8; BLOCK_SIZE];
 
     /// Creates a new SpongeHash-AES256 instance and initializes the hash computation.
+    ///
+    /// **Note:** This function implies an *empty* [`info`](Self::with_info()) string.
     pub fn new() -> Self {
-        let () = NoneZeroArg::<R>::OK;
-        Self {
+        Self::with_info(Default::default())
+    }
+
+    /// Creates a new SpongeHash-AES256 instance and initializes the hash computation with the given `info` string.
+    ///
+    /// **Note:** The length of the `info` string **must not** exceed a length of 255 characters!
+    pub fn with_info(info: &str) -> Self {
+        let () = NoneZero::<R>::OK;
+
+        let mut instance = Self {
             state0: [0u8; BLOCK_SIZE],
             state1: [0u8; BLOCK_SIZE],
             state2: [0u8; BLOCK_SIZE],
             offset: 0usize,
-        }
+        };
+
+        instance.initialize(info.as_bytes());
+        instance
     }
 
-    /// Processes the next message chunk, as given by the slice referenced by `message_chunk`.
+    /// Initializes the internal state with the given `info` string
+    fn initialize(&mut self, info_data: &[u8]) {
+        trace!(self, "initlz::enter");
+
+        match info_data.len().try_into() {
+            Ok(length) => {
+                self.update(u8::to_be_bytes(length));
+                self.update(info_data);
+            }
+            Err(_) => panic!("Info length exceeds the allowable maximum!"),
+        };
+
+        trace!(self, "initlz::leave");
+    }
+
+    /// Processes the next message chunk, as given by the slice referenced by `chunk`.
     ///
     /// The internal state of the hash computation is updated by this function.
-    pub fn update(&mut self, message_chunk: &[u8]) {
+    pub fn update<T: AsRef<[u8]>>(&mut self, chunk: T) {
         trace!(self, "update::enter");
 
-        for byte in message_chunk {
+        for byte in chunk.as_ref() {
             self.state0[self.offset] ^= byte;
             self.offset += 1usize;
 
@@ -143,7 +189,7 @@ impl<const R: usize> SpongeHash256<R> {
     ///
     /// **Note:** The digest output size `N`, in bytes, must be a *positive* value! &#x1F6A8;
     pub fn digest_to_slice<const N: usize>(mut self, digest_out: &mut [u8; N]) {
-        let () = NoneZeroArg::<N>::OK;
+        let () = NoneZero::<N>::OK;
         debug_assert!(self.offset < BLOCK_SIZE);
 
         trace!(self, "digest::enter");
@@ -161,6 +207,7 @@ impl<const R: usize> SpongeHash256<R> {
         trace!(self, "digest::leave");
     }
 
+    /// Pseudorandom permutation, based on the AES-256 block cipher
     fn permute(&mut self) {
         trace!(self, "permfn::enter");
 
@@ -207,28 +254,50 @@ impl<const R: usize> Drop for SpongeHash256<R> {
 // One-Shot API
 // ---------------------------------------------------------------------------
 
-/// Convenience function for “one-shot” SpongeHash-AES256 computation.
+/// Convenience function for “one-shot” SpongeHash-AES256 computation
 ///
 /// The hash value (digest) of the given `message` is returned as an new array of size `N`.
+///
+/// Optionally, an additional `info` string may be specified.
 ///
 /// **Note:** The digest output size `N`, in bytes, must be a *positive* value! &#x1F6A8;
 ///
 /// ### Usage Example
 ///
-/// The **`compute()`** function is used as follows:
+/// The **`compute()`** function can be used as follows:
+///
+/// ```rust
+/// use hex::encode_to_slice;
+/// use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, compute};
+///
+/// fn main() {
+///     // Compute digest using the “one-shot” function
+///     let digest: [u8; DEFAULT_DIGEST_SIZE] =
+///         compute(None, b"The quick brown fox jumps over the lazy dog");
+///
+///     // Encode to hex
+///     let mut hex_buffer = [0u8; 2usize * DEFAULT_DIGEST_SIZE];
+///     encode_to_slice(&digest, &mut hex_buffer).unwrap();
+///
+///     // Print the digest (hex format)
+///     println!("0x{}", str::from_utf8(&hex_buffer).unwrap());
+/// }
+/// ```
+/// &nbsp;
+///
+/// Optionally, additional “context” information may be provided via the `info` parameter:
 ///
 /// ```rust
 /// use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, compute};
 ///
 /// fn main() {
-///     // Compute digest using the “one-shot” function
-///     let digest = compute::<DEFAULT_DIGEST_SIZE>(b"The quick brown fox jumps over the lazy dog");
+///     // Compute digest using the “one-shot” function with “info”
+///     let digest: [u8; DEFAULT_DIGEST_SIZE] =
+///         compute(Some("my_application"), b"The quick brown fox jumps over the lazy dog");
 ///
-///     // Print result
-///     println!("{:02X?}", &digest);
+///     /* ... */
 /// }
 /// ```
-///
 /// &nbsp;
 ///
 /// <div class="warning">
@@ -236,35 +305,42 @@ impl<const R: usize> Drop for SpongeHash256<R> {
 /// Applications that need to process *large* messages are recommended to use the [streaming API](SpongeHash256), which does **not** require *all* message data to be held in memory at once and which allows for an *incremental* hash computation.
 ///
 /// </div>
-pub fn compute<const N: usize>(message: &[u8]) -> [u8; N] {
-    let mut state = SpongeHash256::default();
+pub fn compute<const N: usize, T: AsRef<[u8]>>(info: Option<&str>, message: T) -> [u8; N] {
+    assert!(!info.is_some_and(str::is_empty), "Info must not be empty!");
+    let mut state: SpongeHash256 = SpongeHash256::with_info(info.unwrap_or_default());
     state.update(message);
     state.digest()
 }
 
-/// Convenience function for “one-shot” SpongeHash-AES256 computation.
+/// Convenience function for “one-shot” SpongeHash-AES256 computation
 ///
 /// The hash value (digest) of the given `message` is written into the slice of size `N` referenced by `digest`.
+///
+/// Optionally, an additional `info` string may be specified.
 ///
 /// **Note:** The digest output size `N`, in bytes, must be a *positive* value! &#x1F6A8;
 ///
 /// ### Usage Example
 ///
-/// The **`compute()`** function is used as follows:
+/// The **`compute_to_slice()`** function can be used as follows:
 ///
 /// ```rust
+/// use hex::encode_to_slice;
 /// use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, compute_to_slice};
 ///
 /// fn main() {
 ///     // Compute digest using the “one-shot” function
 ///     let mut digest = [0u8; DEFAULT_DIGEST_SIZE];
-///     compute_to_slice(&mut digest, b"The quick brown fox jumps over the lazy dog");
+///     compute_to_slice(&mut digest, None, b"The quick brown fox jumps over the lazy dog");
 ///
-///     // Print result
-///     println!("{:02X?}", &digest);
+///     // Encode to hex
+///     let mut hex_buffer = [0u8; 2usize * DEFAULT_DIGEST_SIZE];
+///     encode_to_slice(&digest, &mut hex_buffer).unwrap();
+///
+///     // Print the digest (hex format)
+///     println!("0x{}", str::from_utf8(&hex_buffer).unwrap());
 /// }
 /// ```
-///
 /// &nbsp;
 ///
 /// <div class="warning">
@@ -272,8 +348,9 @@ pub fn compute<const N: usize>(message: &[u8]) -> [u8; N] {
 /// Applications that need to process *large* messages are recommended to use the [streaming API](SpongeHash256), which does **not** require *all* message data to be held in memory at once and which allows for an *incremental* hash computation.
 ///
 /// </div>
-pub fn compute_to_slice<const N: usize>(digest_out: &mut [u8; N], message: &[u8]) {
-    let mut state = SpongeHash256::default();
+pub fn compute_to_slice<const N: usize, T: AsRef<[u8]>>(digest_out: &mut [u8; N], info: Option<&str>, message: T) {
+    assert!(!info.is_some_and(str::is_empty), "Info must not be empty!");
+    let mut state: SpongeHash256 = SpongeHash256::with_info(info.unwrap_or_default());
     state.update(message);
     state.digest_to_slice(digest_out);
 }

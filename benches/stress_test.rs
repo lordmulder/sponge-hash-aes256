@@ -9,7 +9,7 @@ use std::{
     io::{BufRead, BufReader},
     path::Path,
     process,
-    time::Instant,
+    time::{Duration, Instant},
 };
 
 // ---------------------------------------------------------------------------
@@ -37,7 +37,7 @@ fn stress_test() {
             Ok(content) => {
                 let item = content.trim();
                 if !item.is_empty() {
-                    digest = compute_hash(item.as_bytes());
+                    digest = compute_hash(None, item.as_bytes());
                     counter += 1u64;
                     let success = set.insert(digest);
                     if (!success) || (counter % UPDATE_CYCLE == 0u64) {
@@ -68,17 +68,20 @@ fn stress_test() {
 // Main
 // ---------------------------------------------------------------------------
 
-const NUM_RUNS: usize = 3usize;
+const NUM_RUNS: usize = 5usize;
 
 fn main() {
-    let mut fastest_run = f64::MAX;
+    let mut measurements = [Duration::default(); NUM_RUNS];
 
-    for _ in 0usize..NUM_RUNS {
+    for i in 0usize..NUM_RUNS {
         let start_time = Instant::now();
         stress_test();
-        fastest_run = fastest_run.min(start_time.elapsed().as_secs_f64());
+        measurements[i] = start_time.elapsed();
+        println!("--------");
     }
 
-    println!("--------");
-    println!("Execution took {:.1} seconds.", fastest_run);
+    measurements.sort();
+    let median = measurements[NUM_RUNS / 2usize];
+
+    println!("Median execution time: {:.2} seconds.", median.as_secs_f64());
 }

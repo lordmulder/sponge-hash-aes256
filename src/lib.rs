@@ -10,9 +10,21 @@
 //!
 //! This hash function has a *variable* output size and can produce outputs of *any* non-zero size (up to [`usize::MAX`]).
 //!
-//! Please see the [`SpongeHash256`] struct for details!
+//! Please see the [`SpongeHash256`] struct for details! &#128161;
 //!
-//! # License
+//! ## Dependencies
+//!
+//! This crate is **`#![no_std]`** compatible and does not link the Rust standard library.
+//!
+//! Required dependencies: [`aes`], [`cipher`], [`semver`], [`zeroize`]
+//!
+//! ## Optional features
+//!
+//! Feature   | Meaning
+//! --------- | ---------------------------------------------------------------------------------------
+//! `tracing` | Dump the internal state to the loggging sub-system (via `log::trace()`) after each step
+//!
+//! ## License
 //!
 //! Copyright (C) 2025 by LoRd_MuldeR &lt;mulder2@gmx.de&gt;
 //!

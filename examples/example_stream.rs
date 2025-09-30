@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: 0BSD
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
+use hex::encode_to_slice;
 use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, SpongeHash256};
 
 #[cfg(feature = "tracing")]
@@ -20,6 +21,10 @@ fn main() {
     // Retrieve the final digest
     let digest = hash.digest::<DEFAULT_DIGEST_SIZE>();
 
-    // Print result
-    println!("{:02X?}", &digest);
+    // Encode to hex
+    let mut hex_buffer = [0u8; 2usize * DEFAULT_DIGEST_SIZE];
+    encode_to_slice(&digest, &mut hex_buffer).unwrap();
+
+    // Print the digest (hex format)
+    println!("0x{}", str::from_utf8(&hex_buffer).unwrap());
 }

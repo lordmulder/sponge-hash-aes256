@@ -4,8 +4,11 @@ description = "A sponge-based secure hash function that uses AES-256 as its inte
 license = "0BSD"
 repository = "https://github.com/lordmulder/sponge-hash-aes256/"
 readme = "README.crates.md"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2024"
+
+[package.metadata]
+no_std = true
 
 [dependencies]
 aes = { version = "0.8.4", default-features = false }
