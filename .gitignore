@@ -1,2 +1,2 @@
-/target
-/benches/data/**/*.txt*
+/**/target
+/lib/benches/data/**/*.txt*

@@ -3,7 +3,7 @@ name = "sponge-hash-aes256"
 description = "A sponge-based secure hash function that uses AES-256 as its internal PRF"
 license = "0BSD"
 repository = "https://github.com/lordmulder/sponge-hash-aes256/"
-readme = "README.crates.md"
+readme = "../README.crates.md"
 version = "1.2.0"
 edition = "2024"
 
