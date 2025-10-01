@@ -146,7 +146,7 @@ struct Args {
 // Hasher
 // ---------------------------------------------------------------------------
 
-const SNAIL_ITERATIONS: usize = 997usize;
+const SNAIL_ITERATIONS: usize = 251usize;
 
 enum Hasher {
     Default(SpongeHash256),
