@@ -293,7 +293,8 @@ fn read_from_stdin(digest_size: usize, args: &Args) -> ExitCode {
 // ---------------------------------------------------------------------------
 
 fn main() -> ExitCode {
-    let args = Args::parse();
+    // Parse command-line args
+    let args = Args::parse_from(wild::args_os());
 
     // Check for invalid combinations of options
     if args.text && args.binary {
