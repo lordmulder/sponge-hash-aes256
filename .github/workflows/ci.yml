@@ -5,6 +5,8 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  release:
+    types: [published]
 
 jobs:
   check:
@@ -14,6 +16,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: cargo check --manifest-path lib/Cargo.toml --verbose
+      - run: cargo check --manifest-path app/Cargo.toml --verbose
   format:
     runs-on: ubuntu-latest
     container:
@@ -22,6 +25,7 @@ jobs:
       - run: rustup component add rustfmt
       - uses: actions/checkout@v3
       - run: cargo fmt --manifest-path lib/Cargo.toml --all --check
+      - run: cargo fmt --manifest-path app/Cargo.toml --all --check
   clippy:
     runs-on: ubuntu-latest
     container:
@@ -30,6 +34,7 @@ jobs:
       - run: rustup component add clippy
       - uses: actions/checkout@v3
       - run: cargo clippy --manifest-path lib/Cargo.toml -- -D warnings
+      - run: cargo clippy --manifest-path app/Cargo.toml -- -D warnings
   test:
     runs-on: ubuntu-latest
     container:
@@ -38,11 +43,22 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - run: cargo test --manifest-path lib/Cargo.toml --verbose
+      - run: cargo test --manifest-path app/Cargo.toml --verbose
   build:
     runs-on: ubuntu-latest
     container:
       image: rust:1.90-bookworm
     needs: test
     steps:
+      - run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y musl-tools
       - uses: actions/checkout@v3
-      - run: cargo build --manifest-path lib/Cargo.toml --verbose --release
+      - run: cargo build --manifest-path app/Cargo.toml --verbose --release --target x86_64-unknown-linux-musl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sponge256sum-release
+          path: |
+            app/target/release/sponge256sum
+            LICENSE

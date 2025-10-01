@@ -13,18 +13,22 @@ This hash function has a *variable* output size and can produce outputs of *any*
 
 Please see the [documentation](https://docs.rs/sponge-hash-aes256/latest/) for details! &#x1F4A1;
 
-## Installation
+## Library
+
+The “core” hash algorithm is implemented in the **`sponge-hash-aes256`** crate.
+
+### Installation
 
 In order to use this crate, you have to add it under `[dependencies]` to your **`Cargo.toml`**:
 
 ```
 [dependencies]
-sponge-hash-aes256 = "1.2.0"
+sponge-hash-aes256 = "1.3.0"
 ```
 
-## Usage
+### Usage
 
-Here is a simple example that demonstrates how to use SpongeHash-AES256 in your code:
+Here is a simple example that demonstrates how to use `SpongeHash256` in your code:
 
 ```rust
 use hex::encode_to_slice;
@@ -47,6 +51,30 @@ fn main() {
     // Print the digest (hex format)
     println!("0x{}", str::from_utf8(&hex_buffer).unwrap());
 }
+```
+
+## Command-line tool
+
+The **`sponge256sum`** command-line tool can be used as follows:
+
+```
+Usage: sponge256sum [OPTIONS] [FILES]...
+
+Arguments:
+  [FILES]...  Files to be processed
+
+Options:
+  -b, --binary           Read the input file(s) in binary mode, i.e., default mode
+  -t, --text             Read the input file(s) in text mode
+  -k, --keep-going       Keep going, even if an input file can not be read
+  -l, --length <LENGTH>  Digest output size, in bits (default: 256, maximum: 1024)
+  -i, --info <INFO>      Include additional context information
+  -s, --snail            Enable "snail" mode, i.e., slow down the hash computation
+  -q, --quiet            Do not output any error messages or warnings
+  -h, --help             Print help
+  -V, --version          Print version
+
+If no input files are specified, reads input data from 'stdin' stream.
 ```
 
 ## License

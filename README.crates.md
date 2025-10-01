@@ -8,7 +8,7 @@ This hash function has a *variable* output size.
 
 ```
 [dependencies]
-sponge-hash-aes256 = "1.2.0"
+sponge-hash-aes256 = "1.3.0"
 ```
 
 ## Usage

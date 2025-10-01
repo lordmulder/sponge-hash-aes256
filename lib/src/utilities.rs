@@ -3,7 +3,6 @@
 
 use aes::Aes256;
 use cipher::{BlockEncrypt, KeyInit, generic_array::GenericArray};
-use semver::Version;
 use zeroize::Zeroize;
 
 pub const BLOCK_SIZE: usize = 16usize;
@@ -34,10 +33,4 @@ pub fn xor_arrays<const N: usize>(dst: &mut [u8; N], src: &[u8; N]) {
             dst[index] ^= src[index];
         }
     }
-}
-
-/// Returns the library version, as a [Version] struct
-pub fn version() -> Version {
-    const VERSION_STRING: &str = env!("CARGO_PKG_VERSION");
-    Version::parse(VERSION_STRING).unwrap_or_else(|_| Version::new(0u64, 0u64, 0u64))
 }
