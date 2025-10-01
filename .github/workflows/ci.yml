@@ -15,8 +15,10 @@ jobs:
       image: rust:1.90-bookworm
     steps:
       - uses: actions/checkout@v3
-      - run: cargo check --manifest-path lib/Cargo.toml --verbose
-      - run: cargo check --manifest-path app/Cargo.toml --verbose
+      - run: cargo check --verbose
+        working-directory: lib
+      - run: cargo check --verbose
+        working-directory: app
   format:
     runs-on: ubuntu-latest
     container:
@@ -24,8 +26,10 @@ jobs:
     steps:
       - run: rustup component add rustfmt
       - uses: actions/checkout@v3
-      - run: cargo fmt --manifest-path lib/Cargo.toml --all --check
-      - run: cargo fmt --manifest-path app/Cargo.toml --all --check
+      - run: cargo fmt --all --check
+        working-directory: lib
+      - run: cargo fmt --all --check
+        working-directory: app
   clippy:
     runs-on: ubuntu-latest
     container:
@@ -33,8 +37,10 @@ jobs:
     steps:
       - run: rustup component add clippy
       - uses: actions/checkout@v3
-      - run: cargo clippy --manifest-path lib/Cargo.toml -- -D warnings
-      - run: cargo clippy --manifest-path app/Cargo.toml -- -D warnings
+      - run: cargo clippy -- -D warnings
+        working-directory: lib
+      - run: cargo clippy -- -D warnings
+        working-directory: app
   test:
     runs-on: ubuntu-latest
     container:
@@ -42,8 +48,10 @@ jobs:
     needs: [check, format, clippy]
     steps:
       - uses: actions/checkout@v3
-      - run: cargo test --manifest-path lib/Cargo.toml --verbose
-      - run: cargo test --manifest-path app/Cargo.toml --verbose
+      - run: cargo test --verbose
+        working-directory: lib
+      - run: cargo test --verbose
+        working-directory: app
   build:
     runs-on: ubuntu-latest
     container:
@@ -53,12 +61,22 @@ jobs:
       - run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get install -y musl-tools
+          apt-get install -y musl-tools crossbuild-essential-i386 crossbuild-essential-arm64
+      - run: rustup target add x86_64-unknown-linux-musl i686-unknown-linux-musl aarch64-unknown-linux-musl
       - uses: actions/checkout@v3
-      - run: cargo build --manifest-path app/Cargo.toml --verbose --release --target x86_64-unknown-linux-musl
+      - run: cargo build --verbose --release --target x86_64-unknown-linux-musl
+        working-directory: app
+      - run: cargo build --verbose --release --target i686-unknown-linux-musl
+        working-directory: app
+      - run: cargo build --verbose --release --target aarch64-unknown-linux-musl
+        working-directory: app
+      - run: |
+          mkdir -p "$RUNNER_TEMP/artifacts/sponge256sum"
+          cp LICENSE README.md "$RUNNER_TEMP/artifacts/sponge256sum/"
+          cp app/target/x86_64-unknown-linux-musl/release/sponge256sum "$RUNNER_TEMP/artifacts/sponge256sum/sponge256sum-x86_64"
+          cp app/target/i686-unknown-linux-musl/release/sponge256sum "$RUNNER_TEMP/artifacts/sponge256sum/sponge256sum-i686"
+          cp app/target/aarch64-unknown-linux-musl/release/sponge256sum "$RUNNER_TEMP/artifacts/sponge256sum/sponge256sum-aarch64"
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-release
-          path: |
-            app/target/release/sponge256sum
-            LICENSE
+          path: ${{ runner.temp }}/artifacts/sponge256sum/*
