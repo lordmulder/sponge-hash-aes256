@@ -13,46 +13,56 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: rust:1.90-bookworm
+    strategy:
+      matrix:
+        project: [lib, app]
     steps:
       - uses: actions/checkout@v3
-      - run: cargo check --verbose
-        working-directory: lib
-      - run: cargo check --verbose
-        working-directory: app
+      - working-directory: ${{ github.workspace }}/${{ matrix.project }}
+        run: cargo check --verbose
+
   format:
     runs-on: ubuntu-latest
     container:
       image: rust:1.90-bookworm
+    needs: check
+    strategy:
+      matrix:
+        project: [lib, app]
     steps:
       - run: rustup component add rustfmt
       - uses: actions/checkout@v3
-      - run: cargo fmt --all --check
-        working-directory: lib
-      - run: cargo fmt --all --check
-        working-directory: app
+      - working-directory: ${{ github.workspace }}/${{ matrix.project }}
+        run: cargo fmt --all --check
+
   clippy:
     runs-on: ubuntu-latest
     container:
       image: rust:1.90-bookworm
+    needs: check
+    strategy:
+      matrix:
+        project: [lib, app]
     steps:
       - run: rustup component add clippy
       - uses: actions/checkout@v3
-      - run: cargo clippy -- -D warnings
-        working-directory: lib
-      - run: cargo clippy -- -D warnings
-        working-directory: app
+      - working-directory: ${{ github.workspace }}/${{ matrix.project }}
+        run: cargo clippy -- -D warnings
+
   test:
     runs-on: ubuntu-latest
     container:
       image: rust:1.90-bookworm
-    needs: [check, format, clippy]
+    needs: [format, clippy]
+    strategy:
+      matrix:
+        project: [lib, app]
     steps:
       - uses: actions/checkout@v3
-      - run: cargo test --verbose
-        working-directory: lib
-      - run: cargo test --verbose
-        working-directory: app
-  build:
+      - working-directory: ${{ github.workspace }}/${{ matrix.project }}
+        run: cargo test --verbose
+
+  build-linux:
     runs-on: ubuntu-latest
     container:
       image: rust:1.90-bookworm
@@ -61,22 +71,15 @@ jobs:
       - run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get install -y musl-tools crossbuild-essential-i386 crossbuild-essential-arm64
-      - run: rustup target add x86_64-unknown-linux-musl i686-unknown-linux-musl aarch64-unknown-linux-musl
-      - uses: actions/checkout@v3
-      - run: cargo build --verbose --release --target x86_64-unknown-linux-musl
-        working-directory: app
-      - run: cargo build --verbose --release --target i686-unknown-linux-musl
-        working-directory: app
-      - run: cargo build --verbose --release --target aarch64-unknown-linux-musl
-        working-directory: app
+          apt-get install -y musl-tools crossbuild-essential-i386 crossbuild-essential-arm64 jq
       - run: |
-          mkdir -p "$RUNNER_TEMP/artifacts/sponge256sum"
-          cp LICENSE README.md "$RUNNER_TEMP/artifacts/sponge256sum/"
-          cp app/target/x86_64-unknown-linux-musl/release/sponge256sum "$RUNNER_TEMP/artifacts/sponge256sum/sponge256sum-x86_64"
-          cp app/target/i686-unknown-linux-musl/release/sponge256sum "$RUNNER_TEMP/artifacts/sponge256sum/sponge256sum-i686"
-          cp app/target/aarch64-unknown-linux-musl/release/sponge256sum "$RUNNER_TEMP/artifacts/sponge256sum/sponge256sum-aarch64"
+          rustup target add x86_64-unknown-linux-musl
+          rustup target add i686-unknown-linux-musl
+          rustup target add aarch64-unknown-linux-musl
+      - uses: actions/checkout@v3
+      - working-directory: ${{ github.workspace }}/.build/linux
+        run: make
       - uses: actions/upload-artifact@v4
         with:
-          name: sponge256sum-release
-          path: ${{ runner.temp }}/artifacts/sponge256sum/*
+          name: sponge256sum-linux
+          path: ${{ github.workspace }}/.build/linux/target/*.tar.xz

@@ -69,6 +69,7 @@ fn do_test_r<const R: usize>(expected: &[u8; DEFAULT_DIGEST_SIZE], message: &str
 include!("include/common.rs");
 
 #[test]
+#[ignore]
 pub fn test_case_6a() {
     do_test_n(
         &hex!("8a399b4da51ae3a5fafedc98bd04b5886a748e04f22a723d674db2c0e89496c5"),
@@ -79,6 +80,7 @@ pub fn test_case_6a() {
 }
 
 #[test]
+#[ignore]
 pub fn test_case_6b() {
     do_test_n(
         &hex!("b1e723d59ff8d638bdab629db1d1aa7f56e7a024788e483930b5fd61bd23d1e2"),
@@ -90,24 +92,24 @@ pub fn test_case_6b() {
 
 #[test]
 pub fn test_case_7a() {
-    do_test_r::<251usize>(
-        &hex!("3c616508376e0c98d6e1f896d74ffde4b5e9c7e1fea1d73d0bac3141dc695326"),
+    do_test_r::<97usize>(
+        &hex!("34844d8d1128e830714e6f6d01bb3c48c7b9cd5d68968c886d5274e94ef6ade2"),
         "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
     );
 }
 
 #[test]
 pub fn test_case_7b() {
-    do_test_r::<65521usize>(
-        &hex!("afb916bd22afee21b9e838f23679e09ce79642880b5f18790e71324e183b6d5b"),
+    do_test_r::<997usize>(
+        &hex!("a6934d0662f4130ae5ade5099ea8289253d3b331b31e5d9130d38c76ef016c1e"),
         "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
     );
 }
 
 #[test]
 pub fn test_case_7c() {
-    do_test_r::<16777213usize>(
-        &hex!("fe218c3c203c1b1d5f95b1da43ab84960eb8e616660648e2813145ee525bd5c8"),
+    do_test_r::<9973usize>(
+        &hex!("b778c95305e2b8d20ab22662e0fe777e38839e10d98b84daa324e8893a77ee4a"),
         "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
     );
 }

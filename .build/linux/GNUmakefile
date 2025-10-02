@@ -16,7 +16,7 @@ build:
 
 docs:
 	cd ../../app
-	cargo doc --no-deps
+	cargo doc
 
 dist: build docs
 	PKG_VERSION="$$(jq -r '.packages[] | select(.name == "sponge256sum") | .version' < ../../app/target/.metadata.json)"

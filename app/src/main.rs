@@ -7,7 +7,7 @@
 //!
 //! This program is designed as a drop-in replacement for [`sha1sum`](https://manpages.debian.org/trixie/coreutils/sha1sum.1.en.html), [`sha256sum`](https://manpages.debian.org/trixie/coreutils/sha256sum.1.en.html) and related utilities.
 //!
-//! Please see the [library documentation](https://docs.rs/sponge-hash-aes256/latest/) for details! &#128161;
+//! Please see the [library documentation](sponge_hash_aes256) for details! &#128161;
 //!
 //! ## Usage
 //!
