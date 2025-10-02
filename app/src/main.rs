@@ -25,8 +25,10 @@
 //!   -k, --keep-going       Keep going, even if an input file can not be read
 //!   -l, --length <LENGTH>  Digest output size, in bits (default: 256, maximum: 1024)
 //!   -i, --info <INFO>      Include additional context information
-//!   -s, --snail            Enable "snail" mode, i.e., slow down the hash computation
+//!   -s, --snail...         Enable "snail" mode, i.e., slow down the hash computation
 //!   -q, --quiet            Do not output any error messages or warnings
+//!   -p, --plain            Print digest(s) in plain format, i.e., without file names
+//!   -f, --flush            Explicitely flush 'stdout' stream after printing a digest
 //!   -h, --help             Print help
 //!   -V, --version          Print version
 //!
@@ -52,6 +54,33 @@
 //!   $ printf "Lorem ipsum dolor sit amet consetetur sadipscing" | sponge256sum
 //!   ```
 //!
+//! ## Options
+//!
+//! The following options are available, among others:
+//!
+//! - **Context information**
+//!
+//!   The `--info <INFO>` option can be used to include some additional context information in the hash computation.
+//!
+//!   For each unique “info” string, a different digest (hash value) is generated from the same message (input).
+//!
+//! - **Snail mode**
+//!
+//!   The `--snail` option can be passed to the program, optionally more than once, to slow down the hash computation:
+//!
+//!   Count  | Number of permutation rounds
+//!   ------ | ----------------------------
+//!   –      | 3 (default)
+//!   **×1** | 97
+//!   **×2** | 997
+//!   **×3** | 9973
+//!
+//! - **Text mode**
+//!
+//!   In this mode, unlike in “binary” mode (the default), the input file will be read as a *text* file, line by line.
+//!
+//!   Platform-specific line endings will normalized to a single `\n` character.
+//!
 //! ## License
 //!
 //! Copyright (C) 2025 by LoRd_MuldeR &lt;mulder2@gmx.de&gt;
@@ -60,35 +89,70 @@
 //!
 //! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-use clap::{Parser, command};
+#![doc(hidden)]
+#![doc(html_no_source)]
+
+use clap::{ArgAction, Parser, command};
 use const_format::formatcp;
+use ctrlc::set_handler;
 use hex::encode_to_slice;
 use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, PKG_VERSION as LIB_VERSION, SpongeHash256};
 use std::{
     env::consts::{ARCH, OS},
+    fmt::Debug,
     fs::File,
-    io::{BufRead, BufReader, Error, Read, stdin},
+    io::{BufRead, BufReader, Error as IoError, Read, Write, stdin, stdout},
     num::NonZeroUsize,
     process::ExitCode,
     slice::Iter,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 /// Maximum allowable digest size, specified in bytes
 const MAX_DIGEST_SIZE: usize = 128usize;
+
+// Type definition
+type Flag = Arc<AtomicBool>;
+
+// ---------------------------------------------------------------------------
+// Error type
+// ---------------------------------------------------------------------------
+
+enum Error {
+    Io(IoError),
+    Aborted,
+}
+
+impl From<IoError> for Error {
+    fn from(error: IoError) -> Self {
+        Error::Io(error)
+    }
+}
+
+impl Debug for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(error) => error.fmt(f),
+            Self::Aborted => write!(f, "Interrupted by user!"),
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 /// Build profile
-#[cfg(debug_assertions)]
-const BUILD_PROFILE: &str = "debug";
 #[cfg(not(debug_assertions))]
 const BUILD_PROFILE: &str = "release";
+#[cfg(debug_assertions)]
+const BUILD_PROFILE: &str = "debug";
 
 /// Header line
-const HEADER_LINE: &str =
-    formatcp!("{} v{} (with SpongeHash-AES256 v{})", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"), LIB_VERSION);
+const HEADER_LINE: &str = formatcp!("{} v{} (with SpongeHash-AES256 v{})", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"), LIB_VERSION);
 
 /// Version string
 const VERSION_STR: &str =
@@ -126,8 +190,8 @@ struct Args {
     info: Option<String>,
 
     /// Enable "snail" mode, i.e., slow down the hash computation
-    #[arg(short, long)]
-    snail: bool,
+    #[arg(short, long, action = ArgAction::Count)]
+    snail: u8,
 
     /// Do not output any error messages or warnings
     #[arg(short, long)]
@@ -137,49 +201,115 @@ struct Args {
     #[arg(short, long)]
     plain: bool,
 
+    /// Explicitely flush 'stdout' stream after printing a digest
+    #[arg(short, long)]
+    flush: bool,
+
     /// Files to be processed
     #[arg()]
     files: Vec<String>,
 }
 
 // ---------------------------------------------------------------------------
+// Error handling
+// ---------------------------------------------------------------------------
+
+/// Conditional printing of error message
+macro_rules! print_error {
+    ($args:ident, $($message:tt)*) => {
+        if !$args.quiet {
+            eprintln!($($message)*);
+        }
+    };
+}
+
+/// Unified error handling routine
+macro_rules! handle_error {
+    ($args:ident, $err_counter:ident, $($message:tt)*) => {{
+        print_error!($args, $($message)*);
+        if $args.keep_going {
+            $err_counter += 1usize;
+        } else {
+            return ExitCode::FAILURE;
+        }
+    }};
+}
+
+// ---------------------------------------------------------------------------
 // Hasher
 // ---------------------------------------------------------------------------
 
-const SNAIL_ITERATIONS: usize = 251usize;
+const SNAIL_ITERATIONS_1: usize = 97usize;
+const SNAIL_ITERATIONS_2: usize = 997usize;
+const SNAIL_ITERATIONS_3: usize = 9973usize;
 
 enum Hasher {
     Default(SpongeHash256),
-    Snailed(SpongeHash256<SNAIL_ITERATIONS>),
+    SnailV1(SpongeHash256<SNAIL_ITERATIONS_1>),
+    SnailV2(SpongeHash256<SNAIL_ITERATIONS_2>),
+    SnailV3(SpongeHash256<SNAIL_ITERATIONS_3>),
 }
 
 impl Hasher {
-    pub fn new(info: &Option<String>, snail_mode: bool) -> Self {
+    pub fn new(info: &Option<String>, snail_mode: u8) -> Self {
         match info {
             Some(info) => match snail_mode {
-                false => Self::Default(SpongeHash256::with_info(info)),
-                true => Self::Snailed(SpongeHash256::with_info(info)),
+                0u8 => Self::Default(SpongeHash256::with_info(info)),
+                1u8 => Self::SnailV1(SpongeHash256::with_info(info)),
+                2u8 => Self::SnailV2(SpongeHash256::with_info(info)),
+                3u8 => Self::SnailV3(SpongeHash256::with_info(info)),
+                _ => unreachable!(),
             },
             None => match snail_mode {
-                false => Self::Default(SpongeHash256::new()),
-                true => Self::Snailed(SpongeHash256::new()),
+                0u8 => Self::Default(SpongeHash256::new()),
+                1u8 => Self::SnailV1(SpongeHash256::new()),
+                2u8 => Self::SnailV2(SpongeHash256::new()),
+                3u8 => Self::SnailV3(SpongeHash256::new()),
+                _ => unreachable!(),
             },
         }
     }
 
+    #[inline(always)]
     pub fn update<T: AsRef<[u8]>>(&mut self, input: T) {
         match self {
             Hasher::Default(hasher) => hasher.update(input),
-            Hasher::Snailed(hasher) => hasher.update(input),
+            Hasher::SnailV1(hasher) => hasher.update(input),
+            Hasher::SnailV2(hasher) => hasher.update(input),
+            Hasher::SnailV3(hasher) => hasher.update(input),
         }
     }
 
+    #[inline(always)]
     pub fn digest_to_slice(self, output: &mut [u8]) {
         match self {
             Hasher::Default(hasher) => hasher.digest_to_slice(output),
-            Hasher::Snailed(hasher) => hasher.digest_to_slice(output),
+            Hasher::SnailV1(hasher) => hasher.digest_to_slice(output),
+            Hasher::SnailV2(hasher) => hasher.digest_to_slice(output),
+            Hasher::SnailV3(hasher) => hasher.digest_to_slice(output),
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Print digest
+// ---------------------------------------------------------------------------
+
+fn print_digest(output: &mut impl Write, digest: &[u8], name: &str, size: usize, args: &Args) -> Result<(), Error> {
+    let mut hexstr = [0u8; 2usize * MAX_DIGEST_SIZE];
+    encode_to_slice(&digest[..size], &mut hexstr[..(2usize * size)]).unwrap();
+
+    if args.plain {
+        writeln!(output, "{}", str::from_utf8(&hexstr).unwrap())?;
+    } else {
+        writeln!(output, "{} {}", str::from_utf8(&hexstr).unwrap(), name)?;
+    }
+
+    if args.flush {
+        output.flush()?;
+    }
+
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------
@@ -193,18 +323,27 @@ const IO_BUFFER_SIZE: usize = 4096usize;
 #[cfg(target_pointer_width = "16")]
 const IO_BUFFER_SIZE: usize = 2048usize;
 
-fn process_file(input: &mut impl Read, name: &str, size: usize, args: &Args) -> Result<(), Error> {
-    let mut hasher = Hasher::new(&args.info, args.snail);
+/// Check whether the process has been interrupted
+macro_rules! check_running {
+    ($flag:ident) => {
+        if !$flag.load(Ordering::Relaxed) {
+            return Err(Error::Aborted);
+        }
+    };
+}
+
+/// Process a single input file
+fn process_file(input: &mut impl Read, output: &mut impl Write, name: &str, size: usize, args: &Args, running: &Flag) -> Result<(), Error> {
     let mut digest = [0u8; MAX_DIGEST_SIZE];
-    let mut hexstr = [0u8; 2usize * MAX_DIGEST_SIZE];
+    let mut hasher = Hasher::new(&args.info, args.snail);
 
     if !args.text {
         let mut buffer = [0u8; IO_BUFFER_SIZE];
         loop {
-            match input.read(&mut buffer) {
-                Ok(0) => break,
-                Ok(length) => hasher.update(&buffer[..length]),
-                Err(error) => return Err(error),
+            check_running!(running);
+            match input.read(&mut buffer)? {
+                0 => break,
+                length => hasher.update(&buffer[..length]),
             }
         }
     } else {
@@ -213,6 +352,7 @@ fn process_file(input: &mut impl Read, name: &str, size: usize, args: &Args) -> 
         if let Some(line) = lines.next() {
             hasher.update(&(line?));
             for line in lines {
+                check_running!(running);
                 hasher.update(LINE_BREAK);
                 hasher.update(&(line?));
             }
@@ -220,13 +360,7 @@ fn process_file(input: &mut impl Read, name: &str, size: usize, args: &Args) -> 
     }
 
     hasher.digest_to_slice(&mut digest[..size]);
-    encode_to_slice(&digest[..size], &mut hexstr[..(2usize * size)]).unwrap();
-
-    if !args.plain {
-        println!("{} {}", str::from_utf8(&hexstr).unwrap(), name);
-    } else {
-        println!("{}", str::from_utf8(&hexstr).unwrap());
-    }
+    print_digest(output, &digest, name, size, args)?;
 
     Ok(())
 }
@@ -235,56 +369,49 @@ fn process_file(input: &mut impl Read, name: &str, size: usize, args: &Args) -> 
 // Iterate input files
 // ---------------------------------------------------------------------------
 
-fn iterate_files(files: Iter<'_, String>, digest_size: usize, args: &Args) -> ExitCode {
-    let mut errors: usize = 0usize;
+/// Iterate a list of input files
+fn iterate_files(files: Iter<'_, String>, digest_size: usize, args: &Args, running: Flag) -> ExitCode {
+    let mut output = stdout().lock();
+    let mut err_counter: usize = 0usize;
 
     for file_name in files {
         match File::open(file_name) {
             Ok(mut file) => {
                 if file.metadata().is_ok_and(|meta| meta.is_dir()) {
-                    if !args.quiet {
-                        eprintln!("Is a directory: {:?}", file_name);
-                    }
-                    if !args.keep_going {
-                        return ExitCode::FAILURE;
-                    } else {
-                        errors += 1usize;
-                    }
-                } else if let Err(error) = process_file(&mut file, file_name, digest_size, args) {
-                    if !args.quiet {
-                        eprintln!("Failed to read file: {:?} [{:?}]", file_name, error);
-                    }
-                    if !args.keep_going {
-                        return ExitCode::FAILURE;
-                    } else {
-                        errors += 1usize;
-                    }
-                }
-            }
-            Err(error) => {
-                if !args.quiet {
-                    eprintln!("Failed to open input file: {:?} [{:?}]", file_name, error);
-                }
-                if !args.keep_going {
-                    return ExitCode::FAILURE;
+                    handle_error!(args, err_counter, "Input is a directory: {:?}", file_name);
                 } else {
-                    errors += 1usize;
+                    match process_file(&mut file, &mut output, file_name, digest_size, args, &running) {
+                        Ok(_) => {}
+                        Err(Error::Aborted) => {
+                            print_error!(args, "Aborted: The process has been interrupted by the user!");
+                            return ExitCode::FAILURE;
+                        }
+                        Err(error) => handle_error!(args, err_counter, "Failed to read file: {:?} [{:?}]", file_name, error),
+                    }
                 }
             }
+            Err(error) => handle_error!(args, err_counter, "Failed to open input file: {:?} [{:?}]", file_name, error),
         }
     }
 
-    if errors == 0usize { ExitCode::SUCCESS } else { ExitCode::FAILURE }
+    if err_counter == 0usize { ExitCode::SUCCESS } else { ExitCode::FAILURE }
 }
 
-fn read_from_stdin(digest_size: usize, args: &Args) -> ExitCode {
-    if let Err(error) = process_file(&mut stdin(), "-", digest_size, args) {
-        if !args.quiet {
-            eprintln!("Failed to read input data from 'stdin' stream: {:?}", error);
+/// Read data from the `stdin` stream
+fn read_from_stdin(digest_size: usize, args: &Args, running: Flag) -> ExitCode {
+    let mut input = stdin().lock();
+    let mut output = stdout().lock();
+
+    match process_file(&mut input, &mut output, "-", digest_size, args, &running) {
+        Ok(_) => ExitCode::SUCCESS,
+        Err(Error::Aborted) => {
+            print_error!(args, "Aborted: The process has been interrupted by the user!");
+            ExitCode::FAILURE
         }
-        ExitCode::FAILURE
-    } else {
-        ExitCode::SUCCESS
+        Err(error) => {
+            print_error!(args, "Failed to read input data from 'stdin' stream: {:?}", error);
+            ExitCode::FAILURE
+        }
     }
 }
 
@@ -292,39 +419,53 @@ fn read_from_stdin(digest_size: usize, args: &Args) -> ExitCode {
 // Main
 // ---------------------------------------------------------------------------
 
+const MAX_SNAIL_OPTIONS: u8 = 3u8;
+
+/// Applicationm entry point (“main” function)
 fn main() -> ExitCode {
     // Parse command-line args
     let args = Args::parse_from(wild::args_os());
 
-    // Check for invalid combinations of options
+    // Check for incompatible arguments
     if args.text && args.binary {
-        if !args.quiet {
-            eprintln!("Error: Options '--binary' and '--text' are mutually exclusive!");
-        }
+        print_error!(args, "Error: Options '--binary' and '--text' are mutually exclusive!");
+        return ExitCode::FAILURE;
+    }
+
+    // Check for too many snail options passed
+    if args.snail > MAX_SNAIL_OPTIONS {
+        print_error!(args, "Error: Options '--snail' must not be set more than three times!");
         return ExitCode::FAILURE;
     }
 
     // Make sure that the digest size is divisble by eight
     if args.length.is_some_and(|value| value.get() % 8usize != 0usize) {
-        if !args.quiet {
-            eprintln!("Error: Digest output size must be divisble by eight! (given value: {})", args.length.unwrap().get());
-        }
+        print_error!(args, "Error: Digest output size must be divisble by eight! (given value: {})", args.length.unwrap().get());
+        return ExitCode::FAILURE;
+    }
+
+    // Check the maximum allowed info string length
+    if args.info.as_ref().is_some_and(|str| str.len() > u8::MAX as usize) {
+        print_error!(args, "Error: Length of \"info\" must not exceed 255 characters! (given length: {})", args.info.unwrap().len());
         return ExitCode::FAILURE;
     }
 
     // Compute and verify the digest size in bytes
     let digest_size = args.length.map(|value| value.get() / 8usize).unwrap_or(DEFAULT_DIGEST_SIZE);
     if digest_size > MAX_DIGEST_SIZE {
-        if !args.quiet {
-            eprintln!("Error: Digest output size exceeds the allowable maximum! (given value: {})", digest_size * 8usize);
-        }
+        print_error!(args, "Error: Digest output size exceeds the allowable maximum! (given value: {})", digest_size * 8usize);
         return ExitCode::FAILURE;
     }
 
+    // Install the interrupt handler
+    let running = Arc::new(AtomicBool::new(true));
+    let flag = running.clone();
+    set_handler(move || flag.store(false, Ordering::SeqCst)).expect("Failed to register CTRL+C handler!");
+
     // Process all files that were given on the command-line
     if !args.files.is_empty() {
-        iterate_files(args.files.iter(), digest_size, &args)
+        iterate_files(args.files.iter(), digest_size, &args, running)
     } else {
-        read_from_stdin(digest_size, &args)
+        read_from_stdin(digest_size, &args, running)
     }
 }

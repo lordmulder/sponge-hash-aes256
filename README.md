@@ -69,8 +69,10 @@ Options:
   -k, --keep-going       Keep going, even if an input file can not be read
   -l, --length <LENGTH>  Digest output size, in bits (default: 256, maximum: 1024)
   -i, --info <INFO>      Include additional context information
-  -s, --snail            Enable "snail" mode, i.e., slow down the hash computation
+  -s, --snail...         Enable "snail" mode, i.e., slow down the hash computation
   -q, --quiet            Do not output any error messages or warnings
+  -p, --plain            Print digest(s) in plain format, i.e., without file names
+  -f, --flush            Explicitely flush 'stdout' stream after printing a digest
   -h, --help             Print help
   -V, --version          Print version
 
