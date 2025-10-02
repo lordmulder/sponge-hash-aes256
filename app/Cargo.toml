@@ -14,3 +14,9 @@ ctrlc = { version = "3.5.0", default-features = false }
 hex = { version = "0.4.3", default-features = false }
 sponge-hash-aes256 = { path = "../lib" }
 wild = { version = "2.2.1", default-features = false }
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
