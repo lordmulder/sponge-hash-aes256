@@ -17,7 +17,7 @@ jobs:
       matrix:
         project: [lib, app]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - working-directory: ${{ github.workspace }}/${{ matrix.project }}
         run: cargo check --verbose
 
@@ -31,7 +31,7 @@ jobs:
         project: [lib, app]
     steps:
       - run: rustup component add rustfmt
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - working-directory: ${{ github.workspace }}/${{ matrix.project }}
         run: cargo fmt --all --check
 
@@ -45,7 +45,7 @@ jobs:
         project: [lib, app]
     steps:
       - run: rustup component add clippy
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - working-directory: ${{ github.workspace }}/${{ matrix.project }}
         run: cargo clippy -- -D warnings
 
@@ -58,7 +58,7 @@ jobs:
       matrix:
         project: [lib, app]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - working-directory: ${{ github.workspace }}/${{ matrix.project }}
         run: cargo test --verbose
 
@@ -71,12 +71,15 @@ jobs:
       - run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get install -y musl-tools crossbuild-essential-i386 crossbuild-essential-arm64 jq
+          apt-get install -y musl-tools crossbuild-essential-i386 crossbuild-essential-arm64
       - run: |
           rustup target add x86_64-unknown-linux-musl
           rustup target add i686-unknown-linux-musl
           rustup target add aarch64-unknown-linux-musl
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - working-directory: ${{ github.workspace }}/.build/linux
         run: make
       - uses: actions/upload-artifact@v4
@@ -91,10 +94,31 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           target: x86_64-pc-windows-msvc,i686-pc-windows-msvc,aarch64-pc-windows-msvc
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - run: git config --global --add safe.directory $env:GITHUB_WORKSPACE
       - working-directory: ${{ github.workspace }}/.build/windows
         run: cmd.exe /c make.cmd
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-windows
           path: ${{ github.workspace }}/.build/windows/target/*.7z
+
+  build-macos:
+    runs-on: macos-latest
+    needs: test
+    steps:
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          target: x86_64-apple-darwin,aarch64-apple-darwin
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - run: git config --global --add safe.directory $GITHUB_WORKSPACE
+      - working-directory: ${{ github.workspace }}/.build/macos
+        run: make
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sponge256sum-macos
+          path: ${{ github.workspace }}/.build/macos/target/*.dmg
