@@ -72,7 +72,7 @@ include!("include/common.rs");
 #[ignore]
 pub fn test_case_6a() {
     do_test_n(
-        &hex!("8a399b4da51ae3a5fafedc98bd04b5886a748e04f22a723d674db2c0e89496c5"),
+        &hex!("51ab3ab93ff64e1a3a96d96ab2c19295f33536a16bcbf400a41b8271f29cd26d"),
         None,
         16777216usize,
         "aabcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno",
@@ -83,7 +83,7 @@ pub fn test_case_6a() {
 #[ignore]
 pub fn test_case_6b() {
     do_test_n(
-        &hex!("b1e723d59ff8d638bdab629db1d1aa7f56e7a024788e483930b5fd61bd23d1e2"),
+        &hex!("9c0ee6e3e61950dd65a44654a1fad4408d37c0cb7f952562b521fb7931516ca8"),
         Some("thingamajig"),
         16777216usize,
         "aabcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno",

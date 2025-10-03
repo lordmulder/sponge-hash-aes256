@@ -11,8 +11,8 @@ pub const DEFAULT_DIGEST_SIZE: usize = 2usize * BLOCK_SIZE;
 
 /// Default number of permutation rounds to be performed
 ///
-/// The default number of permutation rounds is currently defined as `3usize`.
-pub const DEFAULT_PERMUTE_ROUNDS: usize = 3usize;
+/// The default number of permutation rounds is currently defined as 1.
+pub const DEFAULT_PERMUTE_ROUNDS: usize = 1usize;
 
 // ---------------------------------------------------------------------------
 // Tracing
