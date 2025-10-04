@@ -184,6 +184,7 @@ jobs:
         with:
           pattern: sponge256sum-*
           path: artifacts
+          merge-multiple: true
       - uses: Roang-zero1/github-upload-release-artifacts-action@v2
         with:
           args: artifacts/
