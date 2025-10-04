@@ -7,7 +7,7 @@ all: clean dist
 build:
 	cd ../../app; \
 	for t in x86_64 aarch64; do \
-		cargo build --release --target $$t-apple-darwin; \
+		cargo build --release --target $$t-apple-darwin --verbose; \
 	done; \
 	cargo pkgid > target/.CARGO_PKGID
 

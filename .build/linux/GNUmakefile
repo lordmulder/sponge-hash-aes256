@@ -10,7 +10,7 @@ all: clean dist
 build:
 	cd ../../app
 	for t in x86_64 i686 aarch64; do
-		cargo build --release --target $$t-unknown-linux-musl
+		cargo build --release --target $$t-unknown-linux-musl --verbose
 	done
 	cargo pkgid > target/.CARGO_PKGID
 

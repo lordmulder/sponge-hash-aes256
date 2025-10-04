@@ -71,7 +71,7 @@ REM Build
 REM --------------------------------------------------------------------------
 
 for %%t in (x86_64 i686 aarch64) do (
-	cargo build --release --target %%t-pc-windows-msvc
+	cargo build --release --target %%t-pc-windows-msvc --verbose
 	if not !ERRORLEVEL! == 0 goto:error
 )
 
@@ -113,7 +113,8 @@ popd
 attrib +R "%CD%\target\*.7z"
 if not %ERRORLEVEL% == 0 goto:error
 
-copy /B /Y "%SEVENZIP_INSTALL_DIR%\7z.sfx" + "%CD%\target\ponge256sum-%PKG_VERSION%-windows.7z" "%CD%\target\ponge256sum-%PKG_VERSION%-windows.exe"
+copy /B /Y "%SEVENZIP_INSTALL_DIR%\7z.sfx" + "%CD%\target\sponge256sum-%PKG_VERSION%-windows.7z" "%CD%\target\sponge256sum-%PKG_VERSION%-windows.exe"
+if not %ERRORLEVEL% == 0 goto:error
 
 attrib +R "%CD%\target\*.exe"
 if not %ERRORLEVEL% == 0 goto:error

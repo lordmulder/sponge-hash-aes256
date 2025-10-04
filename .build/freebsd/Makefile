@@ -7,7 +7,7 @@ all: clean dist
 build:
 	cd ../../app; \
 	for t in x86_64 i686; do \
-		cargo build --release --target $$t-unknown-freebsd; \
+		cargo build --release --target $$t-unknown-freebsd --verbose; \
 	done; \
 	cargo pkgid > target/.CARGO_PKGID
 
