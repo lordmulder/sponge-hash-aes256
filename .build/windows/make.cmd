@@ -3,28 +3,42 @@ setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
 REM --------------------------------------------------------------------------
-REM Paths
+REM Initialize paths
 REM --------------------------------------------------------------------------
 
-if "%CARGO_INSTALL_PATH%" == "" (
-	set "CARGO_INSTALL_PATH=%USERPROFILE%\.cargo\bin"
+if "%CARGO_INSTALL_DIR%" == "" (
+	set "CARGO_INSTALL_DIR=%USERPROFILE%\.cargo\bin"
 )
 
-if "%SEVENZIP_INSTALL_PATH%" == "" (
-	set "SEVENZIP_INSTALL_PATH=%ProgramFiles%\7-Zip"
+if "%GIT_INSTALL_DIR%" == "" (
+	set "GIT_INSTALL_DIR=%ProgramFiles%\Git"
 )
 
-if not exist "%CARGO_INSTALL_PATH%\cargo.exe" (
-	echo File "%CARGO_INSTALL_PATH%\cargo.exe" not found. Please check CARGO_INSTALL_PATH and try again^^!
+if "%SEVENZIP_INSTALL_DIR%" == "" (
+	set "SEVENZIP_INSTALL_DIR=%ProgramFiles%\7-Zip"
+)
+
+REM --------------------------------------------------------------------------
+REM Check paths
+REM --------------------------------------------------------------------------
+
+if not exist "%CARGO_INSTALL_DIR%\cargo.exe" (
+	echo File "%CARGO_INSTALL_DIR%\cargo.exe" not found. Please check CARGO_INSTALL_DIR and try again^^!
 	goto:error
 )
 
-if not exist "%SEVENZIP_INSTALL_PATH%\7z.exe" (
-	echo File "%SEVENZIP_INSTALL_PATH%\7z.exe" not found. Please check SEVENZIP_INSTALL_PATH and try again^^!
+if not exist "%GIT_INSTALL_DIR%\cmd\git.exe" (
+	echo File "%GIT_INSTALL_DIR%\cmd\git.exe" not found. Please check GIT_INSTALL_DIR and try again^^!
 	goto:error
 )
 
-set "PATH=%CARGO_INSTALL_PATH%;%SEVENZIP_INSTALL_PATH%;%SystemRoot%\System32"
+if not exist "%SEVENZIP_INSTALL_DIR%\7z.exe" (
+	echo File "%SEVENZIP_INSTALL_DIR%\7z.exe" not found. Please check SEVENZIP_INSTALL_DIR and try again^^!
+	goto:error
+)
+
+set "PATH=%SystemRoot%\System32;%SystemRoot%"
+set "PATH=%CARGO_INSTALL_DIR%;%GIT_INSTALL_DIR%\cmd;%SEVENZIP_INSTALL_DIR%;%PATH%"
 
 REM --------------------------------------------------------------------------
 REM Clean-up
@@ -77,10 +91,19 @@ for %%t in (x86_64 i686 aarch64) do (
 	if not !ERRORLEVEL! == 0 goto:error
 )
 
+copy /B /Y "%CD%\..\..\LICENSE" "%CD%\target/dist/LICENSE.txt"
+if not %ERRORLEVEL% == 0 goto:error
+
+git describe --long --always --dirty > "%CD%\target/dist/REVISION.txt"
+if not %ERRORLEVEL% == 0 goto:error
+
 xcopy /E /H /I /Y "%CD%\..\..\app\target\doc" "%CD%\target\dist\doc"
 if not %ERRORLEVEL% == 0 goto:error
 
 copy /B /Y "%CD%\..\.resources\html\index.html" "%CD%\target\dist\doc\index.html"
+if not %ERRORLEVEL% == 0 goto:error
+
+attrib +R "%CD%\target\*.*" /S
 if not %ERRORLEVEL% == 0 goto:error
 
 pushd "%CD%\target\dist"
@@ -88,6 +111,7 @@ pushd "%CD%\target\dist"
 popd
 
 attrib +R "%CD%\target\*.7z"
+if not %ERRORLEVEL% == 0 goto:error
 
 REM --------------------------------------------------------------------------
 REM Completed

@@ -82,6 +82,10 @@ jobs:
       - run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - working-directory: ${{ github.workspace }}/.build/linux
         run: make
+        env:
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+          CARGO_TARGET_I686_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-gnu-gcc
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-linux
@@ -122,3 +126,43 @@ jobs:
         with:
           name: sponge256sum-macos
           path: ${{ github.workspace }}/.build/macos/target/*.dmg
+
+  build-cross-freebsd:
+    runs-on: ubuntu-latest
+    container:
+      image: rust:1.90-bookworm
+    needs: test
+    steps:
+      - run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y clang lld
+      - run: |
+          rustup target add x86_64-unknown-freebsd
+          rustup target add i686-unknown-freebsd
+      - uses: actions/cache@v4
+        id: cache-freebsd-sysroots
+        with:
+          path: /opt/freebsd/sysroot
+          key: freebsd-sysroot-14.3-RELEASE
+      - if: steps.cache-freebsd-sysroots.outputs.cache-hit != 'true'
+        run: |
+          for p in amd64 i386; do
+            mkdir -p /opt/freebsd/sysroot/${p}
+            wget -qO - https://download.freebsd.org/ftp/releases/${p}/14.3-RELEASE/base.txz | tar -C /opt/freebsd/sysroot/${p} -xJv
+          done
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - run: git config --global --add safe.directory $GITHUB_WORKSPACE
+      - working-directory: ${{ github.workspace }}/.build/freebsd
+        run: make
+        env:
+          CARGO_TARGET_I686_UNKNOWN_FREEBSD_LINKER: clang
+          CARGO_TARGET_I686_UNKNOWN_FREEBSD_RUSTFLAGS: "-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-s -Clink-arg=-fuse-ld=lld -Clink-arg=--target=i686-unknown-freebsd -Clink-arg=--sysroot=/opt/freebsd/sysroot/i386"
+          CARGO_TARGET_X86_64_UNKNOWN_FREEBSD_LINKER: clang
+          CARGO_TARGET_X86_64_UNKNOWN_FREEBSD_RUSTFLAGS: "-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-s -Clink-arg=-fuse-ld=lld -Clink-arg=--target=x86_64-unknown-freebsd -Clink-arg=--sysroot=/opt/freebsd/sysroot/amd64"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sponge256sum-freebsd
+          path: ${{ github.workspace }}/.build/freebsd/target/*.tar.xz
