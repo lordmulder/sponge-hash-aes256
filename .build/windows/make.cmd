@@ -113,6 +113,11 @@ popd
 attrib +R "%CD%\target\*.7z"
 if not %ERRORLEVEL% == 0 goto:error
 
+copy /B /Y "%SEVENZIP_INSTALL_DIR%\7z.sfx" + "%CD%\target\ponge256sum-%PKG_VERSION%-windows.7z" "%CD%\target\ponge256sum-%PKG_VERSION%-windows.exe"
+
+attrib +R "%CD%\target\*.exe"
+if not %ERRORLEVEL% == 0 goto:error
+
 REM --------------------------------------------------------------------------
 REM Completed
 REM --------------------------------------------------------------------------

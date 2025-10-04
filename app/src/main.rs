@@ -70,10 +70,11 @@
 //!
 //!   Count  | Number of permutation rounds
 //!   ------ | ----------------------------
-//!   –      | 3 (default)
-//!   **×1** | 97
-//!   **×2** | 997
-//!   **×3** | 9973
+//!   –      | 1 (default)
+//!   **×1** | 13
+//!   **×2** | 251
+//!   **×3** | 4093
+//!   **×4** | 65521
 //!
 //! - **Text mode**
 //!
@@ -239,18 +240,21 @@ macro_rules! handle_error {
 // Hasher
 // ---------------------------------------------------------------------------
 
-const SNAIL_ITERATIONS_1: usize = 97usize;
-const SNAIL_ITERATIONS_2: usize = 997usize;
-const SNAIL_ITERATIONS_3: usize = 9973usize;
+const SNAIL_ITERATIONS_1: usize = 13usize;
+const SNAIL_ITERATIONS_2: usize = 251usize;
+const SNAIL_ITERATIONS_3: usize = 4093usize;
+const SNAIL_ITERATIONS_4: usize = 65521usize;
 
 enum Hasher {
     Default(SpongeHash256),
     SnailV1(SpongeHash256<SNAIL_ITERATIONS_1>),
     SnailV2(SpongeHash256<SNAIL_ITERATIONS_2>),
     SnailV3(SpongeHash256<SNAIL_ITERATIONS_3>),
+    SnailV4(SpongeHash256<SNAIL_ITERATIONS_4>),
 }
 
 impl Hasher {
+    #[inline(always)]
     pub fn new(info: &Option<String>, snail_mode: u8) -> Self {
         match info {
             Some(info) => match snail_mode {
@@ -258,6 +262,7 @@ impl Hasher {
                 1u8 => Self::SnailV1(SpongeHash256::with_info(info)),
                 2u8 => Self::SnailV2(SpongeHash256::with_info(info)),
                 3u8 => Self::SnailV3(SpongeHash256::with_info(info)),
+                4u8 => Self::SnailV4(SpongeHash256::with_info(info)),
                 _ => unreachable!(),
             },
             None => match snail_mode {
@@ -265,6 +270,7 @@ impl Hasher {
                 1u8 => Self::SnailV1(SpongeHash256::new()),
                 2u8 => Self::SnailV2(SpongeHash256::new()),
                 3u8 => Self::SnailV3(SpongeHash256::new()),
+                4u8 => Self::SnailV4(SpongeHash256::new()),
                 _ => unreachable!(),
             },
         }
@@ -277,6 +283,7 @@ impl Hasher {
             Hasher::SnailV1(hasher) => hasher.update(input),
             Hasher::SnailV2(hasher) => hasher.update(input),
             Hasher::SnailV3(hasher) => hasher.update(input),
+            Hasher::SnailV4(hasher) => hasher.update(input),
         }
     }
 
@@ -287,6 +294,7 @@ impl Hasher {
             Hasher::SnailV1(hasher) => hasher.digest_to_slice(output),
             Hasher::SnailV2(hasher) => hasher.digest_to_slice(output),
             Hasher::SnailV3(hasher) => hasher.digest_to_slice(output),
+            Hasher::SnailV4(hasher) => hasher.digest_to_slice(output),
         }
     }
 }
@@ -300,9 +308,9 @@ fn print_digest(output: &mut impl Write, digest: &[u8], name: &str, size: usize,
     encode_to_slice(&digest[..size], &mut hexstr[..(2usize * size)]).unwrap();
 
     if args.plain {
-        writeln!(output, "{}", str::from_utf8(&hexstr).unwrap())?;
+        writeln!(output, "{}", str::from_utf8(&hexstr[..(2usize * size)]).unwrap())?;
     } else {
-        writeln!(output, "{} {}", str::from_utf8(&hexstr).unwrap(), name)?;
+        writeln!(output, "{} {}", str::from_utf8(&hexstr[..(2usize * size)]).unwrap(), name)?;
     }
 
     if args.flush {
@@ -419,7 +427,7 @@ fn read_from_stdin(digest_size: usize, args: &Args, running: Flag) -> ExitCode {
 // Main
 // ---------------------------------------------------------------------------
 
-const MAX_SNAIL_OPTIONS: u8 = 3u8;
+const MAX_SNAIL_COUNT: u8 = 4u8;
 
 /// Applicationm entry point (“main” function)
 fn main() -> ExitCode {
@@ -433,7 +441,7 @@ fn main() -> ExitCode {
     }
 
     // Check for too many snail options passed
-    if args.snail > MAX_SNAIL_OPTIONS {
+    if args.snail > MAX_SNAIL_COUNT {
         print_error!(args, "Error: Options '--snail' must not be set more than three times!");
         return ExitCode::FAILURE;
     }

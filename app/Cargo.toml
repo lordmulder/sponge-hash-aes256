@@ -11,9 +11,12 @@ edition = "2024"
 clap = { version = "4.5.47", default-features = false, features = [ "std", "derive", "help", "usage", "error-context" ] }
 const_format = { version = "0.2.34", default-features = false }
 ctrlc = { version = "3.5.0", default-features = false }
-hex = { version = "0.4.3", default-features = false }
+hex = { version = "0.4.3", default-features = true }
 sponge-hash-aes256 = { path = "../lib" }
 wild = { version = "2.2.1", default-features = false }
+
+[dev-dependencies]
+regex = { version = "1.11.3", default-features = false, features = [ "unicode" ] }
 
 [profile.release]
 opt-level = 3

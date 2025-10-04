@@ -6,12 +6,12 @@ use zeroize::Zeroize;
 
 /// Default digest size, in bytes
 ///
-/// The default digest size is currently defined as 32 bytes, i.e., 256 bits.
+/// The default digest size is currently defined as **32** bytes, i.e., 256 bits.
 pub const DEFAULT_DIGEST_SIZE: usize = 2usize * BLOCK_SIZE;
 
 /// Default number of permutation rounds to be performed
 ///
-/// The default number of permutation rounds is currently defined as 1.
+/// The default number of permutation rounds is currently defined as **1**.
 pub const DEFAULT_PERMUTE_ROUNDS: usize = 1usize;
 
 // ---------------------------------------------------------------------------
@@ -113,8 +113,9 @@ pub struct SpongeHash256<const R: usize = DEFAULT_PERMUTE_ROUNDS> {
 }
 
 impl<const R: usize> SpongeHash256<R> {
-    const BIT_MASK_0: [u8; BLOCK_SIZE] = [0x5Cu8; BLOCK_SIZE];
-    const BIT_MASK_1: [u8; BLOCK_SIZE] = [0x36u8; BLOCK_SIZE];
+    const BIT_MASK_X: [u8; BLOCK_SIZE] = [0x5Cu8; BLOCK_SIZE];
+    const BIT_MASK_Y: [u8; BLOCK_SIZE] = [0x36u8; BLOCK_SIZE];
+    const BIT_MASK_Z: [u8; BLOCK_SIZE] = [0x6Au8; BLOCK_SIZE];
 
     /// Creates a new SpongeHash-AES256 instance and initializes the hash computation.
     ///
@@ -200,6 +201,9 @@ impl<const R: usize> SpongeHash256<R> {
         self.state0[self.offset] ^= 0x80u8;
         let mut pos = 0usize;
 
+        self.permute();
+        xor_arrays(&mut self.state0, &Self::BIT_MASK_Z);
+
         while pos < digest_out.len() {
             self.permute();
             let copy_len = BLOCK_SIZE.min(digest_out.len() - pos);
@@ -227,8 +231,8 @@ impl<const R: usize> SpongeHash256<R> {
             xor_arrays(&mut self.state1, &temp1);
             xor_arrays(&mut self.state2, &temp2);
 
-            xor_arrays(&mut self.state1, &Self::BIT_MASK_0);
-            xor_arrays(&mut self.state2, &Self::BIT_MASK_1);
+            xor_arrays(&mut self.state1, &Self::BIT_MASK_X);
+            xor_arrays(&mut self.state2, &Self::BIT_MASK_Y);
         }
 
         temp0.zeroize();

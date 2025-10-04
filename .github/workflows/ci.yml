@@ -84,8 +84,11 @@ jobs:
         run: make
         env:
           CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
-          CARGO_TARGET_I686_UNKNOWN_LINUX_MUSL_LINKER: musl-gcc
+          CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-s -Clink-arg=-O3 -Clink-arg=-Wl,-O3"
+          CARGO_TARGET_I686_UNKNOWN_LINUX_MUSL_LINKER: i686-linux-gnu-gcc
+          CARGO_TARGET_I686_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-s -Clink-arg=-O3 -Clink-arg=-Wl,-O3"
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_LINKER: aarch64-linux-gnu-gcc
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-s -Clink-arg=-O3 -Clink-arg=-Wl,-O3"
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-linux
@@ -107,7 +110,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-windows
-          path: ${{ github.workspace }}/.build/windows/target/*.7z
+          path: ${{ github.workspace }}/.build/windows/target/*.*
 
   build-macos:
     runs-on: macos-latest
@@ -122,6 +125,9 @@ jobs:
       - run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - working-directory: ${{ github.workspace }}/.build/macos
         run: make
+        env:
+          CARGO_TARGET_X86_64_APPLE_DARWIN_RUSTFLAGS: "-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-O3"
+          CARGO_TARGET_AARCH64_APPLE_DARWIN_RUSTFLAGS: "-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-O3"
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-macos
