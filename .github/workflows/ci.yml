@@ -101,6 +101,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           target: x86_64-pc-windows-msvc,i686-pc-windows-msvc,aarch64-pc-windows-msvc
+          rustflags: "-Dwarnings -Ctarget-feature=+crt-static"
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -119,15 +120,13 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           target: x86_64-apple-darwin,aarch64-apple-darwin
+          rustflags: "-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-O3"
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - working-directory: ${{ github.workspace }}/.build/macos
         run: make
-        env:
-          CARGO_TARGET_X86_64_APPLE_DARWIN_RUSTFLAGS: "-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-O3"
-          CARGO_TARGET_AARCH64_APPLE_DARWIN_RUSTFLAGS: "-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-O3"
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-macos
