@@ -58,29 +58,39 @@
 //!
 //! The following options are available, among others:
 //!
+//! - **Output length**
+//!
+//!   The `--length <LENGTH>` option can be used to specify the digest output size, in bits. The default size is 256 bits.
+//!
+//!   Currently, the maximum output size is 1024 bits. Also, the output size, in bits, must be divisible by eight!
+//!
 //! - **Context information**
 //!
 //!   The `--info <INFO>` option can be used to include some additional context information in the hash computation.
 //!
-//!   For each unique “info” string, a different digest (hash value) is generated from the same message (input).
+//!   For each unique “info” string, different digests (hash values) are generated from the same messages (inputs).
+//!
+//!   This enables proper *domain separation* for different uses, e.g., applications or protocols, of the same hash function.
 //!
 //! - **Snail mode**
 //!
-//!   The `--snail` option can be passed to the program, optionally more than once, to slow down the hash computation:
+//!   The `--snail` option can be passed to the program, optionally more than once, to slow down the hash computation.
 //!
-//!   Count  | Number of permutation rounds
-//!   ------ | ----------------------------
-//!   –      | 1 (default)
-//!   **×1** | 13
-//!   **×2** | 251
-//!   **×3** | 4093
-//!   **×4** | 65521
+//!   This improves the security of certain applications, e.g., password hashing, by making “brute force” attacks harder.
+//!
+//!   Count  | Number of permutation rounds | Throughput (in KiB/s)
+//!   ------ | ---------------------------- | --------------------:
+//!   –      | 1 (default)                  |             40,013.31
+//!   **×1** | 13                           |              2,713.64
+//!   **×2** | 251                          |                138.44
+//!   **×3** | 4093                         |                  8.88
+//!   **×4** | 65521                        |                  0.55
 //!
 //! - **Text mode**
 //!
-//!   In this mode, unlike in “binary” mode (the default), the input file will be read as a *text* file, line by line.
+//!   The `--text` option enables “text” mode. In this mode, the input file is read as a *text* file, line by line.
 //!
-//!   Platform-specific line endings will normalized to a single `\n` character.
+//!   Unlike in “binary” mode (the default), platform-specific line endings will be normalized to a single `\n` character.
 //!
 //! ## License
 //!
@@ -442,7 +452,7 @@ fn main() -> ExitCode {
 
     // Check for too many snail options passed
     if args.snail > MAX_SNAIL_COUNT {
-        print_error!(args, "Error: Options '--snail' must not be set more than three times!");
+        print_error!(args, "Error: Options '--snail' must not be set more than four times!");
         return ExitCode::FAILURE;
     }
 

@@ -1,10 +1,13 @@
 [target.x86_64-unknown-linux-musl]
+linker = "musl-gcc"
 rustflags = [ "-Dwarnings", "-Ctarget-feature=+crt-static" ]
 
 [target.i686-unknown-linux-musl]
+linker = "musl-gcc"
 rustflags = [ "-Dwarnings", "-Ctarget-feature=+crt-static" ]
 
 [target.aarch64-unknown-linux-musl]
+linker = "aarch64-linux-gnu-gcc"
 rustflags = [ "-Dwarnings", "-Ctarget-feature=+crt-static" ]
 
 [target.x86_64-pc-windows-msvc]
