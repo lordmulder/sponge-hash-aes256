@@ -107,6 +107,10 @@ use clap::{ArgAction, Parser, command};
 use const_format::formatcp;
 use ctrlc::set_handler;
 use hex::encode_to_slice;
+use rand_pcg::{
+    Pcg64,
+    rand_core::{RngCore, SeedableRng},
+};
 use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, PKG_VERSION as LIB_VERSION, SpongeHash256};
 use std::{
     env::consts::{ARCH, OS},
@@ -120,6 +124,7 @@ use std::{
         Arc,
         atomic::{AtomicBool, Ordering},
     },
+    time::Instant,
 };
 
 /// Maximum allowable digest size, specified in bytes
@@ -215,6 +220,10 @@ struct Args {
     /// Explicitely flush 'stdout' stream after printing a digest
     #[arg(short, long)]
     flush: bool,
+
+    /// Run the built-in self-test (BIST)
+    #[arg(long)]
+    self_test: bool,
 
     /// Files to be processed
     #[arg()]
@@ -434,6 +443,58 @@ fn read_from_stdin(digest_size: usize, args: &Args, running: Flag) -> ExitCode {
 }
 
 // ---------------------------------------------------------------------------
+// Self-test
+// ---------------------------------------------------------------------------
+
+fn arrays_equal<const N: usize>(array0: &[u8; N], array1: &[u8; N]) -> bool {
+    let mut mask = 0u8;
+    for (value0, value1) in array0.iter().zip(array1.iter()) {
+        mask |= value0 ^ value1;
+    }
+    mask == 0u8
+}
+
+fn self_test(running: Flag) -> ExitCode {
+    const DIGEST_EXPECTED: &[u8; DEFAULT_DIGEST_SIZE] =
+        b"\x19\x50\x87\xa8\x39\x6d\xe8\x0c\xe7\xcb\x3e\xf7\x70\x58\x84\x72\xa6\xd9\x5a\x45\x5d\x93\xc6\x44\x2c\xae\x8d\x11\xbf\x09\x77\x16";
+
+    let mut output = stdout().lock();
+
+    let _ = writeln!(output, "{}\n", HEADER_LINE);
+    let _ = writeln!(output, "Self-test is running, please be patient...");
+    let _ = output.flush();
+
+    let start_time = Instant::now();
+
+    let mut source = Pcg64::seed_from_u64(18446744073709551557u64);
+    let mut buffer = [0u8; 4093usize];
+    let mut hasher = SpongeHash256::default();
+
+    for _ in 0u32..2097143u32 {
+        source.fill_bytes(&mut buffer);
+        hasher.update(buffer);
+        if !running.load(Ordering::Relaxed) {
+            let _ = writeln!(output, "Cancelled !!!");
+            return ExitCode::FAILURE;
+        }
+    }
+
+    let digest_computed = hasher.digest();
+    let elapsed = start_time.elapsed().as_secs_f64();
+
+    if arrays_equal(&digest_computed, DIGEST_EXPECTED) {
+        let _ = writeln!(output, "Successful.\n");
+        let _ = writeln!(output, "Test completed successfully in {:.1} seconds.", elapsed);
+        ExitCode::SUCCESS
+    } else {
+        let _ = writeln!(output, "Failure !!!\n");
+        let _ = writeln!(output, "Digest computed: {:02x?}", &digest_computed[..]);
+        let _ = writeln!(output, "Digest expected: {:02x?}", &DIGEST_EXPECTED[..]);
+        ExitCode::FAILURE
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -479,6 +540,11 @@ fn main() -> ExitCode {
     let running = Arc::new(AtomicBool::new(true));
     let flag = running.clone();
     set_handler(move || flag.store(false, Ordering::SeqCst)).expect("Failed to register CTRL+C handler!");
+
+    // Run built-in self-test, if it was requested by the user
+    if args.self_test {
+        return self_test(running);
+    }
 
     // Process all files that were given on the command-line
     if !args.files.is_empty() {

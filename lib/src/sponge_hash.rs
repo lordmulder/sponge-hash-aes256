@@ -199,11 +199,10 @@ impl<const R: usize> SpongeHash256<R> {
         assert!(!digest_out.is_empty(), "Digest output size must be positive!");
 
         self.state0[self.offset] ^= 0x80u8;
-        let mut pos = 0usize;
-
         self.permute();
         xor_arrays(&mut self.state0, &Self::BIT_MASK_Z);
 
+        let mut pos = 0usize;
         while pos < digest_out.len() {
             self.permute();
             let copy_len = BLOCK_SIZE.min(digest_out.len() - pos);
