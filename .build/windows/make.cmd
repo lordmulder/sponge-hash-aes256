@@ -100,7 +100,7 @@ if not %ERRORLEVEL% == 0 goto:error
 xcopy /E /H /I /Y "%CD%\..\..\app\target\doc" "%CD%\target\dist\doc"
 if not %ERRORLEVEL% == 0 goto:error
 
-copy /B /Y "%CD%\..\.resources\html\index.html" "%CD%\target\dist\doc\index.html"
+copy /B /Y "%CD%\..\..\.assets\html\index.html" "%CD%\target\dist\doc\index.html"
 if not %ERRORLEVEL% == 0 goto:error
 
 attrib +R "%CD%\target\*.*" /S

@@ -24,7 +24,7 @@ dist: build docs
 		chmod 555 target/dist/sponge256sum-$$t; \
 	done; \
 	cp -rf ../../app/target/doc target/dist/; \
-	cp -f ../.resources/html/index.html target/dist/doc/index.html; \
+	cp -f ../../.assets/html/index.html target/dist/doc/index.html; \
 	cp -f ../../LICENSE target/dist/LICENSE; \
 	git describe --long --always --dirty > target/dist/REVISION; \
 	find target/dist -type f -not -name 'sponge256sum-*' -exec chmod 444 {} \;; \

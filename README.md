@@ -7,6 +7,8 @@
 [![Docs.rs](https://img.shields.io/docsrs/sponge-hash-aes256)](https://docs.rs/sponge-hash-aes256/latest/)
 [![License](https://img.shields.io/crates/l/sponge-hash-aes256)](https://opensource.org/license/0BSD)
 
+![SpongeHash-AES256](.assets/images/sponge-hash-aes256.png)
+
 A [**sponge**](https://en.wikipedia.org/wiki/Sponge_function)-based secure hash function that uses [AES-256](https://docs.rs/aes/latest/aes/index.html) as its internal [PRF](https://en.wikipedia.org/wiki/Pseudorandom_permutation).
 
 This hash function has a *variable* output size and can produce outputs of *any* non-zero size.

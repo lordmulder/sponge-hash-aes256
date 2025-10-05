@@ -1,5 +1,7 @@
 # SpongeHash-AES256
 
+![SpongeHash-AES256](https://raw.githubusercontent.com/lordmulder/sponge-hash-aes256/master/.assets/images/sponge-hash-aes256.png)
+
 A [**sponge**](https://en.wikipedia.org/wiki/Sponge_function)-based secure hash function that uses [AES-256](https://docs.rs/aes/latest/aes/index.html) as its internal [PRF](https://en.wikipedia.org/wiki/Pseudorandom_permutation).
 
 This hash function has a *variable* output size.
