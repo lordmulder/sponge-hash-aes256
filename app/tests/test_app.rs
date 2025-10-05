@@ -52,7 +52,7 @@ where
 }
 
 fn do_test_file(expected: &str, file_name: &str, snail_mode: bool) {
-    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^([0-9a-fA-F]+)[\s$]").unwrap());
+    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([0-9a-fA-F]+)[\s$]").unwrap());
 
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join(file_name);
     let output = if snail_mode { run_binary([OsStr::new("--snail"), path.as_os_str()]) } else { run_binary([path.as_os_str()]) };
@@ -62,7 +62,7 @@ fn do_test_file(expected: &str, file_name: &str, snail_mode: bool) {
 }
 
 fn do_test_file_with_length(expected: &str, file_name: &str, length: u32) {
-    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^([0-9a-fA-F]+)[\s$]").unwrap());
+    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([0-9a-fA-F]+)[\s$]").unwrap());
 
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join(file_name);
     let output = run_binary([OsStr::new("--length"), OsStr::new(&format!("{}", length)), path.as_os_str()]);
@@ -72,7 +72,7 @@ fn do_test_file_with_length(expected: &str, file_name: &str, length: u32) {
 }
 
 fn do_test_data(expected: &str, data: &[u8], snail_mode: bool) {
-    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^([0-9a-fA-F]{64})\s+-").unwrap());
+    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([0-9a-fA-F]{64})\s+-").unwrap());
     const NO_ARGS: iter::Empty<&OsStr> = iter::empty::<&OsStr>();
 
     let output = if snail_mode { run_binary_with_data([OsStr::new("--snail")], data) } else { run_binary_with_data(NO_ARGS, data) };
@@ -149,7 +149,7 @@ fn test_data_2b() {
 
 #[test]
 fn test_version() {
-    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"^sponge256sum\s+v(\d+\.\d+\.\d+)[\s$]").unwrap());
+    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^sponge256sum\s+v(\d+\.\d+\.\d+)[\s$]").unwrap());
 
     let output = run_binary([OsStr::new("--version")]);
     let caps = REGEX.captures(&output).expect("Regex did not match!");
@@ -159,6 +159,13 @@ fn test_version() {
 
 #[test]
 fn test_help() {
-    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Usage:\s+sponge256sum[\s$]").unwrap());
+    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Usage:\s+sponge256sum(\.exe)?[\s$]").unwrap());
     assert!(REGEX.is_match(&run_binary([OsStr::new("--help")])));
+}
+
+#[test]
+#[ignore]
+fn test_selftest() {
+    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Successful.").unwrap());
+    assert!(REGEX.is_match(&run_binary([OsStr::new("--self-test")])));
 }
