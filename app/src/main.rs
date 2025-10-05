@@ -513,7 +513,7 @@ fn main() -> ExitCode {
 
     // Check for too many snail options passed
     if args.snail > MAX_SNAIL_COUNT {
-        print_error!(args, "Error: Options '--snail' must not be set more than four times!");
+        print_error!(args, "\n{}", include_str!("../../.assets/text/goat.txt"));
         return ExitCode::FAILURE;
     }
 

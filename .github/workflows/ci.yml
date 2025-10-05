@@ -83,6 +83,11 @@ jobs:
       - run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - working-directory: ${{ github.workspace }}/.build/linux
         run: make
+      - if: ${{ github.event_name == 'release' }}
+        working-directory: ${{ github.workspace }}/.build/linux/target/dist
+        run: |
+          arch
+          gdb --args ./sponge256sum-x86_64 --self-test
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-linux
@@ -102,6 +107,9 @@ jobs:
       - run: git config --global --add safe.directory $env:GITHUB_WORKSPACE
       - working-directory: ${{ github.workspace }}/.build/windows
         run: cmd.exe /c make.cmd
+      - if: ${{ github.event_name == 'release' }}
+        working-directory: ${{ github.workspace }}/.build/windows/target/dist
+        run: .\sponge256sum-x86_64.exe --self-test
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-windows
@@ -121,6 +129,9 @@ jobs:
       - run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - working-directory: ${{ github.workspace }}/.build/macos
         run: make
+      - if: ${{ github.event_name == 'release' }}
+        working-directory: ${{ github.workspace }}/.build/macos/target/dist
+        run: ./sponge256sum-aarch64.exe --self-test
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-macos
@@ -155,12 +166,7 @@ jobs:
           fetch-depth: 0
       - run: git config --global --add safe.directory $GITHUB_WORKSPACE
       - working-directory: ${{ github.workspace }}/.build/freebsd
-        run: make
-        env:
-          CARGO_TARGET_I686_UNKNOWN_FREEBSD_LINKER: clang
-          CARGO_TARGET_I686_UNKNOWN_FREEBSD_RUSTFLAGS: "-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-s -Clink-arg=-fuse-ld=lld -Clink-arg=--target=i686-unknown-freebsd -Clink-arg=--sysroot=/opt/freebsd/sysroot/i386"
-          CARGO_TARGET_X86_64_UNKNOWN_FREEBSD_LINKER: clang
-          CARGO_TARGET_X86_64_UNKNOWN_FREEBSD_RUSTFLAGS: "-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-s -Clink-arg=-fuse-ld=lld -Clink-arg=--target=x86_64-unknown-freebsd -Clink-arg=--sysroot=/opt/freebsd/sysroot/amd64"
+        run: ./crossbuild-linux.sh
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-freebsd
