@@ -161,10 +161,44 @@ jobs:
           name: sponge256sum-freebsd
           path: ${{ github.workspace }}/.build/freebsd/target/*.tar.xz
 
+  build-cross-netbsd:
+    runs-on: ubuntu-latest
+    container:
+      image: rust:1.90-bookworm
+    needs: test
+    steps:
+      - run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y clang lld
+      - run: |
+          rustup target add x86_64-unknown-netbsd
+      - uses: actions/cache@v4
+        id: cache-netbsd-sysroots
+        with:
+          path: /opt/netbsd/sysroot
+          key: netbsd-sysroot-10.1
+      - if: steps.cache-netbsd-sysroots.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p /opt/netbsd/sysroot/amd64
+          for s in base comp; do
+            wget -qO - https://cdn.netbsd.org/pub/NetBSD/NetBSD-10.1/amd64/binary/sets/${s}.tar.xz | tar -C /opt/netbsd/sysroot/amd64 -xJv
+          done
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - run: git config --global --add safe.directory $GITHUB_WORKSPACE
+      - working-directory: ${{ github.workspace }}/.build/netbsd
+        run: ./crossbuild-linux.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sponge256sum-netbsd
+          path: ${{ github.workspace }}/.build/netbsd/target/*.tar.xz
+
   release:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'release' }}
-    needs: [build-linux, build-windows, build-macos, build-cross-freebsd]
+    needs: [build-linux, build-windows, build-macos, build-cross-freebsd, build-cross-netbsd]
     permissions:
       contents: write
     steps:
