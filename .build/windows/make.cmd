@@ -49,6 +49,10 @@ if exist "%CD%\target" (
 	if not !ERRORLEVEL! == 0 goto:error
 )
 
+mkdir "%CD%\target\dist"
+if not %ERRORLEVEL% == 0 goto:error
+
+set "DIST_DIR=%CD%\target\dist"
 pushd "%CD%\..\..\app"
 
 cargo clean
@@ -70,8 +74,20 @@ REM --------------------------------------------------------------------------
 REM Build
 REM --------------------------------------------------------------------------
 
+set "RUSTFLAGS=-Dwarnings -Ctarget-feature=+crt-static"
+
 for %%t in (x86_64 i686 aarch64) do (
 	cargo build --release --target %%t-pc-windows-msvc --verbose
+	if not !ERRORLEVEL! == 0 goto:error
+	copy /B /Y "target\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-%%t.exe"
+	if not !ERRORLEVEL! == 0 goto:error
+)
+
+for %%v in (v2 v3 v4) do (
+	set "RUSTFLAGS=-Dwarnings -Ctarget-feature=+crt-static -Ctarget-cpu=x86-64-%%v"
+	cargo build --release --target x86_64-pc-windows-msvc --verbose
+	if not !ERRORLEVEL! == 0 goto:error
+	copy /B /Y "target\x86_64-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-x86_64-%%v.exe"
 	if not !ERRORLEVEL! == 0 goto:error
 )
 
@@ -83,13 +99,6 @@ popd
 REM --------------------------------------------------------------------------
 REM Packaging
 REM --------------------------------------------------------------------------
-
-mkdir "%CD%\target\dist"
-
-for %%t in (x86_64 i686 aarch64) do (
-	copy /B /Y "%CD%\..\..\app\target\%%t-pc-windows-msvc\release\sponge256sum.exe" "%CD%\target\dist\sponge256sum-%%t.exe"
-	if not !ERRORLEVEL! == 0 goto:error
-)
 
 copy /B /Y "%CD%\..\..\LICENSE" "%CD%\target/dist/LICENSE.txt"
 if not %ERRORLEVEL% == 0 goto:error
