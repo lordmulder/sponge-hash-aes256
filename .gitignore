@@ -1,2 +1,3 @@
 /**/target
+/.releases
 /lib/benches/data/**/*.txt*
