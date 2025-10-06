@@ -23,7 +23,7 @@ build:
 		mv -vf target/x86_64-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-x86_64-$$v
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-x86_64-$$v
 	done
-	for p in i586 pentium2; do
+	for p in i586; do
 		RUSTFLAGS="-Dwarnings -Clinker=i686-linux-gnu-gcc -Ctarget-feature=+crt-static -Clink-arg=-s -Clink-arg=-O3 -Clink-arg=-Wl,-O3 -Ctarget-cpu=$$p" \
 		cargo build --release --target i586-unknown-linux-musl --verbose
 		mv -vf target/i586-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$p
