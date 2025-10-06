@@ -5,9 +5,12 @@ SHELL := /bin/sh -ec
 all: clean dist
 
 build:
+	rm -rf target && mkdir target && mkdir target/dist
 	cd ../../app; \
 	for t in x86_64 i686; do \
 		cargo build --release --target $$t-unknown-freebsd --verbose; \
+		mv -vf target/$$t-unknown-freebsd/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$t; \
+		chmod 555 $(CURDIR)/target/dist/sponge256sum-$$t; \
 	done; \
 	cargo pkgid > target/.CARGO_PKGID
 
@@ -18,11 +21,6 @@ docs:
 dist: build docs
 	PKG_VERSION="$$(grep -Eo '[^@]+$$' < ../../app/target/.CARGO_PKGID | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//')"; \
 	test -n "$${PKG_VERSION}"; \
-	rm -rf target && mkdir target && mkdir target/dist; \
-	for t in x86_64 i686; do \
-		cp -f ../../app/target/$$t-unknown-freebsd/release/sponge256sum target/dist/sponge256sum-$$t; \
-		chmod 555 target/dist/sponge256sum-$$t; \
-	done; \
 	cp -rf ../../app/target/doc target/dist/; \
 	cp -f ../../.assets/html/index.html target/dist/doc/index.html; \
 	cp -f ../../LICENSE target/dist/LICENSE; \
