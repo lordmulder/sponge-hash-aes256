@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: 0BSD
+// SpongeHash-AES256
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use aes::Aes256;
@@ -26,16 +27,25 @@ pub fn aes256_encrypt(dst: &mut [u8; BLOCK_SIZE], src: &[u8; BLOCK_SIZE], key0: 
     cipher.encrypt_block(GenericArray::from_mut_slice(dst));
 }
 
+#[allow(clippy::manual_is_multiple_of)]
 #[inline(always)]
 pub fn xor_arrays(dst: &mut [u8; BLOCK_SIZE], src: &[u8; BLOCK_SIZE]) {
     const WORDS: usize = BLOCK_SIZE / size_of::<usize>();
-    const _: () = assert!(BLOCK_SIZE.is_multiple_of(size_of::<usize>()));
+    const _: () = assert!(BLOCK_SIZE % size_of::<usize>() == 0usize);
 
-    unsafe {
-        let dst = slice::from_raw_parts_mut(dst.as_ptr() as *mut usize, WORDS);
-        let src = slice::from_raw_parts(src.as_ptr() as *const usize, WORDS);
-        for index in 0..WORDS {
-            dst[index] ^= src[index];
+    let (ptr_dst, ptr_src) = (dst.as_ptr() as *mut usize, src.as_ptr() as *const usize);
+
+    if ptr_src.is_aligned() && ptr_dst.is_aligned() {
+        unsafe {
+            let dst_usize = slice::from_raw_parts_mut(ptr_dst, WORDS);
+            let src_usize = slice::from_raw_parts(ptr_src, WORDS);
+            for (dst_value, src_value) in dst_usize.iter_mut().zip(src_usize.iter()) {
+                *dst_value ^= *src_value;
+            }
+        }
+    } else {
+        for (dst_value, src_value) in dst.iter_mut().zip(src.iter()) {
+            *dst_value ^= *src_value;
         }
     }
 }
@@ -56,9 +66,8 @@ mod tests {
         const KEY_1: BlockType = hex!("1f352c073b6108d72d9810a30914dff4");
 
         fn do_aes256_ecb(input: &BlockType, expected: &BlockType, key0: &BlockType, key1: &BlockType) {
-            let mut output: BlockType = [0u8; _];
+            let mut output = [0u8; BLOCK_SIZE];
             aes256_encrypt(&mut output, input, key0, key1);
-            eprintln!("{:02x?}", &output);
             assert_eq!(&output, expected);
         }
 

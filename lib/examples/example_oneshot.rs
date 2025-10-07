@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: 0BSD
+// SpongeHash-AES256
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use hex::encode_to_slice;
 use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, compute};
+use std::str::from_utf8;
 
 #[cfg(feature = "tracing")]
 use simple_logger::SimpleLogger;
@@ -20,5 +22,13 @@ fn main() {
     encode_to_slice(&digest, &mut hex_buffer).unwrap();
 
     // Print the digest (hex format)
-    println!("0x{}", str::from_utf8(&hex_buffer).unwrap());
+    println!("0x{}", from_utf8(&hex_buffer).unwrap());
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_example_oneshot() {
+        super::main();
+    }
 }

@@ -12,9 +12,10 @@ jobs:
   check:
     runs-on: ubuntu-latest
     container:
-      image: rust:1.90-trixie
+      image: rust:${{ matrix.rust }}
     strategy:
       matrix:
+        rust: [1.90-trixie, 1.85-bookworm]
         project: [lib, app]
     steps:
       - uses: actions/checkout@v5
@@ -24,10 +25,11 @@ jobs:
   format:
     runs-on: ubuntu-latest
     container:
-      image: rust:1.90-trixie
+      image: rust:${{ matrix.rust }}
     needs: check
     strategy:
       matrix:
+        rust: [1.90-trixie, 1.85-bookworm]
         project: [lib, app]
     steps:
       - run: rustup component add rustfmt
@@ -38,26 +40,28 @@ jobs:
   clippy:
     runs-on: ubuntu-latest
     container:
-      image: rust:1.90-trixie
+      image: rust:${{ matrix.rust }}
     needs: check
     strategy:
       matrix:
+        rust: [1.90-trixie, 1.85-bookworm]
         project: [lib, app]
     steps:
       - run: rustup component add clippy
       - uses: actions/checkout@v5
       - working-directory: ${{ github.workspace }}/${{ matrix.project }}
-        run: cargo clippy -- -D warnings
+        run: cargo clippy -- -D warnings${{ matrix.rust == '1.85-bookworm' && ' -A unknown_lints' || '' }}
 
   test:
     runs-on: ubuntu-latest
     container:
-      image: rust:1.90-trixie
+      image: rust:${{ matrix.rust }}
     needs: [format, clippy]
     strategy:
       matrix:
+        rust: [1.90-trixie, 1.85-bookworm]
         project: [lib, app]
-        options: ["", " --release"]
+        options: ["", " --release", " --examples"]
     steps:
       - uses: actions/checkout@v5
       - working-directory: ${{ github.workspace }}/${{ matrix.project }}

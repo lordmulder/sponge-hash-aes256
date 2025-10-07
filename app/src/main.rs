@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: 0BSD
+// sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 //! # sponge256sum
@@ -29,6 +30,7 @@
 //!   -q, --quiet            Do not output any error messages or warnings
 //!   -p, --plain            Print digest(s) in plain format, i.e., without file names
 //!   -f, --flush            Explicitely flush 'stdout' stream after printing a digest
+//!       --self-test        Run the built-in self-test (BIST)
 //!   -h, --help             Print help
 //!   -V, --version          Print version
 //!
@@ -107,6 +109,7 @@ use clap::{ArgAction, Parser, command};
 use const_format::formatcp;
 use ctrlc::set_handler;
 use hex::encode_to_slice;
+use hex_literal::hex;
 use rand_pcg::{
     Pcg64,
     rand_core::{RngCore, SeedableRng},
@@ -120,6 +123,7 @@ use std::{
     num::NonZeroUsize,
     process::ExitCode,
     slice::Iter,
+    str::from_utf8,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -327,9 +331,9 @@ fn print_digest(output: &mut impl Write, digest: &[u8], name: &str, size: usize,
     encode_to_slice(&digest[..size], &mut hexstr[..(2usize * size)]).unwrap();
 
     if args.plain {
-        writeln!(output, "{}", str::from_utf8(&hexstr[..(2usize * size)]).unwrap())?;
+        writeln!(output, "{}", from_utf8(&hexstr[..(2usize * size)]).unwrap())?;
     } else {
-        writeln!(output, "{} {}", str::from_utf8(&hexstr[..(2usize * size)]).unwrap(), name)?;
+        writeln!(output, "{} {}", from_utf8(&hexstr[..(2usize * size)]).unwrap(), name)?;
     }
 
     if args.flush {
@@ -446,6 +450,9 @@ fn read_from_stdin(digest_size: usize, args: &Args, running: Flag) -> ExitCode {
 // Self-test
 // ---------------------------------------------------------------------------
 
+const PCG64_SEEDVALUE: u64 = 18446744073709551557u64;
+const DIGEST_EXPECTED: [u8; DEFAULT_DIGEST_SIZE] = hex!("1f4232bab771e668edb99834527d1f632d32963164e0ca25e218210942f41947");
+
 fn arrays_equal<const N: usize>(array0: &[u8; N], array1: &[u8; N]) -> bool {
     let mut mask = 0u8;
     for (value0, value1) in array0.iter().zip(array1.iter()) {
@@ -455,9 +462,6 @@ fn arrays_equal<const N: usize>(array0: &[u8; N], array1: &[u8; N]) -> bool {
 }
 
 fn self_test(running: Flag) -> ExitCode {
-    const DIGEST_EXPECTED: &[u8; DEFAULT_DIGEST_SIZE] =
-        b"\x19\x50\x87\xa8\x39\x6d\xe8\x0c\xe7\xcb\x3e\xf7\x70\x58\x84\x72\xa6\xd9\x5a\x45\x5d\x93\xc6\x44\x2c\xae\x8d\x11\xbf\x09\x77\x16";
-
     let mut output = stdout().lock();
 
     let _ = writeln!(output, "{}\n", HEADER_LINE);
@@ -466,11 +470,11 @@ fn self_test(running: Flag) -> ExitCode {
 
     let start_time = Instant::now();
 
-    let mut source = Pcg64::seed_from_u64(18446744073709551557u64);
+    let mut source = Pcg64::seed_from_u64(PCG64_SEEDVALUE);
     let mut buffer = [0u8; 4093usize];
     let mut hasher = SpongeHash256::default();
 
-    for _ in 0u32..2097143u32 {
+    for _ in 0u32..524287u32 {
         source.fill_bytes(&mut buffer);
         hasher.update(buffer);
         if !running.load(Ordering::Relaxed) {
@@ -482,7 +486,7 @@ fn self_test(running: Flag) -> ExitCode {
     let digest_computed = hasher.digest();
     let elapsed = start_time.elapsed().as_secs_f64();
 
-    if arrays_equal(&digest_computed, DIGEST_EXPECTED) {
+    if arrays_equal(&digest_computed, &DIGEST_EXPECTED) {
         let _ = writeln!(output, "Successful.\n");
         let _ = writeln!(output, "Test completed successfully in {:.1} seconds.", elapsed);
         ExitCode::SUCCESS

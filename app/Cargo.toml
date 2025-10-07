@@ -4,14 +4,15 @@ description = "A sponge-based secure hash function that uses AES-256 as its inte
 license = "0BSD"
 repository = "https://github.com/lordmulder/sponge-hash-aes256/"
 readme = "../README.crates.md"
-version = "1.3.1"
+version = "1.3.2"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4.5.47", default-features = false, features = [ "std", "derive", "help", "usage", "error-context" ] }
-const_format = { version = "0.2.34", default-features = false }
+clap = { version = "4.5.48", default-features = false, features = [ "std", "derive", "help", "usage", "error-context" ] }
+const_format = { version = "0.2.35", default-features = false }
 ctrlc = { version = "3.5.0", default-features = false }
 hex = { version = "0.4.3", default-features = true }
+hex-literal = { version = "1.0.0", default-features = false }
 rand_pcg = { version = "0.9.0", default-features = false }
 sponge-hash-aes256 = { path = "../lib" }
 wild = { version = "2.2.1", default-features = false }

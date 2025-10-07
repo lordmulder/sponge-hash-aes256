@@ -25,7 +25,7 @@ In order to use this crate, you have to add it under `[dependencies]` to your **
 
 ```
 [dependencies]
-sponge-hash-aes256 = "1.3.1"
+sponge-hash-aes256 = "1.3.2"
 ```
 
 ### Usage
@@ -75,11 +75,20 @@ Options:
   -q, --quiet            Do not output any error messages or warnings
   -p, --plain            Print digest(s) in plain format, i.e., without file names
   -f, --flush            Explicitely flush 'stdout' stream after printing a digest
+      --self-test        Run the built-in self-test (BIST)
   -h, --help             Print help
   -V, --version          Print version
 
 If no input files are specified, reads input data from 'stdin' stream.
 ```
+
+## Git repository
+
+Official Git mirrors are available here:
+
+- <https://github.com/lordmulder/sponge-hash-aes256>
+- <https://codeberg.org/MuldeR/sponge-hash-aes256>
+- <https://gitlab.com/lord_mulder/sponge-hash-aes256>
 
 ## License
 

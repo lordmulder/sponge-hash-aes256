@@ -10,7 +10,7 @@ This hash function has a *variable* output size.
 
 ```
 [dependencies]
-sponge-hash-aes256 = "1.3.1"
+sponge-hash-aes256 = "1.3.2"
 ```
 
 ## Usage
@@ -37,6 +37,11 @@ fn main() {
     println!("0x{}", str::from_utf8(&hex_buffer).unwrap());
 }
 ```
+
+## Command-line application
+
+Download the **`sponge256sum`** application here:  
+<https://github.com/lordmulder/sponge-hash-aes256/releases>
 
 ## License
 

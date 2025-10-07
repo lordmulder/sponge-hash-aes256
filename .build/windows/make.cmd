@@ -94,16 +94,31 @@ for %%v in (v2 v3 v4) do (
 cargo doc
 if not %ERRORLEVEL% == 0 goto:error
 
+cargo --version --verbose > "%CD%\target\.RUSTC_VERSION"
+>> "%CD%\target\.RUSTC_VERSION" echo.
+cargo rustc -- --version --verbose >> "%CD%\target\.RUSTC_VERSION"
+
 popd
+
+REM --------------------------------------------------------------------------
+REM Create info
+REM --------------------------------------------------------------------------
+
+for /F "usebackq tokens=*" %%i in (`git describe --long --always --dirty`) do (
+	> "%CD%\target\dist\BUILD_INFO.txt" echo Revision: %%i
+)
+
+>> "%CD%\target\dist\BUILD_INFO.txt" echo Built on %DATE% at %TIME%
+>> "%CD%\target\dist\BUILD_INFO.txt" echo.
+
+type "%CD%\..\..\app\target\.RUSTC_VERSION" >> "%CD%\target\dist\BUILD_INFO.txt"
+if not %ERRORLEVEL% == 0 goto:error
 
 REM --------------------------------------------------------------------------
 REM Packaging
 REM --------------------------------------------------------------------------
 
-copy /B /Y "%CD%\..\..\LICENSE" "%CD%\target/dist/LICENSE.txt"
-if not %ERRORLEVEL% == 0 goto:error
-
-git describe --long --always --dirty > "%CD%\target/dist/REVISION.txt"
+copy /B /Y "%CD%\..\..\LICENSE" "%CD%\target\dist\LICENSE.txt"
 if not %ERRORLEVEL% == 0 goto:error
 
 xcopy /E /H /I /Y "%CD%\..\..\app\target\doc" "%CD%\target\dist\doc"

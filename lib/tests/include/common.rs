@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: 0BSD
+// SpongeHash-AES256
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 #[test]
@@ -70,7 +71,7 @@ pub fn test_case_5a() {
     do_test(
         &hex!("12ccdc15d5eaefa5b9347900b2ac9a9ba7b275deef9d0f372e0701e17e9eb0e2"),
         None,
-        str::from_utf8(&[0x61u8; 1000000usize]).unwrap(),
+        from_utf8(&[0x61u8; 1000000usize]).unwrap(),
     );
 }
 
@@ -79,6 +80,6 @@ pub fn test_case_5b() {
     do_test(
         &hex!("477a83e8a0427c72c3fedb4b9e39a63dcc51b8c8974e0c3c0d4c16db1739be74"),
         Some("thingamajig"),
-        str::from_utf8(&[0x61u8; 1000000usize]).unwrap(),
+        from_utf8(&[0x61u8; 1000000usize]).unwrap(),
     );
 }

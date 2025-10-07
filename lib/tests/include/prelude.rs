@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: 0BSD
+// SpongeHash-AES256
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use hex_literal::hex;
 use hex::encode_to_slice;
+use std::str::from_utf8;
 
 fn encode<'a>(buffer: &'a mut [u8], data: &[u8]) -> &'a str {
     match encode_to_slice(data, buffer) {
-        Ok(_) => str::from_utf8(buffer).unwrap(),
+        Ok(_) => from_utf8(buffer).unwrap(),
         Err(_) => Default::default()
     }
 }

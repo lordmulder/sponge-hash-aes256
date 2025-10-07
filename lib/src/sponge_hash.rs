@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: 0BSD
+// SpongeHash-AES256
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use crate::utilities::{BLOCK_SIZE, aes256_encrypt, xor_arrays};
@@ -79,7 +80,7 @@ impl<const N: usize> NoneZeroArg<N> {
 ///     encode_to_slice(&digest, &mut hex_buffer).unwrap();
 ///
 ///     // Print the digest (hex format)
-///     println!("0x{}", str::from_utf8(&hex_buffer).unwrap());
+///     println!("0x{}", core::str::from_utf8(&hex_buffer).unwrap());
 /// }
 /// ```
 ///
@@ -105,6 +106,7 @@ impl<const N: usize> NoneZeroArg<N> {
 /// The [`compute()`] and [`compute_to_slice()`] convenience functions may be used as an alternative to working with the `SpongeHash256` struct directly. This is especially useful, if *all* data to be hashed is available at once.
 ///
 /// </div>
+#[repr(align(128))]
 pub struct SpongeHash256<const R: usize = DEFAULT_PERMUTE_ROUNDS> {
     state0: [u8; BLOCK_SIZE],
     state1: [u8; BLOCK_SIZE],
@@ -293,7 +295,7 @@ impl<const R: usize> Drop for SpongeHash256<R> {
 ///     encode_to_slice(&digest, &mut hex_buffer).unwrap();
 ///
 ///     // Print the digest (hex format)
-///     println!("0x{}", str::from_utf8(&hex_buffer).unwrap());
+///     println!("0x{}", core::str::from_utf8(&hex_buffer).unwrap());
 /// }
 /// ```
 ///
@@ -359,7 +361,7 @@ pub fn compute<const N: usize, T: AsRef<[u8]>>(info: Option<&str>, message: T) -
 ///     encode_to_slice(&digest, &mut hex_buffer).unwrap();
 ///
 ///     // Print the digest (hex format)
-///     println!("0x{}", str::from_utf8(&hex_buffer).unwrap());
+///     println!("0x{}", core::str::from_utf8(&hex_buffer).unwrap());
 /// }
 ///
 /// ```
