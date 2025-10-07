@@ -26,6 +26,7 @@ simple_logger = { version = "5.0.0", default-features = false }
 
 [features]
 default = []
+aligned = []
 tracing = [ "dep:log" ]
 
 [profile.release]

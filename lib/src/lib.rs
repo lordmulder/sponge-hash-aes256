@@ -2,7 +2,7 @@
 // SpongeHash-AES256
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-//#![no_std]
+#![no_std]
 #![allow(clippy::needless_doctest_main)]
 
 //! # SpongeHash-AES256
@@ -22,8 +22,9 @@
 //! ## Optional features
 //!
 //! Feature   | Meaning
-//! --------- | ---------------------------------------------------------------------------------------
-//! `tracing` | Dump the internal state to the loggging sub-system (via `log::trace()`) after each step
+//! --------- | ------------------------------------------------------------------------------------------
+//! `aligned` | Assume that blocks are always aligned in memory, i.e., do **not** perfrom alignment check.
+//! `tracing` | Dump the internal state to the loggging sub-system (via `log::trace()`) after each step.
 //!
 //! ## License
 //!

@@ -77,7 +77,7 @@ REM --------------------------------------------------------------------------
 set "RUSTFLAGS=-Dwarnings -Ctarget-feature=+crt-static"
 
 for %%t in (x86_64 i686 aarch64) do (
-	cargo build --release --target %%t-pc-windows-msvc --verbose
+	cargo build --release --target %%t-pc-windows-msvc --features aligned --verbose
 	if not !ERRORLEVEL! == 0 goto:error
 	copy /B /Y "target\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-%%t.exe"
 	if not !ERRORLEVEL! == 0 goto:error
@@ -85,7 +85,7 @@ for %%t in (x86_64 i686 aarch64) do (
 
 for %%v in (v2 v3 v4) do (
 	set "RUSTFLAGS=-Dwarnings -Ctarget-feature=+crt-static -Ctarget-cpu=x86-64-%%v"
-	cargo build --release --target x86_64-pc-windows-msvc --verbose
+	cargo build --release --target x86_64-pc-windows-msvc --features aligned --verbose
 	if not !ERRORLEVEL! == 0 goto:error
 	copy /B /Y "target\x86_64-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-x86_64-%%v.exe"
 	if not !ERRORLEVEL! == 0 goto:error

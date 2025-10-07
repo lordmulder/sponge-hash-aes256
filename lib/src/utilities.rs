@@ -11,6 +11,22 @@ pub const BLOCK_SIZE: usize = 16usize;
 pub const KEY_SIZE: usize = 2usize * BLOCK_SIZE;
 
 // ---------------------------------------------------------------------------
+// Alignment checks
+// ---------------------------------------------------------------------------
+
+#[cfg(not(feature = "aligned"))]
+#[inline(always)]
+fn check_aligned<T: Sized>(ptr: *const T) -> bool {
+    ptr.is_aligned()
+}
+
+#[cfg(feature = "aligned")]
+#[inline(always)]
+fn check_aligned<T: Sized>(_ptr: *const T) -> bool {
+    true
+}
+
+// ---------------------------------------------------------------------------
 // Functions
 // ---------------------------------------------------------------------------
 
@@ -35,7 +51,7 @@ pub fn xor_arrays(dst: &mut [u8; BLOCK_SIZE], src: &[u8; BLOCK_SIZE]) {
 
     let (ptr_dst, ptr_src) = (dst.as_ptr() as *mut usize, src.as_ptr() as *const usize);
 
-    if ptr_src.is_aligned() && ptr_dst.is_aligned() {
+    if check_aligned(ptr_src) && check_aligned(ptr_dst) {
         unsafe {
             let dst_usize = slice::from_raw_parts_mut(ptr_dst, WORDS);
             let src_usize = slice::from_raw_parts(ptr_src, WORDS);

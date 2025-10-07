@@ -285,7 +285,7 @@ impl<const R: usize> Drop for SpongeHash256<R> {
 /// use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, compute};
 ///
 /// fn main() {
-///     // Compute digest using the “one-shot” function
+///     // Compute the digest using the “one-shot” function
 ///     let digest: [u8; DEFAULT_DIGEST_SIZE] = compute(
 ///         None,
 ///         b"The quick brown fox jumps over the lazy dog");
@@ -307,7 +307,7 @@ impl<const R: usize> Drop for SpongeHash256<R> {
 /// use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, compute};
 ///
 /// fn main() {
-///     // Compute digest using the “one-shot” function with additional “info”
+///     // Compute the digest using the “one-shot” function with additional “info”
 ///     let digest: [u8; DEFAULT_DIGEST_SIZE] = compute(
 ///         Some("my_application"),
 ///         b"The quick brown fox jumps over the lazy dog");

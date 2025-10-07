@@ -61,7 +61,7 @@ jobs:
       matrix:
         rust: [1.90-trixie, 1.85-bookworm]
         project: [lib, app]
-        options: ["", " --release", " --examples"]
+        options: ["", " --release --features aligned", " --examples"]
     steps:
       - uses: actions/checkout@v5
       - working-directory: ${{ github.workspace }}/${{ matrix.project }}

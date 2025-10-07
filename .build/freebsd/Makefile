@@ -8,7 +8,7 @@ build:
 	rm -rf target && mkdir target && mkdir target/dist
 	cd ../../app; \
 	for t in x86_64 i686; do \
-		cargo build --release --target $$t-unknown-freebsd --verbose; \
+		cargo build --release --target $$t-unknown-freebsd --features aligned --verbose; \
 		mv -vf target/$$t-unknown-freebsd/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$t; \
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-$$t; \
 	done; \

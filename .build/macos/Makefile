@@ -8,7 +8,7 @@ build:
 	rm -rf target && mkdir target && mkdir target/dist
 	cd ../../app; \
 	for t in x86_64 aarch64; do \
-		cargo build --release --target $$t-apple-darwin --verbose; \
+		cargo build --release --target $$t-apple-darwin --features aligned --verbose; \
 		mv -vf target/$$t-apple-darwin/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$t; \
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-$$t; \
 	done; \
