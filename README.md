@@ -82,6 +82,26 @@ Options:
 If no input files are specified, reads input data from 'stdin' stream.
 ```
 
+## Algorithm
+
+This section provides additional details about the SpongeHash-AES256 algorithm.
+
+### Internal state
+
+The state has a total size of 384 bits, consisting of three 128-bit blocks, and is initialized to all zeros at the start of the computation. Only the upper 128 bits are directly used for input and output operations.
+
+### Update function
+
+The “update” function, which *absorbs* input blocks into the state and *squeezes* the corresponding output from it, is defined as follows, where `input[i]` denotes the *i*-th input block and `output[i]` the *i*-th output block:
+
+![Update](.assets/images/function-update.png)
+
+### Permutation function
+
+The “permutation” function, applied to scramble the state after each absorbing or squeezing step, is defined as follows, where `AES-256` denotes the [AES](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard) cipher with a key size of 256 bits and a block size of 128 bits.
+
+![Permutation](.assets/images/function-permutation.png)
+
 ## Git repository
 
 Official Git mirrors are available here:
