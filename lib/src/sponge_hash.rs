@@ -106,6 +106,26 @@ impl<const N: usize> NoneZeroArg<N> {
 /// The [`compute()`] and [`compute_to_slice()`] convenience functions may be used as an alternative to working with the `SpongeHash256` struct directly. This is especially useful, if *all* data to be hashed is available at once.
 ///
 /// </div>
+///
+/// ### Algorithm
+///
+/// This section provides additional details about the SpongeHash-AES256 algorithm.
+///
+/// #### Internal state
+///
+/// The state has a total size of 384 bits, consisting of three 128-bit blocks, and is initialized to all zeros at the start of the computation. Only the upper 128 bits are directly used for input and output operations, as described below.
+///
+/// #### Update function
+///
+/// The “update” function, which *absorbs* input blocks into the state and *squeezes* the corresponding output from it, is defined as follows, where `input[i]` denotes the *i*-th input block and `output[i]` the *i*-th output block:
+///
+/// ![Update](https://github.com/lordmulder/sponge-hash-aes256/raw/master/.assets/images/function-update.png)
+///
+/// #### Permutation function
+///
+/// The “permutation” function, applied to scramble the state after each absorbing or squeezing step, is defined as follows, where `AES-256` denotes the ordinary [AES](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard) block cipher with a key size of 256 bits and a block size of 128 bits.
+///
+/// ![Permutation](https://github.com/lordmulder/sponge-hash-aes256/raw/master/.assets/images/function-permutation.png)
 #[repr(align(128))]
 pub struct SpongeHash256<const R: usize = DEFAULT_PERMUTE_ROUNDS> {
     state0: [u8; BLOCK_SIZE],
