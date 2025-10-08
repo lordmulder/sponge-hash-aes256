@@ -159,12 +159,12 @@ jobs:
         with:
           fetch-depth: 0
       - run: git config --global --add safe.directory $GITHUB_WORKSPACE
-      - working-directory: ${{ github.workspace }}/.build/freebsd
-        run: ./crossbuild-linux.sh
+      - working-directory: ${{ github.workspace }}/.build/unix
+        run: ./crossbuild-freebsd.sh
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-freebsd
-          path: ${{ github.workspace }}/.build/freebsd/target/*.tar.xz
+          path: ${{ github.workspace }}/.build/unix/target/*.tar.xz
 
   build-cross-netbsd:
     runs-on: ubuntu-latest
@@ -193,12 +193,12 @@ jobs:
         with:
           fetch-depth: 0
       - run: git config --global --add safe.directory $GITHUB_WORKSPACE
-      - working-directory: ${{ github.workspace }}/.build/netbsd
-        run: ./crossbuild-linux.sh
+      - working-directory: ${{ github.workspace }}/.build/unix
+        run: ./crossbuild-netbsd.sh
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-netbsd
-          path: ${{ github.workspace }}/.build/netbsd/target/*.tar.xz
+          path: ${{ github.workspace }}/.build/unix/target/*.tar.xz
 
   release:
     runs-on: ubuntu-latest

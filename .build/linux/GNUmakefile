@@ -3,11 +3,11 @@ SHELL = /bin/sh
 
 .ONESHELL:
 
-.PHONY: all build docs dist clean
+.PHONY: all build dist pkg clean
 
-all: clean dist
+all: pkg
 
-build:
+build: clean
 	rm -rf target && mkdir target && mkdir target/dist
 	cd ../../app
 	for t in x86_64 i686 aarch64; do
@@ -29,24 +29,23 @@ build:
 		mv -vf target/i586-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$p
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-$$p
 	done
-	cargo pkgid > target/.CARGO_PKGID
-	printf '%s\n\n%s\n' "$$(cargo --version --verbose)" "$$(cargo rustc -- --version --verbose)" > target/.RUSTC_VERSION
-
-docs:
-	cd ../../app
 	cargo doc
+	cp -rf target/doc $(CURDIR)/target/dist/
+	cargo pkgid | grep -Eo '[^@]+$$' | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//' > $(CURDIR)/target/.PKG_VERSION
+	printf '%s\n\n' "`cargo --version --verbose`" > $(CURDIR)/target/.RUSTC_VERSION
+	printf '%s\n' "`cargo rustc -- --version --verbose`" >> $(CURDIR)/target/.RUSTC_VERSION
 
-dist: build docs
-	PKG_VERSION="$$(grep -Eo '[^@]+$$' < ../../app/target/.CARGO_PKGID | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//')"
-	test -n "$${PKG_VERSION}"
-	cp -rf ../../app/target/doc target/dist/
+dist: build
 	cp -f ../../.assets/html/index.html target/dist/doc/index.html
 	cp -f ../../LICENSE target/dist/LICENSE
-	printf 'Revision: %s\n' "$$(git describe --long --always --dirty)" > target/dist/BUILD_INFO
-	printf 'Built on %s\n\n' "$$(date +'%Y-%m-%d %H:%M:%S')" >> target/dist/BUILD_INFO
-	cat ../../app/target/.RUSTC_VERSION >> target/dist/BUILD_INFO
+	printf 'Revision: %s\n' "`git describe --long --always --dirty`" > target/dist/BUILD_INFO
+	printf 'Built: %s\n\n' "`date +'%Y-%m-%d %H:%M:%S'`" >> target/dist/BUILD_INFO
+	cat target/.RUSTC_VERSION >> target/dist/BUILD_INFO
 	find target/dist -type f -not -name 'sponge256sum-*' -exec chmod 444 {} \;
 	find target/dist -type d -exec chmod 755 {} \;
+
+pkg: dist
+	IFS= read -r PKG_VERSION < target/.PKG_VERSION
 	( cd target/dist && XZ_OPT=-9e tar --owner=0 --group=0 -cJvf ../sponge256sum-$${PKG_VERSION}-linux.tar.xz * )
 	chmod 444 target/sponge256sum-$${PKG_VERSION}-linux.tar.xz
 

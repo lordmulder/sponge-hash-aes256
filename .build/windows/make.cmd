@@ -108,7 +108,7 @@ for /F "usebackq tokens=*" %%i in (`git describe --long --always --dirty`) do (
 	> "%CD%\target\dist\BUILD_INFO.txt" echo Revision: %%i
 )
 
->> "%CD%\target\dist\BUILD_INFO.txt" echo Built on %DATE% at %TIME%
+>> "%CD%\target\dist\BUILD_INFO.txt" echo Built: %DATE% %TIME%
 >> "%CD%\target\dist\BUILD_INFO.txt" echo.
 
 type "%CD%\..\..\app\target\.RUSTC_VERSION" >> "%CD%\target\dist\BUILD_INFO.txt"
