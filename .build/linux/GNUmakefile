@@ -38,7 +38,7 @@ build: clean
 dist: build
 	cp -f ../../.assets/html/index.html target/dist/doc/index.html
 	cp -f ../../LICENSE target/dist/LICENSE
-	printf 'Revision: %s\n' "`git describe --long --always --dirty`" > target/dist/BUILD_INFO
+	printf 'Revision: %s\n' "`git describe --long --tags --always --dirty`" > target/dist/BUILD_INFO
 	printf 'Built: %s\n\n' "`date +'%Y-%m-%d %H:%M:%S'`" >> target/dist/BUILD_INFO
 	cat target/.RUSTC_VERSION >> target/dist/BUILD_INFO
 	find target/dist -type f -not -name 'sponge256sum-*' -exec chmod 444 {} \;

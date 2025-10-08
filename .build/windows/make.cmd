@@ -104,7 +104,7 @@ REM --------------------------------------------------------------------------
 REM Create info
 REM --------------------------------------------------------------------------
 
-for /F "usebackq tokens=*" %%i in (`git describe --long --always --dirty`) do (
+for /F "usebackq tokens=*" %%i in (`git describe --long --tags --always --dirty`) do (
 	> "%CD%\target\dist\BUILD_INFO.txt" echo Revision: %%i
 )
 
