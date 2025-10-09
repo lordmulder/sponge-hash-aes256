@@ -25,7 +25,7 @@ In order to use this crate, you have to add it under `[dependencies]` to your **
 
 ```
 [dependencies]
-sponge-hash-aes256 = "1.3.2"
+sponge-hash-aes256 = "1.3.3"
 ```
 
 ### Usage
@@ -68,18 +68,22 @@ Arguments:
 Options:
   -b, --binary           Read the input file(s) in binary mode, i.e., default mode
   -t, --text             Read the input file(s) in text mode
-  -k, --keep-going       Keep going, even if an input file can not be read
+  -d, --dirs             Enable processing of directories as arguments
+  -r, --recursive        Recursively process the provided directories (implies -d)
+  -k, --keep-going       Continue processing even if errors are encountered
   -l, --length <LENGTH>  Digest output size, in bits (default: 256, maximum: 1024)
   -i, --info <INFO>      Include additional context information
   -s, --snail...         Enable "snail" mode, i.e., slow down the hash computation
   -q, --quiet            Do not output any error messages or warnings
   -p, --plain            Print digest(s) in plain format, i.e., without file names
+  -0, --null             Separate digest(s) by NULL characters instead of newlines
   -f, --flush            Explicitely flush 'stdout' stream after printing a digest
-      --self-test        Run the built-in self-test (BIST)
+  -T, --self-test        Run the built-in self-test (BIST)
   -h, --help             Print help
   -V, --version          Print version
 
-If no input files are specified, reads input data from 'stdin' stream.
+If no input files are specified, reads input data from the 'stdin' stream.
+Returns a non-zero exit code if any errors occurred; otherwise, zero.
 ```
 
 ## Algorithm
@@ -101,6 +105,14 @@ The “update” function, which *absorbs* input blocks into the state and *sque
 The “permutation” function, applied to scramble the state after each absorbing or squeezing step, is defined as follows, where `AES-256` denotes the [AES](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard) cipher with a key size of 256 bits and a block size of 128 bits.
 
 ![Permutation](.assets/images/function-permutation.png)
+
+The constants `const_0` and `const_1` are defined as full blocks filled with `0x5C` and `0x36`, respectively.
+
+### Finalization
+
+The padding of the final input block is performed by first appending a single `1` bit, followed by the minimal number of `0` bits needed to make the total message length a multiple of the block size.
+
+Following the final input block, a 128-bit block filled entirely with `0x6A` bytes is absorbed into the state.
 
 ## Git repository
 

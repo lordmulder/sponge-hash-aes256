@@ -10,7 +10,7 @@ This hash function has a *variable* output size.
 
 ```
 [dependencies]
-sponge-hash-aes256 = "1.3.2"
+sponge-hash-aes256 = "1.3.3"
 ```
 
 ## Usage

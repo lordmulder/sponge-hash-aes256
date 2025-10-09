@@ -3,7 +3,7 @@
 all: mkpkg
 
 dist:
-	$(MAKE) -C../unix dist MY_VENDOR=apple MY_OS=darwin MY_ARCH="aarch64 x86_64"
+	$(MAKE) -C../unix dist MY_VENDOR=apple MY_OS=darwin MY_ARCH="aarch64 x86_64" MY_FEATURES="aligned" MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-O3"
 
 mkpkg: dist
 	set -e; \

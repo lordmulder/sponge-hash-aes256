@@ -29,7 +29,7 @@ rustflags = [ "-Dwarnings", "-Ctarget-feature=+crt-static" ]
 rustflags = [ "-Dwarnings", "-Ctarget-feature=+crt-static" ]
 
 [target.x86_64-apple-darwin]
-rustflags = [ "-Dwarnings", "-Ctarget-feature=+crt-static" ]
+rustflags = [ "-Dwarnings" ]
 
 [target.aarch64-apple-darwin]
-rustflags = [ "-Dwarnings", "-Ctarget-feature=+crt-static" ]
+rustflags = [ "-Dwarnings" ]

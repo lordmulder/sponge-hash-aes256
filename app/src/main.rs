@@ -23,18 +23,22 @@
 //! Options:
 //!   -b, --binary           Read the input file(s) in binary mode, i.e., default mode
 //!   -t, --text             Read the input file(s) in text mode
-//!   -k, --keep-going       Keep going, even if an input file can not be read
+//!   -d, --dirs             Enable processing of directories as arguments
+//!   -r, --recursive        Recursively process the provided directories (implies -d)
+//!   -k, --keep-going       Continue processing even if errors are encountered
 //!   -l, --length <LENGTH>  Digest output size, in bits (default: 256, maximum: 1024)
 //!   -i, --info <INFO>      Include additional context information
 //!   -s, --snail...         Enable "snail" mode, i.e., slow down the hash computation
 //!   -q, --quiet            Do not output any error messages or warnings
 //!   -p, --plain            Print digest(s) in plain format, i.e., without file names
+//!   -0, --null             Separate digest(s) by NULL characters instead of newlines
 //!   -f, --flush            Explicitely flush 'stdout' stream after printing a digest
-//!       --self-test        Run the built-in self-test (BIST)
+//!   -T, --self-test        Run the built-in self-test (BIST)
 //!   -h, --help             Print help
 //!   -V, --version          Print version
 //!
-//! If no input files are specified, reads input data from 'stdin' stream.
+//! If no input files are specified, reads input data from the 'stdin' stream.
+//! Returns a non-zero exit code if any errors occurred; otherwise, zero.
 //! ```
 //!
 //! ## Examples
@@ -117,17 +121,19 @@ use rand_pcg::{
 use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, PKG_VERSION as LIB_VERSION, SpongeHash256};
 use std::{
     env::consts::{ARCH, OS},
+    fs::DirEntry,
+    sync::mpsc::{self, Receiver},
+};
+use std::{
+    ffi::OsStr,
     fmt::Debug,
-    fs::File,
+    fs::{File, metadata, read_dir},
     io::{BufRead, BufReader, Error as IoError, Read, Write, stdin, stdout},
     num::NonZeroUsize,
+    path::PathBuf,
     process::ExitCode,
     slice::Iter,
     str::from_utf8,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
     time::Instant,
 };
 
@@ -135,7 +141,7 @@ use std::{
 const MAX_DIGEST_SIZE: usize = 128usize;
 
 // Type definition
-type Flag = Arc<AtomicBool>;
+type Flag = Receiver<bool>;
 
 // ---------------------------------------------------------------------------
 // Error type
@@ -185,7 +191,8 @@ const VERSION_STR: &str =
 /// SpongeHash-AES256 command-line tool
 #[derive(Parser, Debug)]
 #[command(about = "A sponge-based secure hash function that uses AES-256 as its internal PRF.")]
-#[command(after_help = "If no input files are specified, reads input data from 'stdin' stream.")]
+#[command(after_help = "If no input files are specified, reads input data from the 'stdin' stream.\n\
+    Returns a non-zero exit code if any errors occurred; otherwise, zero.")]
 #[command(version = VERSION_STR)]
 #[command(before_help = HEADER_LINE)]
 struct Args {
@@ -197,7 +204,15 @@ struct Args {
     #[arg(short, long)]
     text: bool,
 
-    /// Keep going, even if an input file can not be read
+    /// Enable processing of directories as arguments
+    #[arg(short, long)]
+    dirs: bool,
+
+    /// Recursively process the provided directories (implies -d)
+    #[arg(short, long)]
+    recursive: bool,
+
+    /// Continue processing even if errors are encountered.
     #[arg(short, long)]
     keep_going: bool,
 
@@ -221,17 +236,21 @@ struct Args {
     #[arg(short, long)]
     plain: bool,
 
+    /// Separate digest(s) by NULL characters instead of newlines
+    #[arg(short = '0', long)]
+    null: bool,
+
     /// Explicitely flush 'stdout' stream after printing a digest
     #[arg(short, long)]
     flush: bool,
 
     /// Run the built-in self-test (BIST)
-    #[arg(long)]
+    #[arg(short = 'T', long)]
     self_test: bool,
 
     /// Files to be processed
     #[arg()]
-    files: Vec<String>,
+    files: Vec<PathBuf>,
 }
 
 // ---------------------------------------------------------------------------
@@ -252,11 +271,26 @@ macro_rules! handle_error {
     ($args:ident, $err_counter:ident, $($message:tt)*) => {{
         print_error!($args, $($message)*);
         if $args.keep_going {
-            $err_counter += 1usize;
+            *$err_counter += 1usize;
         } else {
-            return ExitCode::FAILURE;
+            return false;
         }
     }};
+}
+
+/// Check whether the process has been interrupted
+macro_rules! check_running {
+    ($channel:ident) => {
+        if $channel.try_recv().unwrap_or_default() {
+            return Err(Error::Aborted);
+        }
+    };
+    ($args:ident, $channel:ident) => {
+        if $channel.try_recv().unwrap_or_default() {
+            print_error!($args, "Aborted: The process has been interrupted by the user!");
+            return false;
+        }
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -326,14 +360,20 @@ impl Hasher {
 // Print digest
 // ---------------------------------------------------------------------------
 
-fn print_digest(output: &mut impl Write, digest: &[u8], name: &str, size: usize, args: &Args) -> Result<(), Error> {
+fn print_digest(output: &mut impl Write, digest: &[u8], name: &OsStr, size: usize, args: &Args) -> Result<(), Error> {
     let mut hexstr = [0u8; 2usize * MAX_DIGEST_SIZE];
     encode_to_slice(&digest[..size], &mut hexstr[..(2usize * size)]).unwrap();
 
-    if args.plain {
+    if args.null {
+        if args.plain {
+            write!(output, "{}\0", from_utf8(&hexstr[..(2usize * size)]).unwrap())?;
+        } else {
+            write!(output, "{}\0{}\0", from_utf8(&hexstr[..(2usize * size)]).unwrap(), name.to_string_lossy())?;
+        }
+    } else if args.plain {
         writeln!(output, "{}", from_utf8(&hexstr[..(2usize * size)]).unwrap())?;
     } else {
-        writeln!(output, "{} {}", from_utf8(&hexstr[..(2usize * size)]).unwrap(), name)?;
+        writeln!(output, "{} {}", from_utf8(&hexstr[..(2usize * size)]).unwrap(), name.to_string_lossy())?;
     }
 
     if args.flush {
@@ -354,17 +394,8 @@ const IO_BUFFER_SIZE: usize = 4096usize;
 #[cfg(target_pointer_width = "16")]
 const IO_BUFFER_SIZE: usize = 2048usize;
 
-/// Check whether the process has been interrupted
-macro_rules! check_running {
-    ($flag:ident) => {
-        if !$flag.load(Ordering::Relaxed) {
-            return Err(Error::Aborted);
-        }
-    };
-}
-
 /// Process a single input file
-fn process_file(input: &mut impl Read, output: &mut impl Write, name: &str, size: usize, args: &Args, running: &Flag) -> Result<(), Error> {
+fn process_file(input: &mut impl Read, output: &mut impl Write, name: &OsStr, size: usize, args: &Args, running: &Flag) -> Result<(), Error> {
     let mut digest = [0u8; MAX_DIGEST_SIZE];
     let mut hasher = Hasher::new(&args.info, args.snail);
 
@@ -397,52 +428,120 @@ fn process_file(input: &mut impl Read, output: &mut impl Write, name: &str, size
 }
 
 // ---------------------------------------------------------------------------
-// Iterate input files
+// Read input file or stream
 // ---------------------------------------------------------------------------
 
-/// Iterate a list of input files
-fn iterate_files(files: Iter<'_, String>, digest_size: usize, args: &Args, running: Flag) -> ExitCode {
-    let mut output = stdout().lock();
-    let mut err_counter: usize = 0usize;
-
-    for file_name in files {
-        match File::open(file_name) {
-            Ok(mut file) => {
-                if file.metadata().is_ok_and(|meta| meta.is_dir()) {
-                    handle_error!(args, err_counter, "Input is a directory: {:?}", file_name);
-                } else {
-                    match process_file(&mut file, &mut output, file_name, digest_size, args, &running) {
-                        Ok(_) => {}
-                        Err(Error::Aborted) => {
-                            print_error!(args, "Aborted: The process has been interrupted by the user!");
-                            return ExitCode::FAILURE;
-                        }
-                        Err(error) => handle_error!(args, err_counter, "Failed to read file: {:?} [{:?}]", file_name, error),
+/// Read data from a file
+fn read_file(path: &PathBuf, output: &mut impl Write, digest_size: usize, args: &Args, running: &Flag, errors: &mut usize) -> bool {
+    match File::open(path) {
+        Ok(mut file) => {
+            if file.metadata().is_ok_and(|meta| meta.is_dir()) {
+                handle_error!(args, errors, "Input is a directory: {:?}", path);
+            } else {
+                match process_file(&mut file, output, path.as_os_str(), digest_size, args, running) {
+                    Ok(_) => {}
+                    Err(Error::Aborted) => {
+                        print_error!(args, "Aborted: The process has been interrupted by the user!");
+                        return false;
                     }
+                    Err(error) => handle_error!(args, errors, "Failed to read file: {:?} [{:?}]", path, error),
                 }
             }
-            Err(error) => handle_error!(args, err_counter, "Failed to open input file: {:?} [{:?}]", file_name, error),
         }
+        Err(error) => handle_error!(args, errors, "Failed to open input file: {:?} [{:?}]", path, error),
     }
 
-    if err_counter == 0usize { ExitCode::SUCCESS } else { ExitCode::FAILURE }
+    true
 }
 
 /// Read data from the `stdin` stream
-fn read_from_stdin(digest_size: usize, args: &Args, running: Flag) -> ExitCode {
+fn read_from_stdin(output: &mut impl Write, digest_size: usize, args: &Args, running: Flag) -> bool {
     let mut input = stdin().lock();
-    let mut output = stdout().lock();
 
-    match process_file(&mut input, &mut output, "-", digest_size, args, &running) {
-        Ok(_) => ExitCode::SUCCESS,
+    match process_file(&mut input, output, OsStr::new("-"), digest_size, args, &running) {
+        Ok(_) => true,
         Err(Error::Aborted) => {
             print_error!(args, "Aborted: The process has been interrupted by the user!");
-            ExitCode::FAILURE
+            false
         }
         Err(error) => {
             print_error!(args, "Failed to read input data from 'stdin' stream: {:?}", error);
-            ExitCode::FAILURE
+            false
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Iterate input files/directories
+// ---------------------------------------------------------------------------
+
+/// Iterate a list of input files
+fn iterate_files(files: Iter<'_, PathBuf>, output: &mut impl Write, digest_size: usize, args: &Args, running: Flag) -> bool {
+    let mut errors = 0usize;
+    let handle_dirs = args.dirs || args.recursive;
+
+    for file_name in files {
+        check_running!(args, running);
+        if handle_dirs && metadata(file_name).is_ok_and(|meta| meta.is_dir()) {
+            if !iterate_directory(file_name, output, digest_size, args, &running, &mut errors) {
+                return false;
+            }
+        } else if !read_file(file_name, output, digest_size, args, &running, &mut errors) {
+            return false;
+        }
+    }
+
+    if args.keep_going && (errors > 0usize) {
+        print_error!(args, "Warning: {} file(s) were skipped due to errors.", errors);
+    }
+
+    errors == 0usize
+}
+
+/// Iterate all files and sub-directories in a directory
+fn iterate_directory(path: &PathBuf, output: &mut impl Write, digest_size: usize, args: &Args, running: &Flag, errors: &mut usize) -> bool {
+    match read_dir(path) {
+        Ok(dir_iter) => {
+            for element in dir_iter {
+                check_running!(args, running);
+                match element {
+                    Ok(dir_entry) => {
+                        if is_directory(&dir_entry) {
+                            if args.recursive && (!iterate_directory(&dir_entry.path(), output, digest_size, args, running, errors)) {
+                                return false;
+                            }
+                        } else if !read_file(&dir_entry.path(), output, digest_size, args, running, errors) {
+                            return false;
+                        }
+                    }
+                    Err(error) => {
+                        handle_error!(args, errors, "Failed to read directory: {:?} [{:?}]", path, error);
+                    }
+                }
+            }
+        }
+        Err(error) => {
+            handle_error!(args, errors, "Failed to open directory: {:?} [{:?}]", path, error);
+        }
+    }
+
+    true
+}
+
+/// Check if directory entry is a directory or a symlink to a directory
+fn is_directory(entry: &DirEntry) -> bool {
+    match entry.metadata() {
+        Ok(meta) => {
+            let file_type = meta.file_type();
+            match file_type.is_dir() {
+                true => true,
+                false => match file_type.is_symlink() {
+                    true => metadata(entry.path()).is_ok_and(|info| info.is_dir()),
+                    false => false,
+                },
+            }
+        }
+        Err(_) => false,
     }
 }
 
@@ -461,9 +560,7 @@ fn arrays_equal<const N: usize>(array0: &[u8; N], array1: &[u8; N]) -> bool {
     mask == 0u8
 }
 
-fn self_test(running: Flag) -> ExitCode {
-    let mut output = stdout().lock();
-
+fn self_test(output: &mut impl Write, args: &Args, running: Flag) -> bool {
     let _ = writeln!(output, "{}\n", HEADER_LINE);
     let _ = writeln!(output, "Self-test is running, please be patient...");
     let _ = output.flush();
@@ -477,10 +574,7 @@ fn self_test(running: Flag) -> ExitCode {
     for _ in 0u32..524287u32 {
         source.fill_bytes(&mut buffer);
         hasher.update(buffer);
-        if !running.load(Ordering::Relaxed) {
-            let _ = writeln!(output, "Cancelled !!!");
-            return ExitCode::FAILURE;
-        }
+        check_running!(args, running);
     }
 
     let digest_computed = hasher.digest();
@@ -489,12 +583,12 @@ fn self_test(running: Flag) -> ExitCode {
     if arrays_equal(&digest_computed, &DIGEST_EXPECTED) {
         let _ = writeln!(output, "Successful.\n");
         let _ = writeln!(output, "Test completed successfully in {:.1} seconds.", elapsed);
-        ExitCode::SUCCESS
+        true
     } else {
         let _ = writeln!(output, "Failure !!!\n");
         let _ = writeln!(output, "Digest computed: {:02x?}", &digest_computed[..]);
         let _ = writeln!(output, "Digest expected: {:02x?}", &DIGEST_EXPECTED[..]);
-        ExitCode::FAILURE
+        false
     }
 }
 
@@ -541,19 +635,23 @@ fn main() -> ExitCode {
     }
 
     // Install the interrupt handler
-    let running = Arc::new(AtomicBool::new(true));
-    let flag = running.clone();
-    set_handler(move || flag.store(false, Ordering::SeqCst)).expect("Failed to register CTRL+C handler!");
+    let (stop_tx, stop_rx) = mpsc::channel();
+    set_handler(move || stop_tx.send(true).expect("Failed to send the 'stop' flag!")).expect("Failed to register CTRL+C handler!");
+
+    // Acquire stdout handle
+    let mut output = stdout().lock();
 
     // Run built-in self-test, if it was requested by the user
-    if args.self_test {
-        return self_test(running);
-    }
-
-    // Process all files that were given on the command-line
-    if !args.files.is_empty() {
-        iterate_files(args.files.iter(), digest_size, &args, running)
+    let success = if args.self_test {
+        self_test(&mut output, &args, stop_rx)
     } else {
-        read_from_stdin(digest_size, &args, running)
-    }
+        // Process all files and directories that were given on the command-line
+        if args.files.is_empty() {
+            read_from_stdin(&mut output, digest_size, &args, stop_rx)
+        } else {
+            iterate_files(args.files.iter(), &mut output, digest_size, &args, stop_rx)
+        }
+    };
+
+    if success { ExitCode::SUCCESS } else { ExitCode::FAILURE }
 }

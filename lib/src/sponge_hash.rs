@@ -126,6 +126,12 @@ impl<const N: usize> NoneZeroArg<N> {
 /// The “permutation” function, applied to scramble the state after each absorbing or squeezing step, is defined as follows, where `AES-256` denotes the ordinary [AES](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard) block cipher with a key size of 256 bits and a block size of 128 bits.
 ///
 /// ![Permutation](https://github.com/lordmulder/sponge-hash-aes256/raw/master/.assets/images/function-permutation.png)
+///
+/// ### Finalization
+///
+/// The padding of the final input block is performed by first appending a single `1` bit, followed by the minimal number of `0` bits needed to make the total message length a multiple of the block size.
+///
+/// Following the final input block, a 128-bit block filled entirely with `0x6A` bytes is absorbed into the state.
 #[repr(align(128))]
 pub struct SpongeHash256<const R: usize = DEFAULT_PERMUTE_ROUNDS> {
     state0: [u8; BLOCK_SIZE],

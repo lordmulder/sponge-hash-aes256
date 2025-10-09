@@ -79,7 +79,11 @@ set "RUSTFLAGS=-Dwarnings -Ctarget-feature=+crt-static"
 for %%t in (x86_64 i686 aarch64) do (
 	cargo build --release --target %%t-pc-windows-msvc --features aligned --verbose
 	if not !ERRORLEVEL! == 0 goto:error
-	copy /B /Y "target\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-%%t.exe"
+	if "%%t" == "i686" (
+		copy /B /Y "target\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-pentium4.exe"
+	) else (
+		copy /B /Y "target\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-%%t.exe"
+	)
 	if not !ERRORLEVEL! == 0 goto:error
 )
 
