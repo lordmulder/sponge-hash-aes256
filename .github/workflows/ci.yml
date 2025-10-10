@@ -171,10 +171,11 @@ jobs:
           release: 14.3
           usesh: true
           prepare: |
-            pkg install -y curl
+            pkg install -y git curl
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.90.0
             . "$HOME/.cargo/env"
             rustup target add x86_64-unknown-freebsd i686-unknown-freebsd
+            git config --global --add safe.directory '*'
           run: |
             . "$HOME/.cargo/env"
             cd .build/unix
@@ -197,8 +198,9 @@ jobs:
           release: 10.1
           usesh: true
           prepare: |
-            /usr/sbin/pkg_add curl
+            /usr/sbin/pkg_add git curl
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.90.0
+            git config --global --add safe.directory '*'
           run: |
             . "$HOME/.cargo/env"
             cd .build/unix
@@ -220,7 +222,9 @@ jobs:
         with:
           release: 7.7
           usesh: true
-          prepare: pkg_add rust
+          prepare: |
+            pkg_add git rust
+            git config --global --add safe.directory '*'
           run: |
             cd .build/unix
             make MY_OS=openbsd MY_ARCH=x86_64 MY_FEATURES=aligned MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
@@ -267,8 +271,9 @@ jobs:
           release: r151054
           usesh: true
           prepare: |
-            pkg install developer/build-essential
+            pkg install developer/build-essential developer/versioning/git
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.90.0
+            git config --global --add safe.directory '*'
           run: |
             . "$HOME/.cargo/env"
             cd .build/unix

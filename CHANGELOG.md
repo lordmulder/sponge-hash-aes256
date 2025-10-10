@@ -13,8 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Swicthed to [VM Actions](https://github.com/vmactions) for creating the automated builds for the Unix/BSD platforms.
-- Reduced the size of the documentation files that are inlcuded in the generated release bundles.
+- Switched to [VM Actions](https://github.com/vmactions) for creating the automated builds for the Unix/BSD platforms.
+- Reduced the size of the documentation files that are included in the generated release bundles.
 - Various small improvements.
 
 ## Version 1.3.3
