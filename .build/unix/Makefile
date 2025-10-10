@@ -23,7 +23,7 @@ build: clean
 	done; \
 	cargo doc; \
 	cp -rf target/doc $${ORIGINAL_DIR}/target/dist/; \
-	cargo pkgid | grep -Eo '[^@]+$$' | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//' > $${ORIGINAL_DIR}/target/.PKG_VERSION; \
+	cargo pkgid | sed 's/^.*@//;s/^[[:space:]]*//;s/[[:space:]]*$$//' > $${ORIGINAL_DIR}/target/.PKG_VERSION; \
 	printf '%s\n\n' "`cargo --version --verbose`" > $${ORIGINAL_DIR}/target/.RUSTC_VERSION; \
 	printf '%s\n' "`cargo rustc -- --version --verbose`" >> $${ORIGINAL_DIR}/target/.RUSTC_VERSION;
 
@@ -34,7 +34,7 @@ dist: build
 	printf 'Revision: %s\n' "`git describe --long --tags --always --dirty`" > target/dist/BUILD_INFO; \
 	printf 'Built: %s\n\n' "`date +'%Y-%m-%d %H:%M:%S'`" >> target/dist/BUILD_INFO; \
 	cat target/.RUSTC_VERSION >> target/dist/BUILD_INFO; \
-	find target/dist -type f -not -name 'sponge256sum-*' -exec chmod 444 {} \;; \
+	find target/dist -type f ! -name 'sponge256sum-*' -exec chmod 444 {} \;; \
 	find target/dist -type d -exec chmod 755 {} \;
 
 pkg: dist

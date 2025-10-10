@@ -9,6 +9,10 @@ on:
     types: [published]
 
 jobs:
+  # --------------------------------------------------------------------------
+  # Pre-checks
+  # --------------------------------------------------------------------------
+
   check:
     runs-on: ubuntu-latest
     container:
@@ -61,6 +65,10 @@ jobs:
       - working-directory: ${{ github.workspace }}/${{ matrix.project }}
         run: cargo clippy -- -D warnings${{ matrix.rust == '1.85-bookworm' && ' -A unknown_lints' || '' }}
 
+  # --------------------------------------------------------------------------
+  # Tests
+  # --------------------------------------------------------------------------
+
   test:
     runs-on: ubuntu-latest
     container:
@@ -78,6 +86,10 @@ jobs:
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
       - working-directory: ${{ github.workspace }}/${{ matrix.project }}
         run: cargo test --verbose${{ matrix.options }}${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
+
+  # --------------------------------------------------------------------------
+  # Build
+  # --------------------------------------------------------------------------
 
   build-linux:
     runs-on: ubuntu-latest
@@ -133,7 +145,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           target: x86_64-apple-darwin,aarch64-apple-darwin
-          rustflags: "-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-O3"
+          rustflags: -Dwarnings
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -146,81 +158,135 @@ jobs:
           name: sponge256sum-macos
           path: ${{ github.workspace }}/.build/macos/target/*.dmg
 
-  build-cross-freebsd:
+  build-freebsd:
     runs-on: ubuntu-latest
-    container:
-      image: rust:1.90-trixie
     needs: test
     steps:
-      - run: |
-          export DEBIAN_FRONTEND=noninteractive
-          apt-get update
-          apt-get install -y clang lld
-      - run: |
-          rustup target add x86_64-unknown-freebsd
-          rustup target add i686-unknown-freebsd
-      - uses: actions/cache@v4
-        id: cache-freebsd-sysroots
-        with:
-          path: /opt/freebsd/sysroot
-          key: freebsd-sysroot-14.3-RELEASE
-      - if: steps.cache-freebsd-sysroots.outputs.cache-hit != 'true'
-        run: |
-          for p in amd64 i386; do
-            mkdir -p /opt/freebsd/sysroot/${p}
-            wget -qO - https://download.freebsd.org/ftp/releases/${p}/14.3-RELEASE/base.txz | tar -C /opt/freebsd/sysroot/${p} -xJv
-          done
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - run: git config --global --add safe.directory $GITHUB_WORKSPACE
-      - working-directory: ${{ github.workspace }}/.build/unix
-        run: ./crossbuild-freebsd.sh
+      - uses: vmactions/freebsd-vm@v1
+        with:
+          release: 14.3
+          usesh: true
+          prepare: |
+            pkg install -y curl
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.90.0
+            . "$HOME/.cargo/env"
+            rustup target add x86_64-unknown-freebsd i686-unknown-freebsd
+          run: |
+            . "$HOME/.cargo/env"
+            cd .build/unix
+            make MY_OS=freebsd MY_ARCH="x86_64 i686" MY_FEATURES=aligned MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-freebsd
           path: ${{ github.workspace }}/.build/unix/target/*.tar.xz
 
-  build-cross-netbsd:
+  build-netbsd:
     runs-on: ubuntu-latest
-    container:
-      image: rust:1.90-trixie
     needs: test
     steps:
-      - run: |
-          export DEBIAN_FRONTEND=noninteractive
-          apt-get update
-          apt-get install -y clang lld
-      - run: |
-          rustup target add x86_64-unknown-netbsd
-      - uses: actions/cache@v4
-        id: cache-netbsd-sysroots
-        with:
-          path: /opt/netbsd/sysroot
-          key: netbsd-sysroot-10.1
-      - if: steps.cache-netbsd-sysroots.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p /opt/netbsd/sysroot/amd64
-          for s in base comp; do
-            wget -qO - https://cdn.netbsd.org/pub/NetBSD/NetBSD-10.1/amd64/binary/sets/${s}.tar.xz | tar -C /opt/netbsd/sysroot/amd64 -xJv
-          done
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - run: git config --global --add safe.directory $GITHUB_WORKSPACE
-      - working-directory: ${{ github.workspace }}/.build/unix
-        run: ./crossbuild-netbsd.sh
+      - uses: vmactions/netbsd-vm@v1
+        with:
+          release: 10.1
+          usesh: true
+          prepare: |
+            /usr/sbin/pkg_add curl
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.90.0
+          run: |
+            . "$HOME/.cargo/env"
+            cd .build/unix
+            make MY_OS=netbsd MY_ARCH=x86_64 MY_FEATURES=aligned MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-netbsd
           path: ${{ github.workspace }}/.build/unix/target/*.tar.xz
 
+  build-openbsd:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
+      - uses: vmactions/openbsd-vm@v1
+        with:
+          release: 7.7
+          usesh: true
+          prepare: pkg_add rust
+          run: |
+            cd .build/unix
+            make MY_OS=openbsd MY_ARCH=x86_64 MY_FEATURES=aligned MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sponge256sum-openbsd
+          path: ${{ github.workspace }}/.build/unix/target/*.tar.xz
+
+  build-solaris:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
+      - uses: vmactions/solaris-vm@v1
+        with:
+          release: 11.4
+          usesh: true
+          prepare: |
+            pkg install developer/gcc developer/versioning/git
+            source <(curl -s https://raw.githubusercontent.com/psumbera/solaris-rust/refs/heads/main/sh.rust-web-install)
+            git config --global --add safe.directory '*'
+          run: |
+            export PATH=/root/.rust_solaris/bin:$PATH
+            cd .build/unix
+            make MY_OS=solaris MY_VENDOR=pc MY_ARCH=x86_64 MY_FEATURES=aligned MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sponge256sum-solaris
+          path: ${{ github.workspace }}/.build/unix/target/*.tar.xz
+
+  build-illumos:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
+      - uses: vmactions/omnios-vm@v1
+        with:
+          release: r151054
+          usesh: true
+          prepare: |
+            pkg install developer/build-essential
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.90.0
+          run: |
+            . "$HOME/.cargo/env"
+            cd .build/unix
+            make MY_OS=illumos MY_ARCH=x86_64 MY_FEATURES=aligned MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sponge256sum-illumos
+          path: ${{ github.workspace }}/.build/unix/target/*.tar.xz
+
+  # --------------------------------------------------------------------------
+  # Release
+  # --------------------------------------------------------------------------
+
   release:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'release' }}
-    needs: [build-linux, build-windows, build-macos, build-cross-freebsd, build-cross-netbsd]
+    needs: [build-linux, build-windows, build-macos, build-freebsd, build-netbsd, build-openbsd, build-solaris, build-illumos]
     permissions:
       contents: write
     steps:

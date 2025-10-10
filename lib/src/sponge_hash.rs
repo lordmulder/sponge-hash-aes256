@@ -127,6 +127,8 @@ impl<const N: usize> NoneZeroArg<N> {
 ///
 /// ![Permutation](https://github.com/lordmulder/sponge-hash-aes256/raw/master/.assets/images/function-permutation.png)
 ///
+/// The constants `const_0` and `const_1` are defined as full blocks filled with `0x5C` and `0x36`, respectively.
+///
 /// ### Finalization
 ///
 /// The padding of the final input block is performed by first appending a single `1` bit, followed by the minimal number of `0` bits needed to make the total message length a multiple of the block size.
