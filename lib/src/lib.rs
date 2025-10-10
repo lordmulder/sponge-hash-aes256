@@ -17,7 +17,7 @@
 //!
 //! This crate is **`#![no_std]`** compatible and does not link the Rust standard library.
 //!
-//! Required dependencies: [`aes`], [`cipher`], [`zeroize`]
+//! Required dependencies: [`aes`](https://crates.io/crates/aes), [`cipher`](https://crates.io/crates/cipher), [`zeroize`](https://crates.io/crates/zeroize)
 //!
 //! ## Optional features
 //!
@@ -37,5 +37,5 @@
 mod sponge_hash;
 mod utilities;
 
-pub static PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub use sponge_hash::{DEFAULT_DIGEST_SIZE, DEFAULT_PERMUTE_ROUNDS, SpongeHash256, compute, compute_to_slice};
+pub use utilities::version;

@@ -66,6 +66,12 @@ pub fn xor_arrays(dst: &mut [u8; BLOCK_SIZE], src: &[u8; BLOCK_SIZE]) {
     }
 }
 
+/// Returns the version of the library as a string
+pub const fn version() -> &'static str {
+    static PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
+    PKG_VERSION
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

@@ -106,9 +106,6 @@
 //!
 //! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-#![doc(hidden)]
-#![doc(html_no_source)]
-
 use clap::{ArgAction, Parser, command};
 use const_format::formatcp;
 use ctrlc::set_handler;
@@ -118,7 +115,7 @@ use rand_pcg::{
     Pcg64,
     rand_core::{RngCore, SeedableRng},
 };
-use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, PKG_VERSION as LIB_VERSION, SpongeHash256};
+use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, SpongeHash256, version};
 use std::{
     env::consts::{ARCH, OS},
     fs::DirEntry,
@@ -178,11 +175,11 @@ const BUILD_PROFILE: &str = "release";
 const BUILD_PROFILE: &str = "debug";
 
 /// Header line
-const HEADER_LINE: &str = formatcp!("{} v{} (with SpongeHash-AES256 v{})", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"), LIB_VERSION);
+const HEADER_LINE: &str = formatcp!("{} v{} (with SpongeHash-AES256 v{})", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"), version());
 
 /// Version string
 const VERSION_STR: &str =
-    formatcp!("v{} [SpongeHash-AES256 v{}] [{}] [{}] [{}]", env!("CARGO_PKG_VERSION"), LIB_VERSION, OS, ARCH, BUILD_PROFILE);
+    formatcp!("v{} [SpongeHash-AES256 v{}] [{}] [{}] [{}]", env!("CARGO_PKG_VERSION"), version(), OS, ARCH, BUILD_PROFILE);
 
 // ---------------------------------------------------------------------------
 // Parameters

@@ -96,7 +96,7 @@ The state has a total size of 384 bits, consisting of three 128-bit blocks, and 
 
 ### Update function
 
-The “update” function, which *absorbs* input blocks into the state and *squeezes* the corresponding output from it, is defined as follows, where `input[i]` denotes the *i*-th input block and `output[i]` the *i*-th output block:
+The “update” function, which *absorbs* input blocks into the state and *squeezes* the corresponding output from it, is defined as follows, where `input[i]` denotes the *i*-th input block and `output[k]` the *k*-th output block:
 
 ![Update](.assets/images/function-update.png)
 

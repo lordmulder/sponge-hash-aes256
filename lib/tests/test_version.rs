@@ -4,8 +4,13 @@
 
 use semver::Version;
 
+static PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[test]
 pub fn test_version() {
-    let version = Version::parse(sponge_hash_aes256::PKG_VERSION).expect("Failed to parse version!");
-    println!("{:?}", version);
+    let version_expected = Version::parse(PKG_VERSION).expect("Failed to parse version!");
+    let version_returned = Version::parse(sponge_hash_aes256::version()).expect("Failed to parse version!");
+    assert!(version_returned.build.is_empty());
+    assert!(version_returned.pre.is_empty());
+    assert_eq!(version_returned, version_expected);
 }

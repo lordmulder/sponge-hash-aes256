@@ -29,7 +29,7 @@ build: clean
 		mv -vf target/i586-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$p
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-$$p
 	done
-	cargo doc
+	cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256
 	cp -rf target/doc $(CURDIR)/target/dist/
 	cargo pkgid | grep -Eo '[^@]+$$' | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//' > $(CURDIR)/target/.PKG_VERSION
 	printf '%s\n\n' "`cargo --version --verbose`" > $(CURDIR)/target/.RUSTC_VERSION

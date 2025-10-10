@@ -95,7 +95,7 @@ for %%v in (v2 v3 v4) do (
 	if not !ERRORLEVEL! == 0 goto:error
 )
 
-cargo doc
+cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256
 if not %ERRORLEVEL% == 0 goto:error
 
 cargo --version --verbose > "%CD%\target\.RUSTC_VERSION"

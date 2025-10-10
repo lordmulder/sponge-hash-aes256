@@ -117,7 +117,7 @@ impl<const N: usize> NoneZeroArg<N> {
 ///
 /// #### Update function
 ///
-/// The “update” function, which *absorbs* input blocks into the state and *squeezes* the corresponding output from it, is defined as follows, where `input[i]` denotes the *i*-th input block and `output[i]` the *i*-th output block:
+/// The “update” function, which *absorbs* input blocks into the state and *squeezes* the corresponding output from it, is defined as follows, where `input[i]` denotes the *i*-th input block and `output[k]` the *k*-th output block:
 ///
 /// ![Update](https://github.com/lordmulder/sponge-hash-aes256/raw/master/.assets/images/function-update.png)
 ///
