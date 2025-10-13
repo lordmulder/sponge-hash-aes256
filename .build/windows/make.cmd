@@ -18,6 +18,10 @@ if "%SEVENZIP_INSTALL_DIR%" == "" (
 	set "SEVENZIP_INSTALL_DIR=%ProgramFiles%\7-Zip"
 )
 
+if "%NSIS_INSTALL_DIR%" == "" (
+	set "NSIS_INSTALL_DIR=%ProgramFiles(x86)%\NSIS"
+)
+
 REM --------------------------------------------------------------------------
 REM Check paths
 REM --------------------------------------------------------------------------
@@ -37,8 +41,13 @@ if not exist "%SEVENZIP_INSTALL_DIR%\7z.exe" (
 	goto:error
 )
 
+if not exist "%NSIS_INSTALL_DIR%\makensis.exe" (
+	echo File "%NSIS_INSTALL_DIR%\makensis.exe" not found. Please check NSIS_INSTALL_DIR and try again^^!
+	goto:error
+)
+
 set "PATH=%SystemRoot%\System32;%SystemRoot%"
-set "PATH=%CARGO_INSTALL_DIR%;%GIT_INSTALL_DIR%\cmd;%SEVENZIP_INSTALL_DIR%;%PATH%"
+set "PATH=%CARGO_INSTALL_DIR%;%GIT_INSTALL_DIR%\cmd;%SEVENZIP_INSTALL_DIR%;%NSIS_INSTALL_DIR%;%PATH%"
 
 REM --------------------------------------------------------------------------
 REM Clean-up
@@ -141,7 +150,7 @@ popd
 attrib +R "%CD%\target\*.7z"
 if not %ERRORLEVEL% == 0 goto:error
 
-copy /B /Y "%SEVENZIP_INSTALL_DIR%\7z.sfx" + "%CD%\target\sponge256sum-%PKG_VERSION%-windows.7z" "%CD%\target\sponge256sum-%PKG_VERSION%-windows.exe"
+makensis "-DOUTPUT_FILE=%CD%\target\sponge256sum-%PKG_VERSION%-windows.exe" "-DSOURCE_DIR=%CD%\target\dist" "-DPKG_VERSION=%PKG_VERSION%" "%CD%\nsis\installer.nsi"
 if not %ERRORLEVEL% == 0 goto:error
 
 attrib +R "%CD%\target\*.exe"
