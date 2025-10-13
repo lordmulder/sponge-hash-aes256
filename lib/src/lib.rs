@@ -23,7 +23,6 @@
 //!
 //! Feature   | Meaning
 //! --------- | ------------------------------------------------------------------------------------------
-//! `aligned` | Assume that blocks are always aligned in memory, i.e., do **not** perfrom alignment check.
 //! `tracing` | Dump the internal state to the loggging sub-system (via `log::trace()`) after each step.
 //!
 //! ## License
