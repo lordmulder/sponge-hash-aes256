@@ -8,7 +8,7 @@ version = "1.3.5"
 edition = "2024"
 
 [dependencies]
-clap = { version = "4.5.48", default-features = false, features = [ "std", "derive", "help", "usage", "error-context" ] }
+clap = { version = "4.5.49", default-features = false, features = [ "std", "derive", "help", "usage", "error-context" ] }
 const_format = { version = "0.2.35", default-features = false }
 ctrlc = { version = "3.5.0", default-features = false }
 hex = { version = "0.4.3", default-features = true }
@@ -18,7 +18,7 @@ sponge-hash-aes256 = { path = "../lib", default-features = false }
 wild = { version = "2.2.1", default-features = false }
 
 [dev-dependencies]
-regex = { version = "1.12.1", default-features = false, features = [ "unicode" ] }
+regex = { version = "1.12.2", default-features = false, features = [ "unicode" ] }
 
 [profile.release]
 opt-level = 3

@@ -2,13 +2,10 @@
 // SpongeHash-AES256
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use aes::Aes256;
-use cipher::{BlockEncrypt, KeyInit};
+use aes::{Aes256, Block};
+use cipher::{BlockEncrypt, Key, KeyInit};
 use core::slice;
 use zeroize::Zeroize;
-
-#[allow(deprecated)]
-use cipher::generic_array::GenericArray;
 
 pub const BLOCK_SIZE: usize = 16usize;
 pub const KEY_SIZE: usize = 2usize * BLOCK_SIZE;
@@ -30,25 +27,40 @@ const fn check_aligned<T: Sized>(_ptr: *const T) -> bool {
 }
 
 // ---------------------------------------------------------------------------
-// Functions
+// Generic array wrapper
 // ---------------------------------------------------------------------------
 
 #[allow(deprecated)]
 #[inline(always)]
+fn aes256_wrap_block(block_data: &mut [u8; BLOCK_SIZE]) -> &mut Block {
+    Block::from_mut_slice(block_data)
+}
+
+#[allow(deprecated)]
+#[inline(always)]
+fn aes256_wrap_key(key_data: &[u8; KEY_SIZE]) -> &Key<Aes256> {
+    Key::<Aes256>::from_slice(key_data)
+}
+
+// ---------------------------------------------------------------------------
+// Functions
+// ---------------------------------------------------------------------------
+
+#[inline]
 pub fn aes256_encrypt(dst: &mut [u8; BLOCK_SIZE], src: &[u8; BLOCK_SIZE], key0: &[u8; BLOCK_SIZE], key1: &[u8; BLOCK_SIZE]) {
     let mut full_key = [0u8; KEY_SIZE];
     full_key[..BLOCK_SIZE].copy_from_slice(key0);
     full_key[BLOCK_SIZE..].copy_from_slice(key1);
 
-    let cipher = Aes256::new(GenericArray::from_slice(&full_key));
+    let cipher = Aes256::new(aes256_wrap_key(&full_key));
     full_key.zeroize();
 
     dst.copy_from_slice(src);
-    cipher.encrypt_block(GenericArray::from_mut_slice(dst));
+    cipher.encrypt_block(aes256_wrap_block(dst));
 }
 
 #[allow(clippy::manual_is_multiple_of)]
-#[inline(always)]
+#[inline]
 pub fn xor_arrays(dst: &mut [u8; BLOCK_SIZE], src: &[u8; BLOCK_SIZE]) {
     const WORDS: usize = BLOCK_SIZE / size_of::<usize>();
     const _: () = assert!(BLOCK_SIZE % size_of::<usize>() == 0usize);
