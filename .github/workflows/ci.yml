@@ -22,46 +22,15 @@ jobs:
         rust: [1.90.0-trixie, 1.85.1-bookworm]
         project: [lib, app]
     steps:
+      - run: rustup component add rustfmt clippy
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
       - working-directory: ${{ github.workspace }}/${{ matrix.project }}
         run: cargo check --verbose
-
-  format:
-    runs-on: ubuntu-latest
-    container:
-      image: rust:${{ matrix.rust }}
-    needs: check
-    strategy:
-      matrix:
-        rust: [1.90.0-trixie, 1.85.1-bookworm]
-        project: [lib, app]
-    steps:
-      - run: rustup component add rustfmt
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
       - working-directory: ${{ github.workspace }}/${{ matrix.project }}
-        run: cargo fmt --all --check
-
-  clippy:
-    runs-on: ubuntu-latest
-    container:
-      image: rust:${{ matrix.rust }}
-    needs: check
-    strategy:
-      matrix:
-        rust: [1.90.0-trixie, 1.85.1-bookworm]
-        project: [lib, app]
-    steps:
-      - run: rustup component add clippy
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
+        run: cargo fmt --all --check --verbose
       - working-directory: ${{ github.workspace }}/${{ matrix.project }}
         run: cargo clippy -- -D warnings${{ matrix.rust == '1.85.1-bookworm' && ' -A unknown_lints' || '' }}
 
@@ -73,41 +42,50 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: rust:${{ matrix.rust }}
-    needs: [format, clippy]
+    needs: check
     strategy:
       matrix:
         rust: [1.90.0-trixie, 1.85.1-bookworm]
         project: [lib, app]
-        options: ["", " --release", " --examples"]
+    env:
+      TEST_OPTIONS: --verbose${{ matrix.options }}${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
       - working-directory: ${{ github.workspace }}/${{ matrix.project }}
-        run: cargo test --verbose${{ matrix.options }}${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
+        run: |
+          set -xe
+          cargo test ${TEST_OPTIONS}
+          cargo test --release ${TEST_OPTIONS}
 
   test-windows:
     runs-on: windows-latest
-    needs: [format, clippy]
+    needs: check
     strategy:
       matrix:
         rust: [1.90.0, 1.85.1]
         project: [lib, app]
         arch:  [x86_64, i686]
-        options: ["", " --release", " --examples"]
+    env:
+      TEST_OPTIONS: --target ${{ matrix.arch }}-pc-windows-msvc --verbose${{ matrix.options }}${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
     steps:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
-          target: x86_64-pc-windows-msvc,i686-pc-windows-msvc
-          rustflags: "-Dwarnings"
+          rustflags: -Dwarnings
+          target: ${{ matrix.arch }}-pc-windows-msvc
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
       - working-directory: ${{ github.workspace }}/${{ matrix.project }}
-        run: cargo test --target ${{ matrix.arch }}-pc-windows-msvc --verbose${{ matrix.options }}${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $PSNativeCommandUseErrorActionPreference = $true
+          iex "cargo test $env:TEST_OPTIONS"
+          iex "cargo test --release $env:TEST_OPTIONS"
 
   # --------------------------------------------------------------------------
   # Build
@@ -147,8 +125,8 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: 1.90.0
-          target: x86_64-pc-windows-msvc,i686-pc-windows-msvc,aarch64-pc-windows-msvc
           rustflags: "-Dwarnings -Ctarget-feature=+crt-static"
+          target: x86_64-pc-windows-msvc,i686-pc-windows-msvc,aarch64-pc-windows-msvc
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -168,8 +146,8 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: 1.90.0
-          target: x86_64-apple-darwin,aarch64-apple-darwin
           rustflags: -Dwarnings
+          target: x86_64-apple-darwin,aarch64-apple-darwin
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
