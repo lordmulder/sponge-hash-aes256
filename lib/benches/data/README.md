@@ -20,3 +20,5 @@ Test files containing 512 million random and unique passwords are available here
 * <https://github.com/lordmulder/hash-function-test-files>
 
 * <https://codeberg.org/MuldeR/hash-function-test-files>
+
+* <https://sourceforge.net/projects/muldersoft/files/Test-Data/>

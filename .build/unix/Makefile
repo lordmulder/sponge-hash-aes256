@@ -14,9 +14,9 @@ build: clean
 	cd ../../app; \
 	for t in $(MY_ARCH); do \
 		if [ ! -z "$(MY_RUSTFLAGS)" ]; then \
-			RUSTFLAGS="$(MY_RUSTFLAGS)" cargo build --release --target "$$t-$(MY_VENDOR)-$(MY_OS)" --features "$(MY_FEATURES)" --verbose; \
+			RUSTFLAGS="$(MY_RUSTFLAGS)" cargo build --release --target "$$t-$(MY_VENDOR)-$(MY_OS)" --verbose; \
 		else \
-			cargo build --release --target "$$t-$(MY_VENDOR)-$(MY_OS)" --features "$(MY_FEATURES)" --verbose; \
+			cargo build --release --target "$$t-$(MY_VENDOR)-$(MY_OS)" --verbose; \
 		fi; \
 		mv -f target/$$t-$(MY_VENDOR)-$(MY_OS)/release/sponge256sum $${ORIGINAL_DIR}/target/dist/sponge256sum-$$t; \
 		chmod 555 $${ORIGINAL_DIR}/target/dist/sponge256sum-$$t; \

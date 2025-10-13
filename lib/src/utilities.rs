@@ -3,9 +3,12 @@
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use aes::Aes256;
-use cipher::{BlockEncrypt, KeyInit, generic_array::GenericArray};
+use cipher::{BlockEncrypt, KeyInit};
 use core::slice;
 use zeroize::Zeroize;
+
+#[allow(deprecated)]
+use cipher::generic_array::GenericArray;
 
 pub const BLOCK_SIZE: usize = 16usize;
 pub const KEY_SIZE: usize = 2usize * BLOCK_SIZE;
@@ -14,15 +17,15 @@ pub const KEY_SIZE: usize = 2usize * BLOCK_SIZE;
 // Alignment checks
 // ---------------------------------------------------------------------------
 
-#[cfg(not(feature = "aligned"))]
+#[cfg(debug_assertions)]
 #[inline(always)]
 fn check_aligned<T: Sized>(ptr: *const T) -> bool {
     ptr.is_aligned()
 }
 
-#[cfg(feature = "aligned")]
+#[cfg(not(debug_assertions))]
 #[inline(always)]
-fn check_aligned<T: Sized>(_ptr: *const T) -> bool {
+const fn check_aligned<T: Sized>(_ptr: *const T) -> bool {
     true
 }
 
@@ -30,6 +33,7 @@ fn check_aligned<T: Sized>(_ptr: *const T) -> bool {
 // Functions
 // ---------------------------------------------------------------------------
 
+#[allow(deprecated)]
 #[inline(always)]
 pub fn aes256_encrypt(dst: &mut [u8; BLOCK_SIZE], src: &[u8; BLOCK_SIZE], key0: &[u8; BLOCK_SIZE], key1: &[u8; BLOCK_SIZE]) {
     let mut full_key = [0u8; KEY_SIZE];

@@ -78,7 +78,7 @@ jobs:
       matrix:
         rust: [1.90-trixie, 1.85-bookworm]
         project: [lib, app]
-        options: ["", " --release --features aligned", " --examples"]
+        options: ["", " --release", " --examples"]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -179,7 +179,7 @@ jobs:
           run: |
             . "$HOME/.cargo/env"
             cd .build/unix
-            make MY_OS=freebsd MY_ARCH="x86_64 i686" MY_FEATURES=aligned MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+            make MY_OS=freebsd MY_ARCH="x86_64 i686" MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-freebsd
@@ -204,7 +204,7 @@ jobs:
           run: |
             . "$HOME/.cargo/env"
             cd .build/unix
-            make MY_OS=netbsd MY_ARCH=x86_64 MY_FEATURES=aligned MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+            make MY_OS=netbsd MY_ARCH=x86_64 MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-netbsd
@@ -227,7 +227,7 @@ jobs:
             git config --global --add safe.directory '*'
           run: |
             cd .build/unix
-            make MY_OS=openbsd MY_ARCH=x86_64 MY_FEATURES=aligned MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+            make MY_OS=openbsd MY_ARCH=x86_64 MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-openbsd
@@ -252,7 +252,7 @@ jobs:
           run: |
             export PATH=/root/.rust_solaris/bin:$PATH
             cd .build/unix
-            make MY_OS=solaris MY_VENDOR=pc MY_ARCH=x86_64 MY_FEATURES=aligned MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+            make MY_OS=solaris MY_VENDOR=pc MY_ARCH=x86_64 MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-solaris
@@ -277,7 +277,7 @@ jobs:
           run: |
             . "$HOME/.cargo/env"
             cd .build/unix
-            make MY_OS=illumos MY_ARCH=x86_64 MY_FEATURES=aligned MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+            make MY_OS=illumos MY_ARCH=x86_64 MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
 
       - uses: actions/upload-artifact@v4
         with:
