@@ -8,6 +8,7 @@ version = "1.3.5"
 edition = "2024"
 
 [dependencies]
+build-time = { version = "0.1.3", default-features = false }
 clap = { version = "4.5.49", default-features = false, features = [ "std", "derive", "help", "usage", "error-context" ] }
 const_format = { version = "0.2.35", default-features = false }
 ctrlc = { version = "3.5.0", default-features = false }
@@ -16,6 +17,7 @@ hex-literal = { version = "1.0.0", default-features = false }
 rand_pcg = { version = "0.9.0", default-features = false }
 sponge-hash-aes256 = { path = "../lib", default-features = false }
 wild = { version = "2.2.1", default-features = false }
+rustc-version-const = { version = "1.0.0", default-features = false }
 
 [dev-dependencies]
 regex = { version = "1.12.2", default-features = false, features = [ "unicode" ] }

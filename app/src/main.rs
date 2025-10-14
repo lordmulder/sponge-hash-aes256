@@ -106,6 +106,7 @@
 //!
 //! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
+use build_time::build_time_utc;
 use clap::{ArgAction, Parser, command};
 use const_format::formatcp;
 use ctrlc::set_handler;
@@ -115,6 +116,7 @@ use rand_pcg::{
     Pcg64,
     rand_core::{RngCore, SeedableRng},
 };
+use rustc_version_const::rustc_version_full;
 use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, SpongeHash256, version};
 use std::{
     env::consts::{ARCH, OS},
@@ -174,12 +176,14 @@ const BUILD_PROFILE: &str = "release";
 #[cfg(debug_assertions)]
 const BUILD_PROFILE: &str = "debug";
 
+/// Version string
+const VERSION: &str = formatcp!("v{} [SpongeHash-AES256 v{}] [{OS}] [{ARCH}] [{BUILD_PROFILE}]", env!("CARGO_PKG_VERSION"), version());
+
+/// Full version string
+const LONG_VERSION: &str = formatcp!("{VERSION}\nbuilt on: {}\nrustc version: {}", build_time_utc!("%F, %T"), rustc_version_full());
+
 /// Header line
 const HEADER_LINE: &str = formatcp!("{} v{} (with SpongeHash-AES256 v{})", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"), version());
-
-/// Version string
-const VERSION_STR: &str =
-    formatcp!("v{} [SpongeHash-AES256 v{}] [{}] [{}] [{}]", env!("CARGO_PKG_VERSION"), version(), OS, ARCH, BUILD_PROFILE);
 
 // ---------------------------------------------------------------------------
 // Parameters
@@ -190,8 +194,9 @@ const VERSION_STR: &str =
 #[command(about = "A sponge-based secure hash function that uses AES-256 as its internal PRF.")]
 #[command(after_help = "If no input files are specified, reads input data from the 'stdin' stream.\n\
     Returns a non-zero exit code if any errors occurred; otherwise, zero.")]
-#[command(version = VERSION_STR)]
 #[command(before_help = HEADER_LINE)]
+#[command(version = VERSION)]
+#[command(long_version = LONG_VERSION)]
 struct Args {
     /// Read the input file(s) in binary mode, i.e., default mode
     #[arg(short, long)]
@@ -563,6 +568,7 @@ fn self_test(output: &mut impl Write, args: &Args, running: Flag) -> bool {
     let _ = output.flush();
 
     let start_time = Instant::now();
+    let mut amount = 0u64;
 
     let mut source = Pcg64::seed_from_u64(PCG64_SEEDVALUE);
     let mut buffer = [0u8; 4093usize];
@@ -571,6 +577,7 @@ fn self_test(output: &mut impl Write, args: &Args, running: Flag) -> bool {
     for _ in 0u32..524287u32 {
         source.fill_bytes(&mut buffer);
         hasher.update(buffer);
+        amount += buffer.len() as u64;
         check_running!(args, running);
     }
 
@@ -579,7 +586,8 @@ fn self_test(output: &mut impl Write, args: &Args, running: Flag) -> bool {
 
     if arrays_equal(&digest_computed, &DIGEST_EXPECTED) {
         let _ = writeln!(output, "Successful.\n");
-        let _ = writeln!(output, "Test completed successfully in {:.1} seconds.", elapsed);
+        let _ =
+            writeln!(output, "Test completed successfully in {:.1} seconds ({:.2} MB/s).", elapsed, ((amount as f64) / elapsed) / 1048576.0);
         true
     } else {
         let _ = writeln!(output, "Failure !!!\n");
