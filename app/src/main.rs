@@ -2,6 +2,8 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
+#![doc(hidden)]
+
 //! # sponge256sum
 //!
 //! A command-line tool for computing [**SpongeHash-AES256**](https://github.com/lordmulder/sponge-hash-aes256/) message digest.
@@ -562,6 +564,19 @@ fn arrays_equal<const N: usize>(array0: &[u8; N], array1: &[u8; N]) -> bool {
     mask == 0u8
 }
 
+fn format_bytes(mut value: f64) -> (f64, &'static str) {
+    const BIN_UNITS: [&str; 5usize] = ["Byte", "KiB", "MiB", "GiB", "TiB"];
+    const MAX_INDEX: usize = BIN_UNITS.len() - 1usize;
+
+    let mut index = 0usize;
+    while (index < MAX_INDEX) && (value + f64::EPSILON > 999.9) {
+        value /= 1024.0;
+        index += 1usize;
+    }
+
+    (value, BIN_UNITS[index])
+}
+
 fn self_test(output: &mut impl Write, args: &Args, running: Flag) -> bool {
     let _ = writeln!(output, "{}\n", HEADER_LINE);
     let _ = writeln!(output, "Self-test is running, please be patient...");
@@ -583,11 +598,11 @@ fn self_test(output: &mut impl Write, args: &Args, running: Flag) -> bool {
 
     let digest_computed = hasher.digest();
     let elapsed = start_time.elapsed().as_secs_f64();
+    let (rate, unit) = format_bytes((amount as f64) / elapsed);
 
     if arrays_equal(&digest_computed, &DIGEST_EXPECTED) {
         let _ = writeln!(output, "Successful.\n");
-        let _ =
-            writeln!(output, "Test completed successfully in {:.1} seconds ({:.2} MB/s).", elapsed, ((amount as f64) / elapsed) / 1048576.0);
+        let _ = writeln!(output, "Test completed successfully in {:.1} seconds ({:.2} {}/s).", elapsed, rate, unit);
         true
     } else {
         let _ = writeln!(output, "Failure !!!\n");

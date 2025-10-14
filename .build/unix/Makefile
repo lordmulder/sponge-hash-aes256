@@ -7,12 +7,13 @@ MY_RUSTFLAGS = -Dwarnings
 
 all: pkg
 
-build: clean
+build:
 	set -e; \
 	rm -rf target && mkdir target && mkdir target/dist; \
 	ORIGINAL_DIR="`pwd`"; \
 	cd ../../app; \
 	for t in $(MY_ARCH); do \
+		cargo clean; \
 		if [ ! -z "$(MY_RUSTFLAGS)" ]; then \
 			RUSTFLAGS="$(MY_RUSTFLAGS)" cargo build --release --target "$$t-$(MY_VENDOR)-$(MY_OS)" --verbose; \
 		else \
