@@ -96,7 +96,10 @@ for %%t in (x86_64 i686 aarch64) do (
 	if not !ERRORLEVEL! == 0 goto:error
 )
 
-for %%v in (v2 v3 v4) do (
+cargo clean
+if not %ERRORLEVEL% == 0 goto:error
+
+for %%v in (v2 v3) do (
 	set "RUSTFLAGS=-Dwarnings -Ctarget-feature=+crt-static -Ctarget-cpu=x86-64-%%v"
 	cargo build --release --target x86_64-pc-windows-msvc --verbose
 	if not !ERRORLEVEL! == 0 goto:error
