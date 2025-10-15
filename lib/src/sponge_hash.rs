@@ -7,7 +7,7 @@ use zeroize::Zeroize;
 
 /// Default digest size, in bytes
 ///
-/// The default digest size is currently defined as **32** bytes, i.e., 256 bits.
+/// The default digest size is currently defined as **32** bytes, i.e., **256** bits.
 pub const DEFAULT_DIGEST_SIZE: usize = 2usize * BLOCK_SIZE;
 
 /// Default number of permutation rounds to be performed

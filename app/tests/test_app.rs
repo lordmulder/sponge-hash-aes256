@@ -65,7 +65,7 @@ fn do_test_file(expected: &str, file_name: &str, snail_mode: bool) {
 
 fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: bool, force_null: bool) {
     static REGEX_1: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([0-9a-fA-F]+)\s([\x20-\x7E]+)$").unwrap());
-    static REGEX_2: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([0-9a-fA-F]+)\x00([\x20-\x7E]+)\x00").unwrap());
+    static REGEX_2: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([0-9a-fA-F]+)\s([\x20-\x7E]+)\x00").unwrap());
 
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data");
     let mut digest_set = HashSet::with_capacity(expected_map.len());

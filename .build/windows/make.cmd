@@ -87,7 +87,7 @@ REM --------------------------------------------------------------------------
 REM Build
 REM --------------------------------------------------------------------------
 
-set "DEFAULT_RUSTFLAGS=-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=..\.assets\ico\app-icon.res"
+set "DEFAULT_RUSTFLAGS=-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=..\.build\windows\res\app-icon.res"
 set "RUSTFLAGS=%DEFAULT_RUSTFLAGS%"
 
 for %%t in (x86_64 i686 aarch64) do (

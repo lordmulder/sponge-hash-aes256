@@ -71,7 +71,7 @@ Options:
   -d, --dirs             Enable processing of directories as arguments
   -r, --recursive        Recursively process the provided directories (implies -d)
   -k, --keep-going       Continue processing even if errors are encountered
-  -l, --length <LENGTH>  Digest output size, in bits (default: 256, maximum: 1024)
+  -l, --length <LENGTH>  Digest output size, in bits (default: 256, maximum: 2048)
   -i, --info <INFO>      Include additional context information
   -s, --snail...         Enable "snail" mode, i.e., slow down the hash computation
   -q, --quiet            Do not output any error messages or warnings

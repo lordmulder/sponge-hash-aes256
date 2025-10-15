@@ -1,0 +1,109 @@
+// SPDX-License-Identifier: 0BSD
+// sponge256sum
+// Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
+
+use build_time::build_time_utc;
+use clap::{ArgAction, Parser, command};
+use const_format::formatcp;
+use rustc_version_const::rustc_version_full;
+use sponge_hash_aes256::version;
+use std::env::consts::{ARCH, OS};
+use std::{num::NonZeroUsize, path::PathBuf};
+use wild::args_os;
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
+
+/// Build profile
+#[cfg(not(debug_assertions))]
+const BUILD_PROFILE: &str = "release";
+#[cfg(debug_assertions)]
+const BUILD_PROFILE: &str = "debug";
+
+/// Version string
+pub const VERSION: &str = formatcp!("v{} [SpongeHash-AES256 v{}] [{OS}] [{ARCH}] [{BUILD_PROFILE}]", env!("CARGO_PKG_VERSION"), version());
+
+/// Full version string
+pub const LONG_VERSION: &str = formatcp!("{VERSION}\nbuilt on: {}\nrustc version: {}", build_time_utc!("%F, %T"), rustc_version_full());
+
+/// Header line
+pub const HEADER_LINE: &str = formatcp!("{} v{} (with SpongeHash-AES256 v{})", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"), version());
+
+// ---------------------------------------------------------------------------
+// Command-line arguments
+// ---------------------------------------------------------------------------
+
+/// SpongeHash-AES256 command-line tool
+#[derive(Parser, Debug)]
+#[command(about = "A sponge-based secure hash function that uses AES-256 as its internal PRF.\n\
+    This software is released under the Zero-Clause BSD License.")]
+#[command(after_help = "If no input files are specified, reads input data from the 'stdin' stream.\n\
+    Returns a non-zero exit code if any errors occurred; otherwise, zero.\n\
+    For details please refer to: <https://crates.io/crates/sponge-hash-aes256>")]
+#[command(before_help = HEADER_LINE)]
+#[command(version = VERSION)]
+#[command(long_version = LONG_VERSION)]
+pub struct Args {
+    /// Read the input file(s) in binary mode, i.e., default mode
+    #[arg(short, long)]
+    pub binary: bool,
+
+    /// Read the input file(s) in text mode
+    #[arg(short, long)]
+    pub text: bool,
+
+    /// Enable processing of directories as arguments
+    #[arg(short, long)]
+    pub dirs: bool,
+
+    /// Recursively process the provided directories (implies -d)
+    #[arg(short, long)]
+    pub recursive: bool,
+
+    /// Continue processing even if errors are encountered.
+    #[arg(short, long)]
+    pub keep_going: bool,
+
+    /// Digest output size, in bits (default: 256, maximum: 2048)
+    #[arg(short, long)]
+    pub length: Option<NonZeroUsize>,
+
+    /// Include additional context information
+    #[arg(short, long)]
+    pub info: Option<String>,
+
+    /// Enable "snail" mode, i.e., slow down the hash computation
+    #[arg(short, long, action = ArgAction::Count)]
+    pub snail: u8,
+
+    /// Do not output any error messages or warnings
+    #[arg(short, long)]
+    pub quiet: bool,
+
+    /// Print digest(s) in plain format, i.e., without file names
+    #[arg(short, long)]
+    pub plain: bool,
+
+    /// Separate digest(s) by NULL characters instead of newlines
+    #[arg(short = '0', long, alias = "zero", short_alias = 'z')]
+    pub null: bool,
+
+    /// Explicitely flush 'stdout' stream after printing a digest
+    #[arg(short, long)]
+    pub flush: bool,
+
+    /// Run the built-in self-test (BIST)
+    #[arg(short = 'T', long)]
+    pub self_test: bool,
+
+    /// Files to be processed
+    #[arg()]
+    pub files: Vec<PathBuf>,
+}
+
+impl Args {
+    pub fn parse_from_commandline() -> Self {
+        Self::parse_from(args_os())
+    }
+}

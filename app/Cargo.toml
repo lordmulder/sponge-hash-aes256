@@ -14,10 +14,11 @@ const_format = { version = "0.2.35", default-features = false }
 ctrlc = { version = "3.5.0", default-features = false }
 hex = { version = "0.4.3", default-features = true }
 hex-literal = { version = "1.0.0", default-features = false }
+num = { version = "0.4.3", default-features = false }
 rand_pcg = { version = "0.9.0", default-features = false }
+rustc-version-const = { version = "1.0.0", default-features = false }
 sponge-hash-aes256 = { path = "../lib", default-features = false }
 wild = { version = "2.2.1", default-features = false }
-rustc-version-const = { version = "1.0.0", default-features = false }
 
 [dev-dependencies]
 regex = { version = "1.12.2", default-features = false, features = [ "unicode" ] }
