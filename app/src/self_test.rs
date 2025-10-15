@@ -15,20 +15,13 @@ use crate::{
     arguments::{Args, HEADER_LINE},
     check_running,
     common::{Error, Flag},
+    digest::digest_equal,
     print_error,
 };
 
 // ---------------------------------------------------------------------------
 // Utility functions
 // ---------------------------------------------------------------------------
-
-fn arrays_equal<const N: usize>(array0: &[u8; N], array1: &[u8; N]) -> bool {
-    let mut mask = 0u8;
-    for (value0, value1) in array0.iter().zip(array1.iter()) {
-        mask |= value0 ^ value1;
-    }
-    mask == 0u8
-}
 
 fn format_bytes(mut value: f64) -> (f64, &'static str) {
     const BIN_UNITS: [&str; 5usize] = ["Byte", "KiB", "MiB", "GiB", "TiB"];
@@ -60,10 +53,8 @@ fn print_digest<T: AsRef<[u8]>>(output: &mut impl Write, prefix: &str, digest: T
 const DIGEST_SIZE: usize = DEFAULT_DIGEST_SIZE;
 
 const PCG64_SEEDVALUE: [u64; 2usize] = [18446744073709551557u64, 18446744073709551533u64];
-const DIGEST_EXPECTED: [[u8; DIGEST_SIZE]; 2usize] = [
-    hex!("721a31e8bafb3ed328459f8e87068283b7d19bc736469d02916355ce726873bf"),
-    hex!("cf0bc20b6cc6e9268d0e91d3198ca631bdfc343f8f972bb21c2d3ed375acf1a4"),
-];
+const DIGEST_EXPECTED: [[u8; DIGEST_SIZE]; 2usize] =
+    [hex!("721a31e8bafb3ed328459f8e87068283b7d19bc736469d02916355ce726873bf"), hex!("cf0bc20b6cc6e9268d0e91d3198ca631bdfc343f8f972bb21c2d3ed375acf1a4")];
 
 const BUFFER_SIZE: usize = 4093usize;
 const MAX_ITERATION: u32 = 524287u32;
@@ -80,8 +71,8 @@ fn do_test(seed: u64, digest_expected: &[u8; DIGEST_SIZE], output: &mut impl Wri
         check_running!(running);
     }
 
-    let digest_computed = hasher.digest();
-    let success = arrays_equal(&digest_computed, digest_expected);
+    let digest_computed: [u8; DIGEST_SIZE] = hasher.digest();
+    let success = digest_equal(&digest_computed, digest_expected);
 
     if !success {
         writeln!(output, "Failure !!!\n")?;

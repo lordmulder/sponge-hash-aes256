@@ -53,6 +53,10 @@ pub struct Args {
     #[arg(short, long)]
     pub text: bool,
 
+    /// Read and verify checksums from the provided input file(s)
+    #[arg(short, long)]
+    pub check: bool,
+
     /// Enable processing of directories as arguments
     #[arg(short, long)]
     pub dirs: bool,
@@ -102,8 +106,8 @@ pub struct Args {
     pub files: Vec<PathBuf>,
 }
 
-impl Args {
-    pub fn parse_from_commandline() -> Self {
+impl Default for Args {
+    fn default() -> Self {
         Self::parse_from(args_os())
     }
 }

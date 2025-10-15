@@ -110,8 +110,10 @@
 
 mod arguments;
 mod common;
+mod digest;
 mod process;
 mod self_test;
+mod verify;
 
 use ctrlc::set_handler;
 use num::Integer;
@@ -119,10 +121,12 @@ use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
 use std::sync::mpsc::{self};
 use std::{io::stdout, process::ExitCode};
 
+use crate::process::process_from_stdin;
+use crate::verify::{verify_files, verify_from_stdin};
 use crate::{
     arguments::Args,
     common::{MAX_DIGEST_SIZE, MAX_SNAIL_LEVEL},
-    process::{iterate_files, read_from_stdin},
+    process::process_files,
     self_test::self_test,
 };
 
@@ -132,8 +136,8 @@ use crate::{
 
 /// Applicationm entry point (“main” function)
 fn main() -> ExitCode {
-    // Parse command-line args
-    let args = Args::parse_from_commandline();
+    // Parse the given command-line args
+    let args = Args::default();
 
     // Check for incompatible arguments
     if args.text && args.binary {
@@ -181,12 +185,14 @@ fn main() -> ExitCode {
     // Run built-in self-test, if it was requested by the user
     let success = if args.self_test {
         self_test(&mut output, &args, stop_rx)
+    } else if args.check {
+        if args.files.is_empty() { verify_from_stdin(&mut output, &args, stop_rx) } else { verify_files(args.files.iter(), &mut output, &args, stop_rx) }
     } else {
         // Process all files and directories that were given on the command-line
         if args.files.is_empty() {
-            read_from_stdin(&mut output, digest_size, &args, stop_rx)
+            process_from_stdin(&mut output, digest_size, &args, stop_rx)
         } else {
-            iterate_files(args.files.iter(), &mut output, digest_size, &args, stop_rx)
+            process_files(args.files.iter(), &mut output, digest_size, &args, stop_rx)
         }
     };
 
