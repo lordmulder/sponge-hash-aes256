@@ -41,6 +41,8 @@ fn print_summary(errors: &usize, faults: &usize, args: &Args) -> bool {
 // Verify checksum
 // ---------------------------------------------------------------------------
 
+static RESULT_TEXT: [&str; 2usize] = ["FAILED", "OK"];
+
 /// Compute checksum and compare to expected value
 fn verify_checksum(input: &mut impl Read, digest_expected: &[u8], output: &mut impl Write, name: &OsStr, args: &Args, running: &Flag) -> Result<bool, Error> {
     let digest_size = digest_expected.len();
@@ -51,14 +53,14 @@ fn verify_checksum(input: &mut impl Read, digest_expected: &[u8], output: &mut i
 
     if args.null {
         if args.plain {
-            write!(output, "{}\0", if is_match { "OK" } else { "FAILED " })?;
+            write!(output, "{}\0", RESULT_TEXT[is_match as usize])?;
         } else {
-            write!(output, "{}: {}\0", name.to_string_lossy(), if is_match { "OK" } else { "FAILED " })?;
+            write!(output, "{}: {}\0", name.to_string_lossy(), RESULT_TEXT[is_match as usize])?;
         }
     } else if args.plain {
-        writeln!(output, "{}", if is_match { "OK" } else { "FAILED " })?;
+        writeln!(output, "{}", RESULT_TEXT[is_match as usize])?;
     } else {
-        writeln!(output, "{}: {}", name.to_string_lossy(), if is_match { "OK" } else { "FAILED " })?;
+        writeln!(output, "{}: {}", name.to_string_lossy(), RESULT_TEXT[is_match as usize])?;
     }
 
     if args.flush {
