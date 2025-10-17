@@ -145,6 +145,12 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
 
+    // Check for options that cannot be used in `--check` mode
+    if args.check && args.length.is_some() {
+        print_error!(args, "Error: Option '--length' must not be used in '--check' mode!");
+        return ExitCode::FAILURE;
+    }
+
     // Compute the digest size, in bytes (falling back to the default, it unspecified)
     let (digest_size, digest_rem) = match args.length {
         Some(digest_bits) => digest_bits.get().div_rem(&(u8::BITS as usize)),

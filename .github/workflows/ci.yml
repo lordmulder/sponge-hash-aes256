@@ -129,7 +129,8 @@ jobs:
       - run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get install -y musl-tools crossbuild-essential-i386 crossbuild-essential-arm64
+          apt-get install -y musl-tools crossbuild-essential-i386 crossbuild-essential-arm64 ruby-dev
+          gem install --no-document fpm
           git config --global --add safe.directory '*'
       - run: |
           rustup target add x86_64-unknown-linux-musl
@@ -145,7 +146,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-linux
-          path: ${{ github.workspace }}/.build/linux/target/*.tar.xz
+          path: ${{ github.workspace }}/.build/linux/target/*.*
 
   build-windows:
     runs-on: windows-latest

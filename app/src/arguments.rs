@@ -18,6 +18,8 @@ use wild::args_os;
 /// Build profile
 #[cfg(not(debug_assertions))]
 const BUILD_PROFILE: &str = "release";
+
+/// Build profile
 #[cfg(debug_assertions)]
 const BUILD_PROFILE: &str = "debug";
 
@@ -25,10 +27,19 @@ const BUILD_PROFILE: &str = "debug";
 pub const VERSION: &str = formatcp!("v{} [SpongeHash-AES256 v{}] [{OS}] [{ARCH}] [{BUILD_PROFILE}]", env!("CARGO_PKG_VERSION"), version());
 
 /// Full version string
-pub const LONG_VERSION: &str = formatcp!("{VERSION}\nbuilt on: {}\nrustc version: {}", build_time_utc!("%F, %T"), rustc_version_full());
+pub const LONG_VERSION: &str = formatcp!("{VERSION}\nBuilt on: {}\nCompiled using rustc version: {}", build_time_utc!("%F, %T"), rustc_version_full());
 
 /// Header line
 pub const HEADER_LINE: &str = formatcp!("{} v{} (with SpongeHash-AES256 v{})", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"), version());
+
+/// About text
+const ABOUT_TEXT: &str = "A sponge-based secure hash function that uses AES-256 as its internal PRF.\n\
+    This software is released under the Zero-Clause BSD License.";
+
+/// Additional help text
+const HELP_TEXT: &str = "If no input files are specified, reads input data from the 'stdin' stream.\n\
+    Returns a non-zero exit code if any errors occurred; otherwise, zero.\n\
+    For details please refer to: <https://crates.io/crates/sponge-hash-aes256>";
 
 // ---------------------------------------------------------------------------
 // Command-line arguments
@@ -36,11 +47,8 @@ pub const HEADER_LINE: &str = formatcp!("{} v{} (with SpongeHash-AES256 v{})", e
 
 /// SpongeHash-AES256 command-line tool
 #[derive(Parser, Debug)]
-#[command(about = "A sponge-based secure hash function that uses AES-256 as its internal PRF.\n\
-    This software is released under the Zero-Clause BSD License.")]
-#[command(after_help = "If no input files are specified, reads input data from the 'stdin' stream.\n\
-    Returns a non-zero exit code if any errors occurred; otherwise, zero.\n\
-    For details please refer to: <https://crates.io/crates/sponge-hash-aes256>")]
+#[command(about = ABOUT_TEXT)]
+#[command(after_help = HELP_TEXT)]
 #[command(before_help = HEADER_LINE)]
 #[command(version = VERSION)]
 #[command(long_version = LONG_VERSION)]

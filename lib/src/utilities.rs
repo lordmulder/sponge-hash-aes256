@@ -14,32 +14,35 @@ pub const KEY_SIZE: usize = 2usize * BLOCK_SIZE;
 // Alignment checks
 // ---------------------------------------------------------------------------
 
-#[cfg(debug_assertions)]
-#[inline(always)]
-fn check_aligned<T: Sized>(ptr: *const T) -> bool {
-    ptr.is_aligned()
-}
-
-#[cfg(not(debug_assertions))]
-#[inline(always)]
-const fn check_aligned<T: Sized>(_ptr: *const T) -> bool {
-    true
+macro_rules! check_aligned {
+    ($ptr:expr) => {{
+        #[cfg(debug_assertions)]
+        {
+            $ptr.is_aligned()
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            true
+        }
+    }};
 }
 
 // ---------------------------------------------------------------------------
 // Generic array wrapper
 // ---------------------------------------------------------------------------
 
-#[allow(deprecated)]
-#[inline(always)]
-fn aes256_wrap_block(block_data: &mut [u8; BLOCK_SIZE]) -> &mut Block {
-    Block::from_mut_slice(block_data)
+macro_rules! aes256_wrap_block {
+    ($block_data:expr) => {{
+        #[allow(deprecated)]
+        Block::from_mut_slice($block_data)
+    }};
 }
 
-#[allow(deprecated)]
-#[inline(always)]
-fn aes256_wrap_key(key_data: &[u8; KEY_SIZE]) -> &Key<Aes256> {
-    Key::<Aes256>::from_slice(key_data)
+macro_rules! aes256_wrap_key {
+    ($key_data:expr) => {{
+        #[allow(deprecated)]
+        Key::<Aes256>::from_slice($key_data)
+    }};
 }
 
 // ---------------------------------------------------------------------------
@@ -52,11 +55,11 @@ pub fn aes256_encrypt(dst: &mut [u8; BLOCK_SIZE], src: &[u8; BLOCK_SIZE], key0: 
     full_key[..BLOCK_SIZE].copy_from_slice(key0);
     full_key[BLOCK_SIZE..].copy_from_slice(key1);
 
-    let cipher = Aes256::new(aes256_wrap_key(&full_key));
+    let cipher = Aes256::new(aes256_wrap_key!(&full_key));
     full_key.zeroize();
 
     dst.copy_from_slice(src);
-    cipher.encrypt_block(aes256_wrap_block(dst));
+    cipher.encrypt_block(aes256_wrap_block!(dst));
 }
 
 #[allow(clippy::manual_is_multiple_of)]
@@ -67,7 +70,7 @@ pub fn xor_arrays(dst: &mut [u8; BLOCK_SIZE], src: &[u8; BLOCK_SIZE]) {
 
     let (ptr_dst, ptr_src) = (dst.as_ptr() as *mut usize, src.as_ptr() as *const usize);
 
-    if check_aligned(ptr_src) && check_aligned(ptr_dst) {
+    if check_aligned!(ptr_src) && check_aligned!(ptr_dst) {
         unsafe {
             let dst_usize = slice::from_raw_parts_mut(ptr_dst, WORDS);
             let src_usize = slice::from_raw_parts(ptr_src, WORDS);
