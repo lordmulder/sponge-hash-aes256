@@ -2,9 +2,10 @@
 // SpongeHash-AES256
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use aes::{Aes256, Block};
-use cipher::{BlockEncrypt, Key, KeyInit};
+use aes::Aes256;
+use cipher::{BlockEncrypt, KeyInit};
 use core::slice;
+use generic_array::GenericArray;
 use zeroize::Zeroize;
 
 pub const BLOCK_SIZE: usize = 16usize;
@@ -28,24 +29,6 @@ macro_rules! check_aligned {
 }
 
 // ---------------------------------------------------------------------------
-// Generic array wrapper
-// ---------------------------------------------------------------------------
-
-macro_rules! aes256_wrap_block {
-    ($block_data:expr) => {{
-        #[allow(deprecated)]
-        Block::from_mut_slice($block_data)
-    }};
-}
-
-macro_rules! aes256_wrap_key {
-    ($key_data:expr) => {{
-        #[allow(deprecated)]
-        Key::<Aes256>::from_slice($key_data)
-    }};
-}
-
-// ---------------------------------------------------------------------------
 // Functions
 // ---------------------------------------------------------------------------
 
@@ -55,11 +38,11 @@ pub fn aes256_encrypt(dst: &mut [u8; BLOCK_SIZE], src: &[u8; BLOCK_SIZE], key0: 
     full_key[..BLOCK_SIZE].copy_from_slice(key0);
     full_key[BLOCK_SIZE..].copy_from_slice(key1);
 
-    let cipher = Aes256::new(aes256_wrap_key!(&full_key));
+    let cipher = Aes256::new(GenericArray::from_slice(&full_key).as_0_14());
     full_key.zeroize();
 
     dst.copy_from_slice(src);
-    cipher.encrypt_block(aes256_wrap_block!(dst));
+    cipher.encrypt_block(GenericArray::from_mut_slice(dst).as_0_14_mut());
 }
 
 #[allow(clippy::manual_is_multiple_of)]
