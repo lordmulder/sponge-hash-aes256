@@ -111,6 +111,7 @@
 mod arguments;
 mod common;
 mod digest;
+mod io;
 mod process;
 mod self_test;
 mod verify;

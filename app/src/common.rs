@@ -2,7 +2,7 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use std::{fmt::Debug, io::Error as IoError, sync::mpsc::Receiver};
+use std::{fmt::Display, io::Error as IoError, sync::mpsc::Receiver};
 
 // ---------------------------------------------------------------------------
 // Common definitions
@@ -22,8 +22,8 @@ pub type Flag = Receiver<bool>;
 // ---------------------------------------------------------------------------
 
 pub enum Error {
-    Io(IoError),
     Aborted,
+    Io(IoError),
 }
 
 impl From<IoError> for Error {
@@ -32,10 +32,10 @@ impl From<IoError> for Error {
     }
 }
 
-impl Debug for Error {
+impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Io(error) => error.fmt(f),
+            Self::Io(error) => Display::fmt(error, f),
             Self::Aborted => write!(f, "Interrupted by user!"),
         }
     }
@@ -48,9 +48,9 @@ impl Debug for Error {
 /// Conditional printing of error message
 #[macro_export]
 macro_rules! print_error {
-    ($args:ident, $($message:tt)*) => {
+    ($args:ident, $fmt:literal $(,$arg:expr)*$(,)?) => {
         if !$args.quiet {
-            eprintln!($($message)*);
+            eprintln!(concat!("[sponge256sum] ", $fmt) $(, $arg)*);
         }
     };
 }

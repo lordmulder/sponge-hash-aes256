@@ -5,8 +5,8 @@
 use hex::encode_to_slice;
 use std::{
     ffi::OsStr,
-    fs::{DirEntry, File, metadata, read_dir},
-    io::{Read, Write, stdin},
+    fs::{DirEntry, metadata, read_dir},
+    io::{Read, Write},
     path::PathBuf,
     slice::Iter,
     str::from_utf8,
@@ -17,7 +17,9 @@ use crate::{
     check_running,
     common::{Error, Flag, MAX_DIGEST_SIZE},
     digest::compute_digest,
-    handle_error, print_error,
+    handle_error,
+    io::{DataSource, STDIN_NAME},
+    print_error,
 };
 
 // ---------------------------------------------------------------------------
@@ -46,7 +48,7 @@ fn is_directory(entry: &DirEntry) -> bool {
 // ---------------------------------------------------------------------------
 
 /// Process a single input file
-fn process_file(input: &mut impl Read, output: &mut impl Write, name: &OsStr, digest_size: usize, args: &Args, running: &Flag) -> Result<(), Error> {
+fn process_file(input: &mut dyn Read, output: &mut impl Write, name: &OsStr, digest_size: usize, args: &Args, running: &Flag) -> Result<(), Error> {
     let mut digest = [0u8; MAX_DIGEST_SIZE];
     compute_digest(input, &mut digest[..digest_size], args, running)?;
 
@@ -79,9 +81,9 @@ fn process_file(input: &mut impl Read, output: &mut impl Write, name: &OsStr, di
 
 /// Read data from a file
 fn read_file(path: &PathBuf, output: &mut impl Write, digest_size: usize, args: &Args, running: &Flag, errors: &mut usize) -> bool {
-    match File::open(path) {
+    match DataSource::from_path(path) {
         Ok(mut file) => {
-            if file.metadata().is_ok_and(|meta| meta.is_dir()) {
+            if file.is_directory() {
                 handle_error!(args, errors, "Input file is a directory: {:?}", path);
             } else {
                 match process_file(&mut file, output, path.as_os_str(), digest_size, args, running) {
@@ -90,11 +92,11 @@ fn read_file(path: &PathBuf, output: &mut impl Write, digest_size: usize, args: 
                         print_error!(args, "Aborted: The process has been interrupted by the user!");
                         return false;
                     }
-                    Err(error) => handle_error!(args, errors, "Failed to process file: {:?} [{:?}]", path, error),
+                    Err(error) => handle_error!(args, errors, "Failed to process file: {:?} ({})", path, error),
                 }
             }
         }
-        Err(error) => handle_error!(args, errors, "Failed to open input file: {:?} [{:?}]", path, error),
+        Err(error) => handle_error!(args, errors, "Failed to open input file: {:?} ({})", path, error),
     }
 
     true
@@ -102,16 +104,22 @@ fn read_file(path: &PathBuf, output: &mut impl Write, digest_size: usize, args: 
 
 /// Read data from the `stdin` stream
 pub fn process_from_stdin(output: &mut impl Write, digest_size: usize, args: &Args, running: Flag) -> bool {
-    let mut input = stdin().lock();
+    let mut input = match DataSource::from_stdin() {
+        Ok(stream) => stream,
+        Err(error) => {
+            print_error!(args, "Failed to acquire the standard input stream: {}", error);
+            return false;
+        }
+    };
 
-    match process_file(&mut input, output, OsStr::new("-"), digest_size, args, &running) {
+    match process_file(&mut input, output, &STDIN_NAME, digest_size, args, &running) {
         Ok(_) => true,
         Err(Error::Aborted) => {
             print_error!(args, "Aborted: The process has been interrupted by the user!");
             false
         }
         Err(error) => {
-            print_error!(args, "Failed to process input data from 'stdin' stream: {:?}", error);
+            print_error!(args, "Failed to process input data from 'stdin' stream: {}", error);
             false
         }
     }
@@ -138,13 +146,13 @@ fn process_directory(path: &PathBuf, output: &mut impl Write, digest_size: usize
                         }
                     }
                     Err(error) => {
-                        handle_error!(args, errors, "Failed to read directory: {:?} [{:?}]", path, error);
+                        handle_error!(args, errors, "Failed to read directory: {:?} ({})", path, error);
                     }
                 }
             }
         }
         Err(error) => {
-            handle_error!(args, errors, "Failed to open directory: {:?} [{:?}]", path, error);
+            handle_error!(args, errors, "Failed to open directory: {:?} ({})", path, error);
         }
     }
 
@@ -168,7 +176,7 @@ pub fn process_files(files: Iter<'_, PathBuf>, output: &mut impl Write, digest_s
     }
 
     if args.keep_going && (errors > 0usize) {
-        print_error!(args, "Warning: {} file(s) were skipped due to errors.", errors);
+        print_error!(args, "WARNING: {} file(s) were skipped due to errors.", errors);
     }
 
     errors == 0usize

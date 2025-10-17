@@ -115,7 +115,7 @@ pub fn self_test(output: &mut impl Write, args: &Args, running: Flag) -> bool {
             false
         }
         Err(error) => {
-            print_error!(args, "Self-test encountered an error: {:?}", error);
+            print_error!(args, "Self-test encountered an error: {}", error);
             false
         }
         Ok(result) => result,

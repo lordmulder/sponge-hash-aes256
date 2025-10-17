@@ -87,7 +87,7 @@ impl Hasher {
 // ---------------------------------------------------------------------------
 
 /// Process a single input file
-pub fn compute_digest(input: &mut impl Read, digest_out: &mut [u8], args: &Args, running: &Flag) -> Result<(), Error> {
+pub fn compute_digest(input: &mut dyn Read, digest_out: &mut [u8], args: &Args, running: &Flag) -> Result<(), Error> {
     let mut hasher = Hasher::new(&args.info, args.snail);
 
     if !args.text {

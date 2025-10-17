@@ -2,6 +2,11 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
+use parking_lot::Mutex;
+use rand_pcg::{
+    Pcg64,
+    rand_core::{RngCore, SeedableRng},
+};
 use regex::Regex;
 use std::{
     collections::{HashMap, HashSet},
@@ -59,7 +64,7 @@ where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let dest_file = File::create(dest_file).expect("Failed to create output file!");
+    let dest_file = File::create_new(dest_file).expect("Failed to create output file!");
     let child = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
         .args(args)
         .stdout(Stdio::from(dest_file))
@@ -141,7 +146,7 @@ fn do_test_file_with_info(expected: &str, file_name: &str, info: &str) {
 }
 
 fn do_test_data(expected: &str, data: &[u8], snail_mode: bool) {
-    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([0-9a-fA-F]{64})\s+-").unwrap());
+    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([0-9a-fA-F]{64})\s+[\x20-\x7E]+").unwrap());
     const NO_ARGS: iter::Empty<&OsStr> = iter::empty::<&OsStr>();
 
     let output = if snail_mode { run_binary_with_data([OsStr::new("--snail")], data) } else { run_binary_with_data(NO_ARGS, data) };
@@ -154,12 +159,12 @@ fn do_verify_files(modify: bool, file_count: usize) {
     static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([\x20-\x7E]+):\s(\w+)$").unwrap());
 
     let source_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data");
-    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join("checksums.txt");
+    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
 
     run_binary_to_file([OsStr::new("--recursive"), source_dir.as_os_str()], &check_file);
 
     let input_file = if modify {
-        let modified_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join("checksums_modified.txt");
+        let modified_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("modified_{:016X}.txt", random_u64()));
         modify_checksum_file(&check_file, modified_file)
     } else {
         check_file.clone()
@@ -181,7 +186,7 @@ fn do_verify_files(modify: bool, file_count: usize) {
 
 fn modify_checksum_file(original_file: &Path, modified_file: PathBuf) -> PathBuf {
     let reader = BufReader::new(File::open(original_file).unwrap());
-    let mut writer = BufWriter::new(File::create(&modified_file).unwrap());
+    let mut writer = BufWriter::new(File::create_new(&modified_file).unwrap());
 
     for line in reader.lines() {
         let mut line_modified: Vec<char> = line.unwrap().trim_ascii_start().chars().collect();
@@ -203,6 +208,26 @@ fn modify_hex_char(character: &char) -> char {
         'f' => '0',
         _ => panic!("Invalid hex character: '{}'", *character),
     }
+}
+
+fn random_u64() -> u64 {
+    static BURNED: LazyLock<Mutex<HashSet<u64>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
+    static RANDOM: LazyLock<Mutex<Pcg64>> = LazyLock::new(|| Mutex::new(Pcg64::from_seed(generate_seed())));
+
+    let (mut random, mut burned) = (RANDOM.lock(), BURNED.lock());
+
+    loop {
+        let value = random.next_u64();
+        if burned.insert(value) {
+            return value;
+        }
+    }
+}
+
+fn generate_seed<const N: usize>() -> [u8; N] {
+    let mut seed = [0u8; N];
+    getrandom::fill(&mut seed).expect("Failed to generate seed value!");
+    seed
 }
 
 // ---------------------------------------------------------------------------
