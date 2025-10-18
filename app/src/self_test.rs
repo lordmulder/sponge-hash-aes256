@@ -9,7 +9,7 @@ use rand_pcg::{
     rand_core::{RngCore, SeedableRng},
 };
 use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, SpongeHash256};
-use std::{io::Write, str::from_utf8, time::Instant};
+use std::{env, io::Write, str::from_utf8, time::Instant};
 
 use crate::{
     arguments::{Args, HEADER_LINE},
@@ -50,16 +50,16 @@ fn print_digest<T: AsRef<[u8]>>(output: &mut impl Write, prefix: &str, digest: T
 // Self-test
 // ---------------------------------------------------------------------------
 
-const DIGEST_SIZE: usize = DEFAULT_DIGEST_SIZE;
-
 const PCG64_SEEDVALUE: [u64; 2usize] = [18446744073709551557u64, 18446744073709551533u64];
-const DIGEST_EXPECTED: [[u8; DIGEST_SIZE]; 2usize] =
+const DIGEST_EXPECTED: [[u8; DEFAULT_DIGEST_SIZE]; 2usize] =
     [hex!("721a31e8bafb3ed328459f8e87068283b7d19bc736469d02916355ce726873bf"), hex!("cf0bc20b6cc6e9268d0e91d3198ca631bdfc343f8f972bb21c2d3ed375acf1a4")];
 
 const BUFFER_SIZE: usize = 4093usize;
 const MAX_ITERATION: u32 = 524287u32;
 
-fn do_test(seed: u64, digest_expected: &[u8; DIGEST_SIZE], output: &mut impl Write, counter: &mut u64, running: &Flag) -> Result<bool, Error> {
+const TOTAL_BYTES: u64 = (BUFFER_SIZE as u64) * (MAX_ITERATION as u64) * (PCG64_SEEDVALUE.len() as u64);
+
+fn do_test(seed: u64, digest_expected: &[u8; DEFAULT_DIGEST_SIZE], output: &mut impl Write, counter: &mut u64, running: &Flag) -> Result<bool, Error> {
     let mut source = Pcg64Mcg::seed_from_u64(seed);
     let mut buffer = [0u8; BUFFER_SIZE];
     let mut hasher = SpongeHash256::default();
@@ -71,7 +71,7 @@ fn do_test(seed: u64, digest_expected: &[u8; DIGEST_SIZE], output: &mut impl Wri
         check_running!(running);
     }
 
-    let digest_computed: [u8; DIGEST_SIZE] = hasher.digest();
+    let digest_computed: [u8; DEFAULT_DIGEST_SIZE] = hasher.digest();
     let success = digest_equal(&digest_computed, digest_expected);
 
     if !success {
@@ -84,26 +84,49 @@ fn do_test(seed: u64, digest_expected: &[u8; DIGEST_SIZE], output: &mut impl Wri
 }
 
 fn test_runner(output: &mut impl Write, running: Flag) -> Result<bool, Error> {
-    writeln!(output, "{}\n", HEADER_LINE)?;
-    writeln!(output, "Self-test is running, please be patient...")?;
-    output.flush()?;
+    writeln!(output, "{}", HEADER_LINE)?;
+    let passes = env::var("SPONGE_SELFTEST_PASSES").ok().and_then(|str| str.parse().ok()).filter(|val| *val >= 1u64).unwrap_or(1u64);
 
-    let start_time = Instant::now();
-    let mut total = 0u64;
-
-    for (seed_value, digest_expected) in PCG64_SEEDVALUE.iter().zip(DIGEST_EXPECTED.iter()) {
-        if !do_test(*seed_value, digest_expected, output, &mut total, &running)? {
-            return Ok(false);
-        }
+    if passes <= 1u64 {
+        writeln!(output, "\nSelf-test is running, please be patient...")?;
+        output.flush()?;
     }
 
-    assert_eq!(total, (BUFFER_SIZE as u64) * (MAX_ITERATION as u64) * (PCG64_SEEDVALUE.len() as u64));
+    let (mut elapsed_min, mut elapsed_max) = (f64::MAX, f64::MIN);
 
-    let elapsed = start_time.elapsed().as_secs_f64();
-    let (rate, unit) = format_bytes((total as f64) / elapsed);
+    for current_pass in 0..passes {
+        if passes > 1u64 {
+            writeln!(output, "\nPass {} of {} is running...", current_pass + 1u64, passes)?;
+            output.flush()?;
+        }
 
-    writeln!(output, "Successful.\n")?;
-    writeln!(output, "Completed in {:.1} seconds ({:.2} {}/s).", elapsed, rate, unit)?;
+        let start_time = Instant::now();
+        let mut total = 0u64;
+
+        for (seed_value, digest_expected) in PCG64_SEEDVALUE.iter().zip(DIGEST_EXPECTED.iter()) {
+            if !do_test(*seed_value, digest_expected, output, &mut total, &running)? {
+                return Ok(false);
+            }
+        }
+
+        assert_eq!(total, TOTAL_BYTES);
+
+        let elapsed = start_time.elapsed().as_secs_f64();
+        let (rate, unit) = format_bytes((total as f64) / elapsed);
+
+        (elapsed_min, elapsed_max) = (elapsed_min.min(elapsed), elapsed_max.max(elapsed));
+
+        writeln!(output, "Successful.\n")?;
+        writeln!(output, "Completed in {:.1} seconds ({:.2} {}/s).", elapsed, rate, unit)?;
+    }
+
+    if passes > 1u64 {
+        let (rate_min, unit_min) = format_bytes((TOTAL_BYTES as f64) / elapsed_min);
+        let (rate_max, unit_max) = format_bytes((TOTAL_BYTES as f64) / elapsed_max);
+        writeln!(output, "\n--------\n")?;
+        writeln!(output, "Fastest: {:.1} seconds ({:.2} {}/s)", elapsed_min, rate_min, unit_min)?;
+        writeln!(output, "Slowest: {:.1} seconds ({:.2} {}/s)", elapsed_max, rate_max, unit_max)?;
+    }
 
     Ok(true)
 }

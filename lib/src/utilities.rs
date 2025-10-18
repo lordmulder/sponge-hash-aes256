@@ -38,11 +38,11 @@ pub fn aes256_encrypt(dst: &mut [u8; BLOCK_SIZE], src: &[u8; BLOCK_SIZE], key0: 
     full_key[..BLOCK_SIZE].copy_from_slice(key0);
     full_key[BLOCK_SIZE..].copy_from_slice(key1);
 
-    let cipher = Aes256::new(GenericArray::from_slice(&full_key).as_0_14());
+    let cipher = Aes256::new(GenericArray::from_slice(&full_key).as_ref());
     full_key.zeroize();
 
     dst.copy_from_slice(src);
-    cipher.encrypt_block(GenericArray::from_mut_slice(dst).as_0_14_mut());
+    cipher.encrypt_block(GenericArray::from_mut_slice(dst).as_mut());
 }
 
 #[allow(clippy::manual_is_multiple_of)]
