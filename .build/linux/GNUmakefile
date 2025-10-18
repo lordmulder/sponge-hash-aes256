@@ -49,9 +49,9 @@ dist: build
 
 pkg: dist
 	IFS= read -r PKG_VERSION < target/.PKG_VERSION
-	cat bin/postinstall.sh | sed "s|{{SPONGE256SUM_INSTDIR}}|/opt/sponge256sum/$${PKG_VERSION}|g" | install -D --mode=555 /dev/stdin target/bin/postinstall.sh
+	cat bin/launcher.sh | sed "s|{{SPONGE256SUM_INSTDIR}}|/opt/sponge256sum/$${PKG_VERSION}|g" | install -D --mode=555 /dev/stdin target/bin/sponge256sum.sh
 	( cd target/dist && XZ_OPT=-9e tar --owner=0 --group=0 -cJvf ../sponge256sum-$${PKG_VERSION}-linux.tar.xz * )
-	fpm -s dir -t deb -n sponge256sum -v $${PKG_VERSION} -a all -p target/sponge256sum-$${PKG_VERSION}-linux.deb --description "SpongeHash-AES256" --maintainer "MuldeR <mulder2@gmx.de>" --vendor "Muldersoft" --url "https://crates.io/crates/sponge-hash-aes256" --license 0BSD --deb-changelog ../../CHANGELOG.md --after-install target/bin/postinstall.sh --after-remove bin/uninstall.sh target/dist/=/opt/sponge256sum/$${PKG_VERSION}/
+	fpm -s dir -t deb -n sponge256sum -v $${PKG_VERSION} -a all -p target/sponge256sum-$${PKG_VERSION}-linux.deb --description "SpongeHash-AES256" --maintainer "MuldeR <mulder2@gmx.de>" --vendor "Muldersoft" --url "https://crates.io/crates/sponge-hash-aes256" --license 0BSD --deb-changelog ../../CHANGELOG.md target/bin/sponge256sum.sh=/usr/bin/sponge256sum target/dist/=/opt/sponge256sum/$${PKG_VERSION}/
 	chmod 444 target/sponge256sum-$${PKG_VERSION}-linux.*
 
 clean:
