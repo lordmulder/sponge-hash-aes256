@@ -8,12 +8,16 @@ This hash function has a *variable* output size.
 
 ## Installation
 
+In order to use this crate, add it under `[dependencies]` to your **`Cargo.toml`**:
+
 ```
 [dependencies]
-sponge-hash-aes256 = "1.3.5"
+sponge-hash-aes256 = "1.4.0"
 ```
 
 ## Usage
+
+Here is a simple example that demonstrates how to use `SpongeHash256`:
 
 ```rust
 use hex::encode_to_slice;

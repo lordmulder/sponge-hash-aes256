@@ -21,11 +21,11 @@ The “core” hash algorithm is implemented in the **`sponge-hash-aes256`** cra
 
 ### Installation
 
-In order to use this crate, you have to add it under `[dependencies]` to your **`Cargo.toml`**:
+In order to use this crate, add it under `[dependencies]` to your **`Cargo.toml`**:
 
 ```
 [dependencies]
-sponge-hash-aes256 = "1.3.5"
+sponge-hash-aes256 = "1.4.0"
 ```
 
 ### Usage
@@ -68,6 +68,7 @@ Arguments:
 Options:
   -b, --binary           Read the input file(s) in binary mode, i.e., default mode
   -t, --text             Read the input file(s) in text mode
+  -c, --check            Read and verify checksums from the provided input file(s)
   -d, --dirs             Enable processing of directories as arguments
   -r, --recursive        Recursively process the provided directories (implies -d)
   -k, --keep-going       Continue processing even if errors are encountered

@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 1.4.0
+
+### Added
+
+- Implemented support for option `--check` to verify files from an existing checksum file.
+- Updated GitHub workflow (CI) to produce a `.deb` installation package for Linux.
+
+### Changed
+
+- New workaround for deprecation of `generic_array` version 0.14.x, now using version 1.3.x.
+- Various improvements to the self-test code.
+- Various improvements to the Windows (Nullsoft) installer.
+
 ## Version 1.3.5
 
 ### Added
@@ -13,12 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
-- Feature `aligned` has been removed. Now enabled implicitely when building in "release" mode.
+- Feature `aligned` has been removed. Now enabled implicitly when building in "release" mode.
 
 ### Changed
 
 - Updated GitHub workflow (CI) to run the tests on Windows and macOS, in addition to Linux.
-- Various improvements to the Windows installer.
+- Various improvements to the Windows (Nullsoft) installer.
 
 ## Version 1.3.4
 

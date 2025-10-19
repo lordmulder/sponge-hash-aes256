@@ -25,6 +25,7 @@
 //! Options:
 //!   -b, --binary           Read the input file(s) in binary mode, i.e., default mode
 //!   -t, --text             Read the input file(s) in text mode
+//!   -c, --check            Read and verify checksums from the provided input file(s)
 //!   -d, --dirs             Enable processing of directories as arguments
 //!   -r, --recursive        Recursively process the provided directories (implies -d)
 //!   -k, --keep-going       Continue processing even if errors are encountered
@@ -49,7 +50,7 @@
 //!
 //! * Compute the hash values (digests) of one or multiple input files:
 //!   ```sh
-//!   $ sponge256sum /path/to/foo.dat /path/to/bar.dat /path/to/baz.dat
+//!   $ sponge256sum /path/to/first.dat /path/to/second.dat /path/to/third.dat
 //!   ```
 //!
 //! * Selecting multiple input files can also be done with wildcards:
@@ -57,9 +58,19 @@
 //!   $ sponge256sum /path/to/*.dat
 //!   ```
 //!
+//! * Perform a recursive scan of an entire directory tree:
+//!   ```sh
+//!   $ sponge256sum --recursive /path/to/base-dir
+//!   ```
+//!
 //! * Compute the hash value (digest) of the data from the `stdin` stream:
 //!   ```sh
 //!   $ printf "Lorem ipsum dolor sit amet consetetur sadipscing" | sponge256sum
+//!   ```
+//!
+//! * Verify files (hashes) from an existing checksum file:
+//!   ```sh
+//!   $ sponge256sum --check /path/to/SPONGE256SUMS.txt
 //!   ```
 //!
 //! ## Options
