@@ -76,6 +76,24 @@ where
     assert!(child.wait_with_output().unwrap().status.success());
 }
 
+fn run_binary_with_env<I, S>(args: I, env: HashMap<&str, String>) -> String
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let output = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .stdin(Stdio::null())
+        .envs(env)
+        .output()
+        .expect("Failed to run binary!");
+
+    assert!(output.status.success());
+    String::from_utf8(output.stdout).unwrap()
+}
+
 fn do_test_file(expected: &str, file_name: &str, snail_mode: bool) {
     static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([0-9a-fA-F]+)\s[\x20-\x7E]+$").unwrap());
 
@@ -372,5 +390,7 @@ fn test_help() {
 #[ignore]
 fn test_selftest() {
     static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Successful.").unwrap());
-    assert!(REGEX.is_match(&run_binary([OsStr::new("--self-test")], true)));
+    let mut env = HashMap::with_capacity(1);
+    env.insert("SPONGE_SELFTEST_PASSES", 1.to_string());
+    assert!(REGEX.is_match(&run_binary_with_env([OsStr::new("--self-test")], env)));
 }
