@@ -12,23 +12,20 @@ build:
 	cd ../../app
 	for t in x86_64 i686 aarch64; do
 		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Ctarget-feature=+crt-static -Clink-arg=-s -Clink-arg=-O3 -Clink-arg=-Wl,-O3" \
-		cargo clean
-		cargo build --release --target $$t-unknown-linux-musl --verbose
+		$(SHELL) -c "cargo clean && cargo build --release --target $$t-unknown-linux-musl --verbose"
 		[ "$$t" = "i686" ] && suffix=pentium4 || suffix=$$t
 		mv -vf target/$$t-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$suffix
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-$$suffix
 	done
 	for v in v2 v3 v4; do
 		RUSTFLAGS="-Dwarnings -Clinker=x86_64-linux-gnu-gcc -Ctarget-feature=+crt-static -Clink-arg=-s -Clink-arg=-O3 -Clink-arg=-Wl,-O3 -Ctarget-cpu=x86-64-$$v" \
-		cargo clean
-		cargo build --release --target x86_64-unknown-linux-musl --verbose
+		$(SHELL) -c "cargo clean && cargo build --release --target x86_64-unknown-linux-musl --verbose"
 		mv -vf target/x86_64-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-x86_64-$$v
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-x86_64-$$v
 	done
 	for p in i586; do
 		RUSTFLAGS="-Dwarnings -Clinker=i686-linux-gnu-gcc -Ctarget-feature=+crt-static -Clink-arg=-s -Clink-arg=-O3 -Clink-arg=-Wl,-O3 -Ctarget-cpu=$$p" \
-		cargo clean
-		cargo build --release --target i586-unknown-linux-musl --verbose
+		$(SHELL) -c "cargo clean && cargo build --release --target i586-unknown-linux-musl --verbose"
 		mv -vf target/i586-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$p
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-$$p
 	done
