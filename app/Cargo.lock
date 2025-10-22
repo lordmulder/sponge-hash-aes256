@@ -554,7 +554,7 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "sponge-hash-aes256"
-version = "1.4.1"
+version = "1.4.2"
 dependencies = [
  "aes",
  "cipher",
@@ -564,7 +564,7 @@ dependencies = [
 
 [[package]]
 name = "sponge256sum"
-version = "1.4.1"
+version = "1.4.2"
 dependencies = [
  "build-time",
  "clap",

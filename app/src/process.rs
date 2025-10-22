@@ -4,16 +4,16 @@
 
 use hex::encode_to_slice;
 use std::{
+    borrow::Cow,
+    collections::BTreeSet,
     ffi::OsStr,
     fs::{DirEntry, Metadata, metadata, read_dir},
     io::{Read, Write},
+    iter,
     path::PathBuf,
     slice::Iter,
     str::from_utf8,
 };
-
-#[cfg(unix)]
-use std::{collections::BTreeSet, os::unix::fs::MetadataExt};
 
 use crate::{
     arguments::Args,
@@ -25,13 +25,35 @@ use crate::{
     print_error,
 };
 
-/// Data type used to store visited directories on Unix
-#[cfg(unix)]
-type SetType = BTreeSet<u128>;
+/// Data type used to store already visited directories
+type FileId = (u64, u64);
+type SetType = BTreeSet<FileId>;
 
-/// Dummy data type to be used on other platform
-#[cfg(not(unix))]
-type SetType = ();
+// ---------------------------------------------------------------------------
+// Platform support
+// ---------------------------------------------------------------------------
+
+#[cfg(target_family = "unix")]
+mod file_id {
+    use super::*;
+    use std::os::unix::fs::MetadataExt;
+
+    /// Get the unique file id
+    #[inline(always)]
+    pub fn get(meta: &Metadata) -> Option<FileId> {
+        Some((meta.dev(), meta.ino()))
+    }
+}
+
+#[cfg(not(target_family = "unix"))]
+mod file_id {
+    use super::*;
+
+    #[inline(always)]
+    pub fn get(_: &Metadata) -> Option<FileId> {
+        None
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Utility functions
@@ -55,25 +77,14 @@ fn is_directory(dir_entry: &DirEntry) -> Option<Metadata> {
     }
 }
 
-/// Combine two separate u64 values to a single u128 value
-#[cfg(unix)]
-#[inline(always)]
-fn make_u128(high: u64, low: u64) -> u128 {
-    ((high as u128) << 64usize) | (low as u128)
-}
-
-/// Make sure that the directory was not visited yet
-#[cfg(unix)]
-#[inline(always)]
-fn not_visited(meta: &Metadata, visited: &mut SetType) -> bool {
-    visited.insert(make_u128(meta.dev(), meta.ino()))
-}
-
-/// On platforms other than Unix we simply return `true`
-#[cfg(not(unix))]
-#[inline(always)]
-fn not_visited(_: &Metadata, _: &mut SetType) -> bool {
-    true
+/// Appends a directory id to the set of visited directories
+#[inline]
+fn append(visited: &'_ SetType, file_id: Option<FileId>) -> Cow<'_, SetType> {
+    file_id.map_or(Cow::Borrowed(visited), |id| {
+        let mut cloned = visited.clone();
+        assert!(cloned.insert(id), "Failed to insert file id!");
+        Cow::Owned(cloned)
+    })
 }
 
 // ---------------------------------------------------------------------------
@@ -163,8 +174,8 @@ pub fn process_from_stdin(output: &mut impl Write, size: usize, args: &Args, run
 // ---------------------------------------------------------------------------
 
 /// Iterate all files and sub-directories in a directory
-fn process_directory(path: &PathBuf, visited: &mut SetType, output: &mut impl Write, size: usize, args: &Args, running: &Flag, errors: &mut usize) -> bool {
-    let mut dir_queue = if args.recursive { Vec::with_capacity(64usize) } else { Vec::new() };
+fn process_directory(path: &PathBuf, visited: &SetType, output: &mut impl Write, size: usize, args: &Args, running: &Flag, errors: &mut usize) -> bool {
+    let mut dir_queue: Option<Vec<(Option<FileId>, PathBuf)>> = None;
 
     match read_dir(path) {
         Ok(dir_iter) => {
@@ -173,8 +184,13 @@ fn process_directory(path: &PathBuf, visited: &mut SetType, output: &mut impl Wr
                 match element {
                     Ok(dir_entry) => {
                         if let Some(meta_data) = is_directory(&dir_entry) {
-                            if args.recursive && not_visited(&meta_data, visited) {
-                                dir_queue.push(dir_entry.path());
+                            if args.recursive {
+                                let file_id = file_id::get(&meta_data);
+                                if file_id.is_none_or(|id| !visited.contains(&id)) {
+                                    dir_queue.get_or_insert_with(|| Vec::with_capacity(64usize)).push((file_id, dir_entry.path()));
+                                } else {
+                                    print_error!(args, "File system loop detected, ignoring directory: {:?}", path);
+                                }
                             }
                         } else if !read_file(&dir_entry.path(), output, size, args, running, errors) {
                             return false;
@@ -191,9 +207,11 @@ fn process_directory(path: &PathBuf, visited: &mut SetType, output: &mut impl Wr
         }
     }
 
-    for dir_name in dir_queue.into_iter() {
-        if !process_directory(&dir_name, visited, output, size, args, running, errors) {
-            return false;
+    if let Some(queue) = dir_queue {
+        for (file_id, dir_name) in queue.into_iter() {
+            if !process_directory(&dir_name, &append(visited, file_id), output, size, args, running, errors) {
+                return false;
+            }
         }
     }
 
@@ -207,8 +225,10 @@ pub fn process_files(files: Iter<'_, PathBuf>, output: &mut impl Write, digest_s
 
     for file_name in files {
         check_running!(args, running);
-        if handle_dirs && metadata(file_name).is_ok_and(|meta| meta.is_dir()) {
-            if !process_directory(file_name, &mut SetType::default(), output, digest_size, args, &running, &mut errors) {
+        let dir_info = if handle_dirs { metadata(file_name).ok().filter(|meta| meta.is_dir()) } else { None };
+        if let Some(meta_data) = dir_info {
+            let visited = file_id::get(&meta_data).map_or_else(SetType::new, |dir_id| iter::once(dir_id).collect());
+            if !process_directory(file_name, &visited, output, digest_size, args, &running, &mut errors) {
                 return false;
             }
         } else if !read_file(file_name, output, digest_size, args, &running, &mut errors) {

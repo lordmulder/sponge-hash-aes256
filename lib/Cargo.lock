@@ -126,7 +126,7 @@ dependencies = [
 
 [[package]]
 name = "sponge-hash-aes256"
-version = "1.4.1"
+version = "1.4.2"
 dependencies = [
  "aes",
  "cipher",
