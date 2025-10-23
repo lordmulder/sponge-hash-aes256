@@ -13,6 +13,7 @@ use std::{
 };
 
 use crate::{
+    abort,
     arguments::Args,
     check_running,
     common::{Error, Flag, MAX_DIGEST_SIZE},
@@ -91,10 +92,7 @@ fn verify_file(path: &OsStr, digest_expected: &[u8], output: &mut impl Write, ar
                             return false;
                         }
                     }
-                    Err(Error::Aborted) => {
-                        print_error!(args, "Aborted: The process has been interrupted by the user!");
-                        return false;
-                    }
+                    Err(Error::Aborted) => abort!(args),
                     Err(error) => handle_error!(args, errors, "Failed to verify file: {:?} ({})", path, error),
                 }
             }

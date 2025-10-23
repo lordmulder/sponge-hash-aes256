@@ -7,8 +7,11 @@ use clap::{ArgAction, Parser, command};
 use const_format::formatcp;
 use rustc_version_const::rustc_version_full;
 use sponge_hash_aes256::version;
-use std::env::consts::{ARCH, OS};
-use std::{num::NonZeroUsize, path::PathBuf};
+use std::{
+    env::consts::{ARCH, OS},
+    num::NonZeroUsize,
+    path::PathBuf,
+};
 use wild::args_os;
 
 // ---------------------------------------------------------------------------
@@ -114,8 +117,8 @@ pub struct Args {
     pub files: Vec<PathBuf>,
 }
 
-impl Default for Args {
-    fn default() -> Self {
+impl Args {
+    pub fn parse_command_line() -> Self {
         Self::parse_from(args_os())
     }
 }

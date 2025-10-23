@@ -2,7 +2,8 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use std::{fmt::Display, io::Error as IoError, sync::mpsc::Receiver};
+use crossbeam_channel::Receiver;
+use std::{fmt::Display, io::Error as IoError};
 
 // ---------------------------------------------------------------------------
 // Common definitions
@@ -15,7 +16,7 @@ pub const MAX_SNAIL_LEVEL: u8 = 4u8;
 pub const MAX_DIGEST_SIZE: usize = 256usize;
 
 /// Cancellation flag
-pub type Flag = Receiver<bool>;
+pub type Flag = Receiver<()>;
 
 // ---------------------------------------------------------------------------
 // Error type
@@ -71,15 +72,23 @@ macro_rules! handle_error {
 /// Check whether the process has been interrupted
 #[macro_export]
 macro_rules! check_running {
-    ($channel:ident) => {
-        if $channel.try_recv().unwrap_or_default() {
+    ($channel_rx:ident) => {
+        if $channel_rx.try_recv().is_ok() {
             return Err(Error::Aborted);
         }
     };
-    ($args:ident, $channel:ident) => {
-        if $channel.try_recv().unwrap_or_default() {
-            $crate::print_error!($args, "Aborted: The process has been interrupted by the user!");
-            return false;
+    ($args:ident, $channel_rx:ident) => {
+        if $channel_rx.try_recv().is_ok() {
+            $crate::abort!($args)
         }
     };
+}
+
+/// Abort process, e.g., after it has been interrupted
+#[macro_export]
+macro_rules! abort {
+    ($args:ident) => {{
+        $crate::print_error!($args, "Aborted: The process has been interrupted by the user!");
+        std::process::exit(130i32);
+    }};
 }

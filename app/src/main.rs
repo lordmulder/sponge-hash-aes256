@@ -127,11 +127,10 @@ mod process;
 mod self_test;
 mod verify;
 
-use ctrlc::set_handler;
+use crossbeam_channel::{SendTimeoutError, Sender, bounded};
 use num::Integer;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
-use std::sync::mpsc::{self};
-use std::{io::stdout, process::ExitCode};
+use std::{io::stdout, process::ExitCode, sync::Arc, time::Duration};
 
 use crate::process::process_from_stdin;
 use crate::verify::{verify_files, verify_from_stdin};
@@ -148,8 +147,8 @@ use crate::{
 
 /// Applicationm entry point (“main” function)
 fn main() -> ExitCode {
-    // Parse the given command-line args
-    let args = Args::default();
+    // Initialize the Args from the given command-line arguments
+    let args = Arc::new(Args::parse_command_line());
 
     // Check for incompatible arguments
     if args.text && args.binary {
@@ -189,13 +188,14 @@ fn main() -> ExitCode {
 
     // Check the maximum allowable info length
     if args.info.as_ref().is_some_and(|str| str.len() > u8::MAX as usize) {
-        print_error!(args, "Error: Length of \"info\" must not exceed 255 characters! (given length: {})", args.info.unwrap().len());
+        print_error!(args, "Error: Length of \"info\" must not exceed 255 characters! (given length: {})", args.info.as_ref().unwrap().len());
         return ExitCode::FAILURE;
     }
 
     // Install the interrupt handler
-    let (stop_tx, stop_rx) = mpsc::channel();
-    set_handler(move || stop_tx.send(true).expect("Failed to send the 'stop' flag!")).expect("Failed to register CTRL+C handler!");
+    let (stop_tx, stop_rx) = bounded(0usize);
+    let args_rc = Arc::clone(&args);
+    let _ = ctrlc::set_handler(move || sigint_handler(&args_rc, &stop_tx));
 
     // Acquire stdout handle
     let mut output = stdout().lock();
@@ -215,4 +215,15 @@ fn main() -> ExitCode {
     };
 
     if success { ExitCode::SUCCESS } else { ExitCode::FAILURE }
+}
+
+// ---------------------------------------------------------------------------
+// Ctrl+C handler routine
+// ---------------------------------------------------------------------------
+
+/// Try to send the "stop" signal for at most 5 secs, then exit immediately
+fn sigint_handler(args: &Args, channel_tx: &Sender<()>) {
+    if matches!(channel_tx.send_timeout((), Duration::from_secs(5u64)), Err(SendTimeoutError::Timeout(_))) {
+        abort!(args);
+    }
 }

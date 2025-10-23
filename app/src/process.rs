@@ -16,6 +16,7 @@ use std::{
 };
 
 use crate::{
+    abort,
     arguments::Args,
     check_running,
     common::{Error, Flag, MAX_DIGEST_SIZE},
@@ -132,10 +133,7 @@ fn read_file(path: &PathBuf, output: &mut impl Write, size: usize, args: &Args, 
             } else {
                 match process_file(&mut file, output, path.as_os_str(), size, args, running) {
                     Ok(_) => {}
-                    Err(Error::Aborted) => {
-                        print_error!(args, "Aborted: The process has been interrupted by the user!");
-                        return false;
-                    }
+                    Err(Error::Aborted) => abort!(args),
                     Err(error) => handle_error!(args, errors, "Failed to process file: {:?} ({})", path, error),
                 }
             }
@@ -158,10 +156,7 @@ pub fn process_from_stdin(output: &mut impl Write, size: usize, args: &Args, run
 
     match process_file(&mut input, output, &STDIN_NAME, size, args, &running) {
         Ok(_) => true,
-        Err(Error::Aborted) => {
-            print_error!(args, "Aborted: The process has been interrupted by the user!");
-            false
-        }
+        Err(Error::Aborted) => abort!(args),
         Err(error) => {
             print_error!(args, "Failed to process input data from 'stdin' stream: {}", error);
             false

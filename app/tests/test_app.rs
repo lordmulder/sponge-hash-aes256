@@ -131,8 +131,8 @@ fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: bool, force_null: 
     for caps in (if force_null { &REGEX_2 } else { &REGEX_1 }).captures_iter(&output) {
         let digest = caps.get(1).unwrap().as_str();
         let file_name = caps.get(2).unwrap().as_str().split(|c| c == '/' || c == '\\').last().expect("No file name!");
-        if !(file_name.eq("LICENSE") || file_name.eq("SHA512SUMS")) {
-            let expected_name = expected_map.get(digest).expect("Unknownd digest!");
+        if !["LICENSE", "SHA512SUMS", "next"].iter().any(|str| file_name.eq_ignore_ascii_case(*str)) {
+            let expected_name = expected_map.get(digest).expect("Unknown digest!");
             assert!(digest_set.insert(digest));
             assert_eq!(file_name, *expected_name);
         }
