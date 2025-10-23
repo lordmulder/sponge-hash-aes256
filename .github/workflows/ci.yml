@@ -76,6 +76,7 @@ jobs:
           target: x86_64-pc-windows-msvc,i686-pc-windows-msvc
           cache: false
           rustflags: -Dwarnings
+      - run: git config --global core.symlinks false
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -152,7 +153,6 @@ jobs:
     runs-on: windows-latest
     needs: [test-linux, test-windows, test-macos]
     steps:
-      - run: git config --global --add safe.directory '*'
       - uses: repolevedavaj/install-nsis@v1.1.0
         with:
           nsis-version: '3.11'
@@ -162,6 +162,9 @@ jobs:
           target: x86_64-pc-windows-msvc,i686-pc-windows-msvc,aarch64-pc-windows-msvc
           cache: false
           rustflags: "-Dwarnings -Ctarget-feature=+crt-static"
+      - run: |
+          git config --global core.symlinks false
+          git config --global --add safe.directory '*'
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
