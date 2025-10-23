@@ -42,7 +42,7 @@ pkg: dist
 	set -e; \
 	IFS= read -r PKG_VERSION < target/.PKG_VERSION; \
 	( cd target/dist && tar -cf ../sponge256sum-$${PKG_VERSION}-$(MY_OS).tar * ); \
-	xz -9e target/sponge256sum-$${PKG_VERSION}-$(MY_OS).tar; \
+	xz -9 target/sponge256sum-$${PKG_VERSION}-$(MY_OS).tar; \
 	chmod 444 target/*.tar.xz
 
 clean:
