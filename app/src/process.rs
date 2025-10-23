@@ -184,7 +184,7 @@ fn process_directory(path: &PathBuf, visited: &SetType, output: &mut impl Write,
                                 if file_id.is_none_or(|id| !visited.contains(&id)) {
                                     dir_queue.get_or_insert_with(|| Vec::with_capacity(64usize)).push((file_id, dir_entry.path()));
                                 } else {
-                                    print_error!(args, "File system loop detected, ignoring directory: {:?}", path);
+                                    print_error!(args, "File system loop detected, skipping: {:?}", dir_entry.path());
                                 }
                             }
                         } else if !read_file(&dir_entry.path(), output, size, args, running, errors) {
