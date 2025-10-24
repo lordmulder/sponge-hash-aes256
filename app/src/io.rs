@@ -2,31 +2,32 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use std::ffi::OsStr;
-use std::sync::{LazyLock, Mutex, MutexGuard};
+use lazy_static::lazy_static;
+use std::ffi::OsString;
+use std::sync::{Mutex, MutexGuard};
 use std::{
     fs::File,
-    io::{Error as IoError, Read, Result as IoResult, StdinLock, stdin},
+    io::{stdin, Error as IoError, Read, Result as IoResult, StdinLock},
     path::Path,
 };
 
 use crate::common::Error;
 
 // ---------------------------------------------------------------------------
-// I/O buffer size
+// Standard streams
 // ---------------------------------------------------------------------------
 
-/// Standard input sentinal value for various OS
+#[cfg(not(target_family = "windows"))]
+lazy_static! {
+    /// Standard input sentinal value for various OS
+    pub static ref STDIN_NAME: OsString = OsString::from("/dev/stdin");
+}
+
 #[cfg(target_family = "windows")]
-pub static STDIN_NAME: LazyLock<&OsStr> = LazyLock::new(|| OsStr::new("CON"));
-
-/// Standard input sentinal value for various OS
-#[cfg(target_family = "unix")]
-pub static STDIN_NAME: LazyLock<&OsStr> = LazyLock::new(|| OsStr::new("/dev/stdin"));
-
-/// Standard input sentinal value for various OS
-#[cfg(not(any(target_family = "unix", target_family = "windows")))]
-pub static STDIN_NAME: LazyLock<&OsStr> = LazyLock::new(|| OsStr::new("-"));
+lazy_static! {
+    /// Standard input sentinal value for various OS
+    pub static ref STDIN_NAME: OsString = OsString::from("CON");
+}
 
 // ---------------------------------------------------------------------------
 // I/O wrapper
@@ -48,7 +49,11 @@ impl DataSource<'_> {
     }
 
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
-        if !STDIN_NAME.eq(path.as_ref()) { Ok(DataSource::File(File::open(path)?)) } else { DataSource::from_stdin() }
+        if !STDIN_NAME.eq(path.as_ref()) {
+            Ok(DataSource::File(File::open(path)?))
+        } else {
+            DataSource::from_stdin()
+        }
     }
 
     pub fn is_directory(&self) -> bool {

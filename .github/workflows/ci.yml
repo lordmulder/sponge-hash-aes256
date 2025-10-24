@@ -19,21 +19,22 @@ jobs:
       image: rust:${{ matrix.rust }}
     strategy:
       matrix:
-        rust: [1.90.0-trixie, 1.85.1-bookworm]
-    env:
-      CLIPPY_OPTIONS: -Dwarnings${{ matrix.rust == '1.85.1-bookworm' && ' -A unknown_lints' || '' }}
+        include:
+          - rust: 1.78.0-bookworm
+            clippy_opts: "-Dwarnings -Aunknown_lints"
+          - rust: 1.90.0-trixie
+            clippy_opts: "-Dwarnings"
     steps:
       - run: rustup component add rustfmt clippy
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - working-directory: ${{ github.workspace }}/${{ matrix.project }}
-        run: |
+      - run: |
           for subdir in lib app; do
             cargo check --manifest-path ${subdir}/Cargo.toml --verbose
             cargo fmt --manifest-path ${subdir}/Cargo.toml --all --check --verbose
-            cargo clippy --manifest-path ${subdir}/Cargo.toml -- ${CLIPPY_OPTIONS}
+            cargo clippy --manifest-path ${subdir}/Cargo.toml -- ${{ matrix.clippy_opts }}
           done
 
   # --------------------------------------------------------------------------
@@ -47,9 +48,9 @@ jobs:
     needs: check
     strategy:
       matrix:
-        rust: [1.90.0-trixie, 1.85.1-bookworm]
+        rust: [1.78.0-bookworm, 1.90.0-trixie]
     env:
-      TEST_OPTIONS: --verbose${{ matrix.options }}${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
+      TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -57,8 +58,8 @@ jobs:
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
       - run: |
           for subdir in lib app; do
-            cargo test --manifest-path ${subdir}/Cargo.toml ${TEST_OPTIONS}
-            cargo test --manifest-path ${subdir}/Cargo.toml --release ${TEST_OPTIONS}
+            cargo test --manifest-path ${subdir}/Cargo.toml ${TEST_EXTRA_OPTS}
+            cargo test --manifest-path ${subdir}/Cargo.toml --release ${TEST_EXTRA_OPTS}
           done
 
   test-windows:
@@ -66,9 +67,9 @@ jobs:
     needs: check
     strategy:
       matrix:
-        rust: [1.90.0, 1.85.1]
+        rust: [1.78.0, 1.90.0]
     env:
-      TEST_OPTIONS: --verbose${{ matrix.options }}${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
+      TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
     steps:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -85,8 +86,8 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           foreach ($subdir in @("lib", "app")) {
             foreach ($arch in @("x86_64", "i686")) {
-              iex "cargo test --manifest-path $subdir/Cargo.toml --target $arch-pc-windows-msvc $env:TEST_OPTIONS"
-              iex "cargo test --manifest-path $subdir/Cargo.toml --target $arch-pc-windows-msvc --release $env:TEST_OPTIONS"
+              iex "cargo test --manifest-path $subdir/Cargo.toml --target $arch-pc-windows-msvc $env:TEST_EXTRA_OPTS"
+              iex "cargo test --manifest-path $subdir/Cargo.toml --target $arch-pc-windows-msvc --release $env:TEST_EXTRA_OPTS"
             }
           }
 
@@ -95,9 +96,9 @@ jobs:
     needs: check
     strategy:
       matrix:
-        rust: [1.90.0, 1.85.1]
+        rust: [1.78.0, 1.90.0]
     env:
-      TEST_OPTIONS: --verbose${{ matrix.options }}${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
+      TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
     steps:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -112,8 +113,8 @@ jobs:
       - run: |
           for subdir in lib app; do
             for arch in x86_64 aarch64; do
-              cargo test --manifest-path ${subdir}/Cargo.toml --target $arch-apple-darwin ${TEST_OPTIONS}
-              cargo test --manifest-path ${subdir}/Cargo.toml --target $arch-apple-darwin --release ${TEST_OPTIONS}
+              cargo test --manifest-path ${subdir}/Cargo.toml --target $arch-apple-darwin ${TEST_EXTRA_OPTS}
+              cargo test --manifest-path ${subdir}/Cargo.toml --target $arch-apple-darwin --release ${TEST_EXTRA_OPTS}
             done
           done
 
@@ -218,8 +219,7 @@ jobs:
             git config --global --add safe.directory '*'
           run: |
             . "$HOME/.cargo/env"
-            cd .build/unix
-            make MY_OS=freebsd MY_ARCH="x86_64 i686" MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+            cd .build/unix && ./build-freebsd.sh
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-freebsd
@@ -243,8 +243,7 @@ jobs:
             git config --global --add safe.directory '*'
           run: |
             . "$HOME/.cargo/env"
-            cd .build/unix
-            make MY_OS=netbsd MY_ARCH=x86_64 MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+            cd .build/unix && ./build-netbsd.sh
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-netbsd
@@ -266,8 +265,7 @@ jobs:
             pkg_add git rust
             git config --global --add safe.directory '*'
           run: |
-            cd .build/unix
-            make MY_OS=openbsd MY_ARCH=x86_64 MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+            cd .build/unix && ./build-openbsd.sh
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-openbsd
@@ -291,8 +289,7 @@ jobs:
             git config --global --add safe.directory '*'
           run: |
             export PATH=/root/.rust_solaris/bin:$PATH
-            cd .build/unix
-            make MY_OS=solaris MY_VENDOR=pc MY_ARCH=x86_64 MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+            cd .build/unix && ./build-solaris.sh
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-solaris
@@ -316,8 +313,7 @@ jobs:
             git config --global --add safe.directory '*'
           run: |
             . "$HOME/.cargo/env"
-            cd .build/unix
-            make MY_OS=illumos MY_ARCH=x86_64 MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+            cd .build/unix && ./build-solaris.sh
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-illumos

@@ -2,9 +2,11 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
+use hex_literal::hex;
+use lazy_static::lazy_static;
 use rand_pcg::{
-    Pcg64,
     rand_core::{RngCore, SeedableRng},
+    Pcg64,
 };
 use regex::Regex;
 use std::{
@@ -15,8 +17,56 @@ use std::{
     iter,
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::{LazyLock, Mutex},
+    sync::Mutex,
+    time::{SystemTime, UNIX_EPOCH},
 };
+
+// ---------------------------------------------------------------------------
+// Regular expressions
+// ---------------------------------------------------------------------------
+
+lazy_static! {
+    static ref REGEX_LINE: Regex = Regex::new(r"(?m)^([0-9a-fA-F]+)\s([\x20-\x7E]+)$").unwrap();
+    static ref REGEX_ZERO: Regex = Regex::new(r"([0-9a-fA-F]+)\s([\x20-\x7E]+)\x00").unwrap();
+    static ref REGEX_CHECK: Regex = Regex::new(r"(?m)^([\x20-\x7E]+):\s(\w+)$").unwrap();
+    static ref REGEX_VERSION: Regex = Regex::new(r"(?m)^sponge256sum\s+v(\d+\.\d+\.\d+)[\s$]").unwrap();
+    static ref REGEX_HELP: Regex = Regex::new(r"(?m)^Usage:\s+sponge256sum(\.exe)?[\s$]").unwrap();
+    static ref REGEX_SELFTEST: Regex = Regex::new(r"(?m)^Successful.").unwrap();
+}
+
+// ---------------------------------------------------------------------------
+// Randomness
+// ---------------------------------------------------------------------------
+
+struct RandContext {
+    burned: HashSet<u64>,
+    random: Pcg64,
+}
+
+impl RandContext {
+    pub fn new() -> Self {
+        let mut seed = hex!("2ca33785d2ae0c7fc0cf4c5267bf10f0854053c52428b24d3903a62c145a7f8b");
+        for (index, value) in SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos().to_be_bytes().iter().enumerate() {
+            seed[16usize + index] ^= value;
+        }
+        Self { burned: HashSet::new(), random: Pcg64::from_seed(seed) }
+    }
+}
+
+lazy_static! {
+    static ref RANDOM: Mutex<RandContext> = Mutex::new(RandContext::new());
+}
+
+fn random_u64() -> u64 {
+    let mut context = RANDOM.lock().unwrap();
+
+    loop {
+        let value = context.random.next_u64();
+        if context.burned.insert(value) {
+            return value;
+        }
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Test functions
@@ -94,22 +144,17 @@ where
 }
 
 fn do_test_file(expected: &str, file_name: &str, snail_mode: bool) {
-    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([0-9a-fA-F]+)\s[\x20-\x7E]+$").unwrap());
-
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join(file_name);
     let output = match snail_mode {
         false => run_binary([path.as_os_str()], true),
         true => run_binary([OsStr::new("--snail"), path.as_os_str()], true),
     };
 
-    let caps = REGEX.captures(&output).expect("Regex did not match!");
+    let caps = REGEX_LINE.captures(&output).expect("Regex did not match!");
     assert_eq!(caps.get(1).unwrap().as_str(), expected);
 }
 
 fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: bool, force_null: bool) {
-    static REGEX_1: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([0-9a-fA-F]+)\s([\x20-\x7E]+)$").unwrap());
-    static REGEX_2: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([0-9a-fA-F]+)\s([\x20-\x7E]+)\x00").unwrap());
-
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data");
     let mut digest_set = HashSet::with_capacity(expected_map.len());
 
@@ -127,7 +172,7 @@ fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: bool, force_null: 
         }
     };
 
-    for caps in (if force_null { &REGEX_2 } else { &REGEX_1 }).captures_iter(&output) {
+    for caps in if force_null { REGEX_ZERO.captures_iter(&output) } else { REGEX_LINE.captures_iter(&output) } {
         let digest = caps.get(1).unwrap().as_str();
         let file_name = caps.get(2).unwrap().as_str().split(|c| c == '/' || c == '\\').last().expect("No file name!");
         if !["LICENSE", "SHA512SUMS", "next"].iter().any(|str| file_name.eq_ignore_ascii_case(*str)) {
@@ -143,38 +188,31 @@ fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: bool, force_null: 
 }
 
 fn do_test_file_with_length(expected: &str, file_name: &str, length: u32) {
-    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([0-9a-fA-F]+)\s[\x20-\x7E]+$").unwrap());
-
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join(file_name);
     let output = run_binary([OsStr::new("--length"), OsStr::new(&format!("{}", length)), path.as_os_str()], true);
-    let caps = REGEX.captures(&output).expect("Regex did not match!");
+    let caps = REGEX_LINE.captures(&output).expect("Regex did not match!");
 
     assert_eq!(caps.get(1).unwrap().as_str(), expected);
 }
 
 fn do_test_file_with_info(expected: &str, file_name: &str, info: &str) {
-    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([0-9a-fA-F]+)\s[\x20-\x7E]+$").unwrap());
-
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join(file_name);
     let output = run_binary([OsStr::new("--info"), OsStr::new(info), path.as_os_str()], true);
-    let caps = REGEX.captures(&output).expect("Regex did not match!");
+    let caps = REGEX_LINE.captures(&output).expect("Regex did not match!");
 
     assert_eq!(caps.get(1).unwrap().as_str(), expected);
 }
 
 fn do_test_data(expected: &str, data: &[u8], snail_mode: bool) {
-    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([0-9a-fA-F]{64})\s+[\x20-\x7E]+").unwrap());
     const NO_ARGS: iter::Empty<&OsStr> = iter::empty::<&OsStr>();
 
     let output = if snail_mode { run_binary_with_data([OsStr::new("--snail")], data) } else { run_binary_with_data(NO_ARGS, data) };
-    let caps = REGEX.captures(&output).expect("Regex did not match!");
+    let caps = REGEX_LINE.captures(&output).expect("Regex did not match!");
 
     assert_eq!(caps.get(1).unwrap().as_str(), expected);
 }
 
 fn do_verify_files(modify: bool, file_count: usize) {
-    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([\x20-\x7E]+):\s(\w+)$").unwrap());
-
     let source_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data");
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
 
@@ -190,7 +228,7 @@ fn do_verify_files(modify: bool, file_count: usize) {
     let output = run_binary([OsStr::new("--check"), OsStr::new("--keep-going"), input_file.as_os_str()], !modify);
     let mut result_set = HashSet::with_capacity(file_count);
 
-    for caps in REGEX.captures_iter(&output) {
+    for caps in REGEX_CHECK.captures_iter(&output) {
         let (file_name, result) = (caps.get(1).unwrap().as_str(), caps.get(2).unwrap().as_str());
         if file_name.ends_with(".pdf") {
             assert_eq!(result, if modify { "FAILED" } else { "OK" });
@@ -206,7 +244,7 @@ fn modify_checksum_file(original_file: &Path, modified_file: PathBuf) -> PathBuf
     let mut writer = BufWriter::new(File::create_new(&modified_file).unwrap());
 
     for line in reader.lines() {
-        let mut line_modified: Vec<char> = line.unwrap().trim_ascii_start().chars().collect();
+        let mut line_modified: Vec<char> = line.unwrap().trim_start().chars().collect();
         if !line_modified.is_empty() {
             let first_char = line_modified.first_mut().unwrap();
             *first_char = modify_hex_char(first_char);
@@ -225,26 +263,6 @@ fn modify_hex_char(character: &char) -> char {
         'f' => '0',
         _ => panic!("Invalid hex character: '{}'", *character),
     }
-}
-
-fn random_u64() -> u64 {
-    static BURNED: LazyLock<Mutex<HashSet<u64>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
-    static RANDOM: LazyLock<Mutex<Pcg64>> = LazyLock::new(|| Mutex::new(Pcg64::from_seed(generate_seed())));
-
-    let (mut random, mut burned) = (RANDOM.lock().unwrap(), BURNED.lock().unwrap());
-
-    loop {
-        let value = random.next_u64();
-        if burned.insert(value) {
-            return value;
-        }
-    }
-}
-
-fn generate_seed<const N: usize>() -> [u8; N] {
-    let mut seed = [0u8; N];
-    getrandom::fill(&mut seed).expect("Failed to generate seed value!");
-    seed
 }
 
 // ---------------------------------------------------------------------------
@@ -371,25 +389,21 @@ fn test_verify_2() {
 
 #[test]
 fn test_version() {
-    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^sponge256sum\s+v(\d+\.\d+\.\d+)[\s$]").unwrap());
-
     let output = run_binary([OsStr::new("--version")], true);
-    let caps = REGEX.captures(&output).expect("Regex did not match!");
+    let caps = REGEX_VERSION.captures(&output).expect("Regex did not match!");
 
     assert_eq!(caps.get(1).unwrap().as_str(), env!("CARGO_PKG_VERSION"));
 }
 
 #[test]
 fn test_help() {
-    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Usage:\s+sponge256sum(\.exe)?[\s$]").unwrap());
-    assert!(REGEX.is_match(&run_binary([OsStr::new("--help")], true)));
+    assert!(REGEX_HELP.is_match(&run_binary([OsStr::new("--help")], true)));
 }
 
 #[test]
 #[ignore]
 fn test_selftest() {
-    static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Successful.").unwrap());
     let mut env = HashMap::with_capacity(1);
     env.insert("SPONGE256SUM_SELFTEST_PASSES", 1.to_string());
-    assert!(REGEX.is_match(&run_binary_with_env([OsStr::new("--self-test")], env)));
+    assert!(REGEX_SELFTEST.is_match(&run_binary_with_env([OsStr::new("--self-test")], env)));
 }

@@ -20,7 +20,7 @@ use crate::{
     abort,
     arguments::Args,
     check_running,
-    common::{Error, Flag, MAX_DIGEST_SIZE, get_env},
+    common::{get_env, Error, Flag, MAX_DIGEST_SIZE},
     digest::compute_digest,
     handle_error,
     io::{DataSource, STDIN_NAME},
@@ -184,6 +184,7 @@ fn parse_search_strategy(args: &Args) -> Option<bool> {
 }
 
 /// Iterate all files and sub-directories in a directory
+#[allow(clippy::unnecessary_map_or)]
 fn process_directory(path: &PathBuf, visited: &SetType, output: &mut impl Write, size: usize, args: &Args, running: &Flag, errors: &mut usize) -> bool {
     let mut dir_queue: Option<Vec<(Option<FileId>, PathBuf)>> = None;
 
@@ -197,7 +198,7 @@ fn process_directory(path: &PathBuf, visited: &SetType, output: &mut impl Write,
                         if let Some(meta_data) = is_directory(&dir_entry) {
                             if args.recursive {
                                 let file_id = file_id::get(&meta_data);
-                                if file_id.is_none_or(|id| !visited.contains(&id)) {
+                                if file_id.map_or(true, |id| !visited.contains(&id)) {
                                     if breadth_first {
                                         dir_queue.get_or_insert_with(|| Vec::with_capacity(64usize)).push((file_id, dir_entry.path()));
                                     } else if !process_directory(&dir_entry.path(), &append(visited, file_id), output, size, args, running, errors) {

@@ -4,7 +4,7 @@
 
 include!("include/prelude.rs");
 
-use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, compute, compute_to_slice};
+use sponge_hash_aes256::{compute, compute_to_slice, DEFAULT_DIGEST_SIZE};
 
 // ---------------------------------------------------------------------------
 // Test functions

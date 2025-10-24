@@ -132,7 +132,7 @@ fn verify_checksums(input: &mut dyn Read, output: &mut impl Write, name: &OsStr,
         check_running!(args, running);
         match line {
             Ok(line) => {
-                let line_trimmed = line.trim_ascii_start();
+                let line_trimmed = line.trim_start();
                 if !line_trimmed.is_empty() {
                     if let Some((file_name, digest_expected)) = parse_line(line_trimmed, &mut digest_buffer, args) {
                         if !verify_file(file_name, digest_expected, output, args, running, errors, faults) {

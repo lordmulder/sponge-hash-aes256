@@ -3,7 +3,7 @@
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use hex::encode_to_slice;
-use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, compute as compute_hash};
+use sponge_hash_aes256::{compute as compute_hash, DEFAULT_DIGEST_SIZE};
 use std::{
     borrow::Cow,
     collections::HashSet,
@@ -24,7 +24,7 @@ fn stress_test() {
     let mut set: HashSet<[u8; DEFAULT_DIGEST_SIZE]> = HashSet::new();
     let mut counter = 1usize;
 
-    let input_file_name: Cow<Path> = match option_env!("SPONGE_BENCH_INPUT_FILE").map(str::trim_ascii) {
+    let input_file_name: Cow<Path> = match option_env!("SPONGE_BENCH_INPUT_FILE").map(str::trim) {
         Some(path) if !path.is_empty() => Path::new(path).into(),
         _ => Path::new(env!("CARGO_MANIFEST_DIR")).join("benches").join("data").join("input.txt").into(),
     };

@@ -2,7 +2,7 @@
 // SpongeHash-AES256
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use crate::utilities::{BLOCK_SIZE, aes256_encrypt, xor_arrays};
+use crate::utilities::{aes256_encrypt, xor_arrays, BLOCK_SIZE};
 use zeroize::Zeroize;
 
 /// Default digest size, in bytes

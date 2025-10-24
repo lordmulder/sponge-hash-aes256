@@ -5,18 +5,18 @@
 use hex::encode_to_slice;
 use hex_literal::hex;
 use rand_pcg::{
-    Pcg64Mcg,
     rand_core::{RngCore, SeedableRng},
+    Pcg64Mcg,
 };
 use rolling_median::Median;
-use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, SpongeHash256};
+use sponge_hash_aes256::{SpongeHash256, DEFAULT_DIGEST_SIZE};
 use std::{io::Write, str::from_utf8, time::Instant};
 
 use crate::{
     abort,
     arguments::{Args, HEADER_LINE},
     check_running,
-    common::{Error, Flag, get_env},
+    common::{get_env, Error, Flag},
     digest::digest_equal,
     print_error,
 };

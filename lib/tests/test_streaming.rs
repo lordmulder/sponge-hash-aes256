@@ -4,14 +4,18 @@
 
 include!("include/prelude.rs");
 
-use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, DEFAULT_PERMUTE_ROUNDS, SpongeHash256};
+use sponge_hash_aes256::{SpongeHash256, DEFAULT_DIGEST_SIZE, DEFAULT_PERMUTE_ROUNDS};
 
 // ---------------------------------------------------------------------------
 // Test functions
 // ---------------------------------------------------------------------------
 
 fn create_instance(info: Option<&str>) -> SpongeHash256<DEFAULT_PERMUTE_ROUNDS> {
-    if let Some(info) = info { SpongeHash256::with_info(info) } else { SpongeHash256::default() }
+    if let Some(info) = info {
+        SpongeHash256::with_info(info)
+    } else {
+        SpongeHash256::default()
+    }
 }
 
 fn do_test(expected: &[u8; DEFAULT_DIGEST_SIZE], info: Option<&str>, message: &str) {

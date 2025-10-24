@@ -36,5 +36,5 @@
 mod sponge_hash;
 mod utilities;
 
-pub use sponge_hash::{DEFAULT_DIGEST_SIZE, DEFAULT_PERMUTE_ROUNDS, SpongeHash256, compute, compute_to_slice};
+pub use sponge_hash::{compute, compute_to_slice, SpongeHash256, DEFAULT_DIGEST_SIZE, DEFAULT_PERMUTE_ROUNDS};
 pub use utilities::version;

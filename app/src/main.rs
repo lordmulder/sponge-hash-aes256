@@ -127,7 +127,7 @@ mod process;
 mod self_test;
 mod verify;
 
-use crossbeam_channel::{SendTimeoutError, Sender, bounded};
+use crossbeam_channel::{bounded, SendTimeoutError, Sender};
 use num::Integer;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
 use std::{io::stdout, process::ExitCode, sync::Arc, time::Duration};
@@ -204,7 +204,11 @@ fn main() -> ExitCode {
     let success = if args.self_test {
         self_test(&mut output, &args, stop_rx)
     } else if args.check {
-        if args.files.is_empty() { verify_from_stdin(&mut output, &args, stop_rx) } else { verify_files(args.files.iter(), &mut output, &args, stop_rx) }
+        if args.files.is_empty() {
+            verify_from_stdin(&mut output, &args, stop_rx)
+        } else {
+            verify_files(args.files.iter(), &mut output, &args, stop_rx)
+        }
     } else {
         // Process all files and directories that were given on the command-line
         if args.files.is_empty() {
@@ -214,7 +218,11 @@ fn main() -> ExitCode {
         }
     };
 
-    if success { ExitCode::SUCCESS } else { ExitCode::FAILURE }
+    if success {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
+    }
 }
 
 // ---------------------------------------------------------------------------

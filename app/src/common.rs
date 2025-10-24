@@ -3,13 +3,8 @@
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use crossbeam_channel::Receiver;
-use std::{
-    collections::HashMap,
-    env,
-    fmt::Display,
-    io::Error as IoError,
-    sync::{LazyLock, Mutex},
-};
+use lazy_static::lazy_static;
+use std::{collections::HashMap, env, fmt::Display, io::Error as IoError, sync::Mutex};
 
 // ---------------------------------------------------------------------------
 // Common definitions
@@ -28,20 +23,26 @@ pub type Flag = Receiver<()>;
 // Environment
 // ---------------------------------------------------------------------------
 
-type EnvValueType = Option<&'static str>;
+lazy_static! {
+    pub static ref ENV_CACHE: Mutex<HashMap<&'static str, Option<&'static str>>> = Mutex::new(HashMap::new());
+}
 
-static ENV_MAP: LazyLock<Mutex<HashMap<&'static str, EnvValueType>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
-
-fn init_env(name: &str) -> Option<&'static str> {
-    match env::var(name).ok().as_ref().map(|str| str.trim_ascii()) {
-        Some(str) if !str.is_empty() => Some(Box::leak(Box::new(str.to_owned()))),
-        _ => None,
+#[inline(always)]
+fn str_to_static(str: &str) -> &'static str {
+    static EMPTY_STRING: &str = "";
+    if !str.is_empty() {
+        Box::leak(Box::new(str.to_owned()))
+    } else {
+        EMPTY_STRING
     }
 }
 
-pub fn get_env(name: &'static str) -> EnvValueType {
-    let mut guard = ENV_MAP.lock().unwrap();
-    *guard.entry(name).or_insert_with(|| init_env(name))
+pub fn get_env(name: &'static str) -> Option<&'static str> {
+    let mut cache = ENV_CACHE.lock().unwrap();
+    *cache.entry(name).or_insert_with(|| match env::var(name).ok().as_ref().map(|str| str.trim()) {
+        Some(str) if !str.is_empty() => Some(str_to_static(str)),
+        _ => None,
+    })
 }
 
 // ---------------------------------------------------------------------------

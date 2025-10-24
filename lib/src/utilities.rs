@@ -4,7 +4,7 @@
 
 use aes::Aes256;
 use cipher::{BlockEncrypt, KeyInit};
-use core::slice;
+use core::{mem::size_of, slice};
 use generic_array::GenericArray;
 use zeroize::Zeroize;
 
@@ -15,17 +15,16 @@ pub const KEY_SIZE: usize = 2usize * BLOCK_SIZE;
 // Alignment checks
 // ---------------------------------------------------------------------------
 
-macro_rules! check_aligned {
-    ($ptr:expr) => {{
-        #[cfg(debug_assertions)]
-        {
-            $ptr.is_aligned()
-        }
-        #[cfg(not(debug_assertions))]
-        {
-            true
-        }
-    }};
+#[cfg(debug_assertions)]
+#[inline(always)]
+fn check_aligned<T: Sized>(ptr: *const T) -> bool {
+    ptr.align_offset(core::mem::align_of::<T>()) == 0usize
+}
+
+#[cfg(not(debug_assertions))]
+#[inline(always)]
+fn check_aligned<T: Sized>(_ptr: *const T) -> bool {
+    true
 }
 
 // ---------------------------------------------------------------------------
@@ -53,7 +52,7 @@ pub fn xor_arrays(dst: &mut [u8; BLOCK_SIZE], src: &[u8; BLOCK_SIZE]) {
 
     let (ptr_dst, ptr_src) = (dst.as_ptr() as *mut usize, src.as_ptr() as *const usize);
 
-    if check_aligned!(ptr_src) && check_aligned!(ptr_dst) {
+    if check_aligned(ptr_src) && check_aligned(ptr_dst) {
         unsafe {
             let dst_usize = slice::from_raw_parts_mut(ptr_dst, WORDS);
             let src_usize = slice::from_raw_parts(ptr_src, WORDS);
@@ -70,7 +69,7 @@ pub fn xor_arrays(dst: &mut [u8; BLOCK_SIZE], src: &[u8; BLOCK_SIZE]) {
 
 /// Returns the version of the library as a string
 pub const fn version() -> &'static str {
-    static PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
+    const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
     PKG_VERSION
 }
 

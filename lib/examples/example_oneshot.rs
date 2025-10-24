@@ -3,7 +3,7 @@
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use hex::encode_to_slice;
-use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, compute};
+use sponge_hash_aes256::{compute, DEFAULT_DIGEST_SIZE};
 use std::str::from_utf8;
 
 #[cfg(feature = "tracing")]
