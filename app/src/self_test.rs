@@ -10,12 +10,13 @@ use rand_pcg::{
 };
 use rolling_median::Median;
 use sponge_hash_aes256::{DEFAULT_DIGEST_SIZE, SpongeHash256};
-use std::{env, io::Write, str::from_utf8, time::Instant};
+use std::{io::Write, str::from_utf8, time::Instant};
 
 use crate::{
+    abort,
     arguments::{Args, HEADER_LINE},
     check_running,
-    common::{Error, Flag},
+    common::{Error, Flag, get_env},
     digest::digest_equal,
     print_error,
 };
@@ -87,7 +88,7 @@ fn do_test(seed: u64, digest_expected: &[u8; DEFAULT_DIGEST_SIZE], output: &mut 
 fn test_runner(output: &mut impl Write, running: Flag) -> Result<bool, Error> {
     writeln!(output, "{}\n", HEADER_LINE)?;
 
-    let passes = env::var("SPONGE_SELFTEST_PASSES").ok().and_then(|str| str.parse().ok()).filter(|val| *val >= 1u16).unwrap_or(3u16);
+    let passes = get_env("SPONGE256SUM_SELFTEST_PASSES").and_then(|str| str.parse().ok()).filter(|val| *val >= 1u16).unwrap_or(3u16);
     let mut elapsed_median = Median::new();
 
     for i in 0..passes {
@@ -119,10 +120,7 @@ fn test_runner(output: &mut impl Write, running: Flag) -> Result<bool, Error> {
 
 pub fn self_test(output: &mut impl Write, args: &Args, running: Flag) -> bool {
     match test_runner(output, running) {
-        Err(Error::Aborted) => {
-            print_error!(args, "Aborted: The process has been interrupted by the user!");
-            false
-        }
+        Err(Error::Aborted) => abort!(args),
         Err(error) => {
             print_error!(args, "Self-test encountered an error: {}", error);
             false

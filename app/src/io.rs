@@ -3,15 +3,12 @@
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use std::ffi::OsStr;
-use std::sync::LazyLock;
-use std::time::Duration;
+use std::sync::{LazyLock, Mutex, MutexGuard};
 use std::{
     fs::File,
     io::{Error as IoError, Read, Result as IoResult, StdinLock, stdin},
     path::Path,
 };
-
-use parking_lot::{Mutex, MutexGuard};
 
 use crate::common::Error;
 
@@ -44,9 +41,9 @@ pub enum DataSource<'a> {
 
 impl DataSource<'_> {
     pub fn from_stdin() -> Result<Self, Error> {
-        match STDIN_MUTEX.try_lock_for(Duration::from_secs(10u64)) {
-            None => Err(Error::Io(IoError::other("Failed to lock 'stdin' handle, already in use!"))),
-            Some(guard) => Ok(DataSource::Stream((guard, stdin().lock()))),
+        match STDIN_MUTEX.try_lock() {
+            Ok(guard) => Ok(DataSource::Stream((guard, stdin().lock()))),
+            Err(_) => Err(Error::Io(IoError::other("Failed to lock 'stdin' handle, already in use!"))),
         }
     }
 

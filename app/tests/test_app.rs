@@ -2,7 +2,6 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use parking_lot::Mutex;
 use rand_pcg::{
     Pcg64,
     rand_core::{RngCore, SeedableRng},
@@ -16,7 +15,7 @@ use std::{
     iter,
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::LazyLock,
+    sync::{LazyLock, Mutex},
 };
 
 // ---------------------------------------------------------------------------
@@ -232,7 +231,7 @@ fn random_u64() -> u64 {
     static BURNED: LazyLock<Mutex<HashSet<u64>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
     static RANDOM: LazyLock<Mutex<Pcg64>> = LazyLock::new(|| Mutex::new(Pcg64::from_seed(generate_seed())));
 
-    let (mut random, mut burned) = (RANDOM.lock(), BURNED.lock());
+    let (mut random, mut burned) = (RANDOM.lock().unwrap(), BURNED.lock().unwrap());
 
     loop {
         let value = random.next_u64();
@@ -391,6 +390,6 @@ fn test_help() {
 fn test_selftest() {
     static REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Successful.").unwrap());
     let mut env = HashMap::with_capacity(1);
-    env.insert("SPONGE_SELFTEST_PASSES", 1.to_string());
+    env.insert("SPONGE256SUM_SELFTEST_PASSES", 1.to_string());
     assert!(REGEX.is_match(&run_binary_with_env([OsStr::new("--self-test")], env)));
 }

@@ -7,19 +7,20 @@ use std::{
     borrow::Cow,
     collections::BTreeSet,
     ffi::OsStr,
-    fs::{DirEntry, Metadata, metadata, read_dir},
+    fs::{self, DirEntry, Metadata},
     io::{Read, Write},
     iter,
     path::PathBuf,
     slice::Iter,
     str::from_utf8,
+    sync::OnceLock,
 };
 
 use crate::{
     abort,
     arguments::Args,
     check_running,
-    common::{Error, Flag, MAX_DIGEST_SIZE},
+    common::{Error, Flag, MAX_DIGEST_SIZE, get_env},
     digest::compute_digest,
     handle_error,
     io::{DataSource, STDIN_NAME},
@@ -68,7 +69,7 @@ fn is_directory(dir_entry: &DirEntry) -> Option<Metadata> {
             let file_type = meta_data.file_type();
             match file_type.is_dir() {
                 false => match file_type.is_symlink() {
-                    true => metadata(dir_entry.path()).ok().filter(|value| value.is_dir()),
+                    true => fs::metadata(dir_entry.path()).ok().filter(|value| value.is_dir()),
                     false => None,
                 },
                 true => Some(meta_data),
@@ -168,12 +169,27 @@ pub fn process_from_stdin(output: &mut impl Write, size: usize, args: &Args, run
 // Iterate input files/directories
 // ---------------------------------------------------------------------------
 
+/// Enable breadth-first search?
+fn parse_search_strategy(args: &Args) -> Option<bool> {
+    static SEARCH_STRATEGY: OnceLock<Option<bool>> = OnceLock::new();
+    *SEARCH_STRATEGY.get_or_init(|| {
+        get_env("SPONGE256SUM_DIRWALK_STRATEGY").and_then(|strategy| match ["BFS", "DFS"].iter().position(|value| strategy.eq_ignore_ascii_case(value)) {
+            Some(position) => Some(position == 0usize),
+            None => {
+                print_error!(args, "Invalid directory search strategy: {:?}", strategy);
+                None
+            }
+        })
+    })
+}
+
 /// Iterate all files and sub-directories in a directory
 fn process_directory(path: &PathBuf, visited: &SetType, output: &mut impl Write, size: usize, args: &Args, running: &Flag, errors: &mut usize) -> bool {
     let mut dir_queue: Option<Vec<(Option<FileId>, PathBuf)>> = None;
 
-    match read_dir(path) {
+    match fs::read_dir(path) {
         Ok(dir_iter) => {
+            let breadth_first = if args.recursive { parse_search_strategy(args).unwrap_or(true) } else { false };
             for element in dir_iter {
                 check_running!(args, running);
                 match element {
@@ -182,7 +198,11 @@ fn process_directory(path: &PathBuf, visited: &SetType, output: &mut impl Write,
                             if args.recursive {
                                 let file_id = file_id::get(&meta_data);
                                 if file_id.is_none_or(|id| !visited.contains(&id)) {
-                                    dir_queue.get_or_insert_with(|| Vec::with_capacity(64usize)).push((file_id, dir_entry.path()));
+                                    if breadth_first {
+                                        dir_queue.get_or_insert_with(|| Vec::with_capacity(64usize)).push((file_id, dir_entry.path()));
+                                    } else if !process_directory(&dir_entry.path(), &append(visited, file_id), output, size, args, running, errors) {
+                                        return false;
+                                    }
                                 } else {
                                     print_error!(args, "File system loop detected, skipping: {:?}", dir_entry.path());
                                 }
@@ -220,7 +240,7 @@ pub fn process_files(files: Iter<'_, PathBuf>, output: &mut impl Write, digest_s
 
     for file_name in files {
         check_running!(args, running);
-        let dir_info = if handle_dirs { metadata(file_name).ok().filter(|meta| meta.is_dir()) } else { None };
+        let dir_info = if handle_dirs { fs::metadata(file_name).ok().filter(|meta| meta.is_dir()) } else { None };
         if let Some(meta_data) = dir_info {
             let visited = file_id::get(&meta_data).map_or_else(SetType::new, |dir_id| iter::once(dir_id).collect());
             if !process_directory(file_name, &visited, output, digest_size, args, &running, &mut errors) {

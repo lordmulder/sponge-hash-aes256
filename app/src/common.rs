@@ -3,7 +3,13 @@
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use crossbeam_channel::Receiver;
-use std::{fmt::Display, io::Error as IoError};
+use std::{
+    collections::HashMap,
+    env,
+    fmt::Display,
+    io::Error as IoError,
+    sync::{LazyLock, Mutex},
+};
 
 // ---------------------------------------------------------------------------
 // Common definitions
@@ -17,6 +23,26 @@ pub const MAX_DIGEST_SIZE: usize = 256usize;
 
 /// Cancellation flag
 pub type Flag = Receiver<()>;
+
+// ---------------------------------------------------------------------------
+// Environment
+// ---------------------------------------------------------------------------
+
+type EnvValueType = Option<&'static str>;
+
+static ENV_MAP: LazyLock<Mutex<HashMap<&'static str, EnvValueType>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+
+fn init_env(name: &str) -> Option<&'static str> {
+    match env::var(name).ok().as_ref().map(|str| str.trim_ascii()) {
+        Some(str) if !str.is_empty() => Some(Box::leak(Box::new(str.to_owned()))),
+        _ => None,
+    }
+}
+
+pub fn get_env(name: &'static str) -> EnvValueType {
+    let mut guard = ENV_MAP.lock().unwrap();
+    *guard.entry(name).or_insert_with(|| init_env(name))
+}
 
 // ---------------------------------------------------------------------------
 // Error type
