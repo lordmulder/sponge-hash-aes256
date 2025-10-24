@@ -260,7 +260,7 @@ jobs:
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
       - uses: vmactions/openbsd-vm@v1
         with:
-          release: 7.7
+          release: 7.8
           usesh: true
           prepare: |
             pkg_add git rust
