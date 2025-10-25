@@ -13,7 +13,7 @@ A [**sponge**](https://en.wikipedia.org/wiki/Sponge_function)-based secure hash 
 
 This hash function has a *variable* output size and can produce outputs of *any* non-zero size.
 
-Please see the [documentation](https://docs.rs/sponge-hash-aes256/latest/) for details! &#x1F4A1;
+Please see the [**documentation**](https://lordmulder.github.io/sponge-hash-aes256/) for details! &#x1F4A1;
 
 ## Library
 
@@ -114,6 +114,19 @@ The constants `const_0` and `const_1` are defined as full blocks filled with `0x
 The padding of the final input block is performed by first appending a single `1` bit, followed by the minimal number of `0` bits needed to make the total message length a multiple of the block size.
 
 Following the final input block, a 128-bit block filled entirely with `0x6A` bytes is absorbed into the state.
+
+## Platform support
+
+This crate uses Rust edition 2021, and requires `rustc` version 1.78.0 or newer.
+
+The following targets are officially supported, other platforms may function but are **not** guaranteed:
+
+- Linux
+- Windows
+- macOS
+- *BSD (FreeBSD, OpenBSD, NetBSD, etc.)
+- Haiku OS
+- Solaris / Illumos
 
 ## Git repository
 

@@ -111,6 +111,19 @@
 //!
 //!   Unlike in “binary” mode (the default), platform-specific line endings will be normalized to a single `\n` character.
 //!
+//! ## Platform support
+//!
+//! This crate uses Rust edition 2021, and requires `rustc` version 1.78.0 or newer.
+//!
+//! The following targets are officially supported, other platforms may function but are **not** guaranteed:
+//!
+//! - Linux
+//! - Windows
+//! - macOS
+//! - *BSD (FreeBSD, OpenBSD, NetBSD, etc.)
+//! - Haiku OS
+//! - Solaris / Illumos
+//!
 //! ## License
 //!
 //! Copyright (C) 2025 by LoRd_MuldeR &lt;mulder2@gmx.de&gt;

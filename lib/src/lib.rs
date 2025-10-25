@@ -25,6 +25,10 @@
 //! --------- | ------------------------------------------------------------------------------------------
 //! `tracing` | Dump the internal state to the loggging sub-system (via `log::trace()`) after each step.
 //!
+//! ## Rust support
+//!
+//! This crate uses Rust edition 2021, and requires `rustc` version 1.78.0 or newer.
+//!
 //! ## License
 //!
 //! Copyright (C) 2025 by LoRd_MuldeR &lt;mulder2@gmx.de&gt;
