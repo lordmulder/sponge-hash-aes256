@@ -17,16 +17,11 @@ use crate::common::Error;
 // Standard streams
 // ---------------------------------------------------------------------------
 
-#[cfg(not(target_family = "windows"))]
-lazy_static! {
-    /// Standard input sentinal value for various OS
-    pub static ref STDIN_NAME: OsString = OsString::from("/dev/stdin");
-}
+const STD_STRING: &str = if cfg!(target_family = "windows") { "CON" } else { "/dev/stdin" };
 
-#[cfg(target_family = "windows")]
 lazy_static! {
     /// Standard input sentinal value for various OS
-    pub static ref STDIN_NAME: OsString = OsString::from("CON");
+    pub static ref STDIN_NAME: OsString = OsString::from(STD_STRING);
 }
 
 // ---------------------------------------------------------------------------

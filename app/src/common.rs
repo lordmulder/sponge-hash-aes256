@@ -45,6 +45,14 @@ pub fn get_env(name: &'static str) -> Option<&'static str> {
     })
 }
 
+pub fn parse_enum(value: &str, options: &[&str]) -> Option<usize> {
+    if value.is_empty() || options.is_empty() {
+        None
+    } else {
+        options.iter().position(|str| value.eq_ignore_ascii_case(str))
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Error type
 // ---------------------------------------------------------------------------

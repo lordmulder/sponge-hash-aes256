@@ -20,7 +20,7 @@ use crate::{
     abort,
     arguments::Args,
     check_running,
-    common::{get_env, Error, Flag, MAX_DIGEST_SIZE},
+    common::{get_env, parse_enum, Error, Flag, MAX_DIGEST_SIZE},
     digest::compute_digest,
     handle_error,
     io::{DataSource, STDIN_NAME},
@@ -170,17 +170,19 @@ pub fn process_from_stdin(output: &mut impl Write, size: usize, args: &Args, run
 // ---------------------------------------------------------------------------
 
 /// Enable breadth-first search?
-fn parse_search_strategy(args: &Args) -> Option<bool> {
+fn parse_search_strategy(args: &Args) -> bool {
     static SEARCH_STRATEGY: OnceLock<Option<bool>> = OnceLock::new();
-    *SEARCH_STRATEGY.get_or_init(|| {
-        get_env("SPONGE256SUM_DIRWALK_STRATEGY").and_then(|strategy| match ["BFS", "DFS"].iter().position(|value| strategy.eq_ignore_ascii_case(value)) {
-            Some(position) => Some(position == 0usize),
-            None => {
-                print_error!(args, "Invalid directory search strategy: {:?}", strategy);
-                None
-            }
+    SEARCH_STRATEGY
+        .get_or_init(|| {
+            get_env("SPONGE256SUM_DIRWALK_STRATEGY").and_then(|value| match parse_enum(value, &["BFS", "DFS"]) {
+                Some(position) => Some(position == 0usize),
+                None => {
+                    print_error!(args, "Invalid directory search strategy: {:?}", value);
+                    None
+                }
+            })
         })
-    })
+        .unwrap_or(true)
 }
 
 /// Iterate all files and sub-directories in a directory
@@ -190,7 +192,7 @@ fn process_directory(path: &PathBuf, visited: &SetType, output: &mut impl Write,
 
     match fs::read_dir(path) {
         Ok(dir_iter) => {
-            let breadth_first = if args.recursive { parse_search_strategy(args).unwrap_or(true) } else { false };
+            let breadth_first = if args.recursive { Some(parse_search_strategy(args)) } else { None };
             for element in dir_iter {
                 check_running!(args, running);
                 match element {
@@ -199,7 +201,7 @@ fn process_directory(path: &PathBuf, visited: &SetType, output: &mut impl Write,
                             if args.recursive {
                                 let file_id = file_id::get(&meta_data);
                                 if file_id.map_or(true, |id| !visited.contains(&id)) {
-                                    if breadth_first {
+                                    if breadth_first.unwrap() {
                                         dir_queue.get_or_insert_with(|| Vec::with_capacity(64usize)).push((file_id, dir_entry.path()));
                                     } else if !process_directory(&dir_entry.path(), &append(visited, file_id), output, size, args, running, errors) {
                                         return false;

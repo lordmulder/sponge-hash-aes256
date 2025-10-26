@@ -111,6 +111,17 @@
 //!
 //!   Unlike in “binary” mode (the default), platform-specific line endings will be normalized to a single `\n` character.
 //!
+//! ## Environment
+//!
+//! The following environment variables are recognized:
+//!
+//! - **`SPONGE256SUM_SELFTEST_PASSES`**:  
+//!   Specifies the number of passes to be executed in “self-test” mode. Default is **3**.
+//!
+//! - **`SPONGE256SUM_DIRWALK_STRATEGY`**:  
+//!   Selects the search strategy to be used for walking the directory tree in “recursive” mode.  
+//!   This can be `BFS` (breadth-first search) or `DFS` (depath-first search). Default is `BFS`.
+//!
 //! ## Platform support
 //!
 //! This crate uses Rust edition 2021, and requires `rustc` version 1.78.0 or newer.

@@ -2,8 +2,7 @@
 // SpongeHash-AES256
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use crate::utilities::{aes256_encrypt, xor_arrays, BLOCK_SIZE};
-use zeroize::Zeroize;
+use crate::utilities::{aes256_encrypt, BlockType, BLOCK_SIZE};
 
 /// Default digest size, in bytes
 ///
@@ -136,16 +135,16 @@ impl<const N: usize> NoneZeroArg<N> {
 /// Following the final input block, a 128-bit block filled entirely with `0x6A` bytes is absorbed into the state.
 #[repr(align(128))]
 pub struct SpongeHash256<const R: usize = DEFAULT_PERMUTE_ROUNDS> {
-    state0: [u8; BLOCK_SIZE],
-    state1: [u8; BLOCK_SIZE],
-    state2: [u8; BLOCK_SIZE],
+    state0: BlockType,
+    state1: BlockType,
+    state2: BlockType,
     offset: usize,
 }
 
 impl<const R: usize> SpongeHash256<R> {
-    const BIT_MASK_X: [u8; BLOCK_SIZE] = [0x5Cu8; BLOCK_SIZE];
-    const BIT_MASK_Y: [u8; BLOCK_SIZE] = [0x36u8; BLOCK_SIZE];
-    const BIT_MASK_Z: [u8; BLOCK_SIZE] = [0x6Au8; BLOCK_SIZE];
+    const BIT_MASK_X: BlockType = BlockType([0x5Cu8; BLOCK_SIZE]);
+    const BIT_MASK_Y: BlockType = BlockType([0x36u8; BLOCK_SIZE]);
+    const BIT_MASK_Z: BlockType = BlockType([0x6Au8; BLOCK_SIZE]);
 
     /// Creates a new SpongeHash-AES256 instance and initializes the hash computation.
     ///
@@ -161,7 +160,7 @@ impl<const R: usize> SpongeHash256<R> {
         let () = NoneZeroArg::<R>::OK;
 
         let mut instance =
-            Self { state0: [0u8; BLOCK_SIZE], state1: [0u8; BLOCK_SIZE], state2: [0u8; BLOCK_SIZE], offset: 0usize };
+            Self { state0: BlockType::default(), state1: BlockType::default(), state2: BlockType::default(), offset: 0usize };
 
         instance.initialize(info.as_bytes());
         instance
@@ -230,13 +229,13 @@ impl<const R: usize> SpongeHash256<R> {
 
         self.state0[self.offset] ^= 0x80u8;
         self.permute();
-        xor_arrays(&mut self.state0, &Self::BIT_MASK_Z);
+        self.state0.xor_with(&Self::BIT_MASK_Z);
 
         let mut pos = 0usize;
         while pos < digest_out.len() {
             self.permute();
             let copy_len = BLOCK_SIZE.min(digest_out.len() - pos);
-            digest_out[pos..(pos + copy_len)].copy_from_slice(&self.state0[..copy_len]);
+            digest_out[pos..(pos + copy_len)].copy_from_slice(&self.state0.0[..copy_len]);
             pos += copy_len;
         }
 
@@ -247,21 +246,21 @@ impl<const R: usize> SpongeHash256<R> {
     fn permute(&mut self) {
         trace!(self, "permfn::enter");
 
-        let mut temp0 = [0u8; BLOCK_SIZE];
-        let mut temp1 = [0u8; BLOCK_SIZE];
-        let mut temp2 = [0u8; BLOCK_SIZE];
+        let mut temp0 = BlockType::default();
+        let mut temp1 = BlockType::default();
+        let mut temp2 = BlockType::default();
 
         for _ in 0..R {
             aes256_encrypt(&mut temp0, &self.state0, &self.state1, &self.state2);
             aes256_encrypt(&mut temp1, &self.state1, &self.state2, &self.state0);
             aes256_encrypt(&mut temp2, &self.state2, &self.state0, &self.state1);
 
-            xor_arrays(&mut self.state0, &temp0);
-            xor_arrays(&mut self.state1, &temp1);
-            xor_arrays(&mut self.state2, &temp2);
+            self.state0.xor_with(&temp0);
+            self.state1.xor_with(&temp1);
+            self.state2.xor_with(&temp2);
 
-            xor_arrays(&mut self.state1, &Self::BIT_MASK_X);
-            xor_arrays(&mut self.state2, &Self::BIT_MASK_Y);
+            self.state1.xor_with(&Self::BIT_MASK_X);
+            self.state2.xor_with(&Self::BIT_MASK_Y);
         }
 
         temp0.zeroize();
