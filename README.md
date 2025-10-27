@@ -135,6 +135,7 @@ Official Git mirrors are available here:
 - <https://github.com/lordmulder/sponge-hash-aes256>
 - <https://codeberg.org/MuldeR/sponge-hash-aes256>
 - <https://gitlab.com/lord_mulder/sponge-hash-aes256>
+- <https://repo.or.cz/sponge-hash-aes256.git>
 
 ## License
 
