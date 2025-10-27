@@ -5,7 +5,7 @@ license = "0BSD"
 repository = "https://github.com/lordmulder/sponge-hash-aes256/"
 readme = "../README.crates.md"
 edition = "2021"
-version = "1.4.3"
+version = "1.5.0"
 
 [package.metadata]
 no_std = true

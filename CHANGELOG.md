@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 1.5.0
+
+### Added
+
+- Added an environment variable to switch between `BFS` and `DFS` search strategies.
+- Updated GitHub workflow (CI) to produce automated builds for the DragonFly BSD platform.
+
+### Changed
+
+- Implemented an improved memory handling for the 128-bit AES blocks and the 256-bit key data.
+- Implemented faster methods for XOR'ing data blocks and concatenating key data.
+- Lowered the required Rust edition to 2021.
+- Implemented workarounds to allow building with older Rust versions (1.78.0 or newer).
+- Implemented an improved method to shut down the application when receiving a `SIGINT` signal.
+- Various small improvements.
+
 ## Version 1.4.2
 
 ### Added
