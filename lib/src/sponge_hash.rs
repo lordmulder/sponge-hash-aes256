@@ -142,9 +142,9 @@ pub struct SpongeHash256<const R: usize = DEFAULT_PERMUTE_ROUNDS> {
 }
 
 impl<const R: usize> SpongeHash256<R> {
-    const BIT_MASK_X: BlockType = BlockType([0x5Cu8; BLOCK_SIZE]);
-    const BIT_MASK_Y: BlockType = BlockType([0x36u8; BLOCK_SIZE]);
-    const BIT_MASK_Z: BlockType = BlockType([0x6Au8; BLOCK_SIZE]);
+    const BIT_MASK_X: BlockType = BlockType::new::<0x5Cu8>();
+    const BIT_MASK_Y: BlockType = BlockType::new::<0x36u8>();
+    const BIT_MASK_Z: BlockType = BlockType::new::<0x6Au8>();
 
     /// Creates a new SpongeHash-AES256 instance and initializes the hash computation.
     ///
@@ -158,12 +158,9 @@ impl<const R: usize> SpongeHash256<R> {
     /// **Note:** The length of the `info` string **must not** exceed a length of 255 characters!
     pub fn with_info(info: &str) -> Self {
         let () = NoneZeroArg::<R>::OK;
-
-        let mut instance =
-            Self { state0: BlockType::default(), state1: BlockType::default(), state2: BlockType::default(), offset: 0usize };
-
-        instance.initialize(info.as_bytes());
-        instance
+        let mut hash = Self { state0: BlockType::zero(), state1: BlockType::zero(), state2: BlockType::zero(), offset: 0usize };
+        hash.initialize(info.as_bytes());
+        hash
     }
 
     /// Initializes the internal state with the given `info` string
@@ -235,7 +232,7 @@ impl<const R: usize> SpongeHash256<R> {
         while pos < digest_out.len() {
             self.permute();
             let copy_len = BLOCK_SIZE.min(digest_out.len() - pos);
-            digest_out[pos..(pos + copy_len)].copy_from_slice(&self.state0.0[..copy_len]);
+            digest_out[pos..(pos + copy_len)].copy_from_slice(&self.state0[..copy_len]);
             pos += copy_len;
         }
 
@@ -246,9 +243,9 @@ impl<const R: usize> SpongeHash256<R> {
     fn permute(&mut self) {
         trace!(self, "permfn::enter");
 
-        let mut temp0 = BlockType::default();
-        let mut temp1 = BlockType::default();
-        let mut temp2 = BlockType::default();
+        let mut temp0 = BlockType::from_uninit();
+        let mut temp1 = BlockType::from_uninit();
+        let mut temp2 = BlockType::from_uninit();
 
         for _ in 0..R {
             aes256_encrypt(&mut temp0, &self.state0, &self.state1, &self.state2);
@@ -263,10 +260,6 @@ impl<const R: usize> SpongeHash256<R> {
             self.state2.xor_with(&Self::BIT_MASK_Y);
         }
 
-        temp0.zeroize();
-        temp1.zeroize();
-        temp2.zeroize();
-
         trace!(self, "permfn::leave");
     }
 }
@@ -274,14 +267,6 @@ impl<const R: usize> SpongeHash256<R> {
 impl Default for SpongeHash256 {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-impl<const R: usize> Drop for SpongeHash256<R> {
-    fn drop(&mut self) {
-        self.state0.zeroize();
-        self.state1.zeroize();
-        self.state2.zeroize();
     }
 }
 

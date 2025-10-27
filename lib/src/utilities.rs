@@ -2,10 +2,12 @@
 // SpongeHash-AES256
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use core::ops::{Index, IndexMut};
-
 use aes::Aes256;
 use cipher::{BlockEncrypt, KeyInit};
+use core::{
+    mem::MaybeUninit,
+    ops::{Index, IndexMut, RangeTo},
+};
 use generic_array::GenericArray;
 use zeroize::Zeroize;
 
@@ -17,24 +19,51 @@ pub const KEY_SIZE: usize = 2usize * BLOCK_SIZE;
 // ---------------------------------------------------------------------------
 
 /// Represents an aligned 128-Bit block
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 #[repr(align(128))]
-pub struct BlockType(pub [u8; BLOCK_SIZE]);
+pub struct BlockType([u8; BLOCK_SIZE]);
 
 impl BlockType {
-    /// Forces *self* to be overwritten completely with zeros, earsing the previous content
+    /// Create a new block that is initialized from the given `INIT_VALUE`
     #[inline(always)]
-    pub fn zeroize(&mut self) {
-        self.0.zeroize();
+    pub const fn new<const INIT_VALUE: u8>() -> Self {
+        Self([INIT_VALUE; BLOCK_SIZE])
+    }
+
+    /// Create a new block that is initialized to "zero" bytes
+    #[inline(always)]
+    pub const fn zero() -> Self {
+        Self::new::<0u8>()
+    }
+
+    /// Create a new block with an "undefined" content that must be overwritten before it is read
+    #[allow(invalid_value)]
+    #[allow(clippy::uninit_assumed_init)]
+    #[inline(always)]
+    pub const fn from_uninit() -> Self {
+        unsafe { Self(MaybeUninit::<[u8; BLOCK_SIZE]>::uninit().assume_init()) }
     }
 
     /// Computes the bit-wise XOR of `other` and *self*, stores the result "in-place" in *self*
     #[inline(always)]
-    pub fn xor_with(&mut self, other: &BlockType) {
-        let (dst_ptr, src_ptr) = (self.0.as_mut_ptr() as *mut u128, other.0.as_ptr() as *const u128);
+    pub fn xor_with(&mut self, other: &Self) {
+        let (ptr_self, ptr_other) = (self.0.as_mut_ptr() as *mut u128, other.0.as_ptr() as *const u128);
         unsafe {
-            *dst_ptr ^= *src_ptr;
+            *ptr_self ^= *ptr_other;
         }
+    }
+
+    /// Copy the content of `other` into *self*, replacing the previous content
+    #[inline(always)]
+    pub fn assign_from(&mut self, other: &Self) {
+        self.0 = other.0
+    }
+
+    /// Copy content of this block to the address given by the "raw" `*mut u8` pointer
+    #[inline(always)]
+    unsafe fn copy_to(&self, dest: *mut u128) {
+        let ptr_self = self.0.as_ptr() as *const u128;
+        *dest = *ptr_self;
     }
 }
 
@@ -54,6 +83,59 @@ impl IndexMut<usize> for BlockType {
     }
 }
 
+impl Index<RangeTo<usize>> for BlockType {
+    type Output = [u8];
+
+    #[inline(always)]
+    fn index(&self, range: RangeTo<usize>) -> &Self::Output {
+        &self.0[range]
+    }
+}
+
+impl PartialEq for BlockType {
+    #[inline(always)]
+    fn eq(&self, other: &Self) -> bool {
+        let (ptr_self, ptr_other) = (self.0.as_ptr() as *const u128, other.0.as_ptr() as *const u128);
+        (unsafe { *ptr_self ^ *ptr_other }) == 0u128
+    }
+}
+
+impl Drop for BlockType {
+    #[inline(always)]
+    fn drop(&mut self) {
+        Zeroize::zeroize(&mut self.0);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Key type
+// ---------------------------------------------------------------------------
+
+/// Represents an aligned 256-Bit block
+#[repr(align(256))]
+pub struct KeyType([u8; KEY_SIZE]);
+
+impl KeyType {
+    /// Concatenate the two 128-bit blocks `key0` and `key1` to from a full 256-bit key
+    #[allow(clippy::uninit_assumed_init)]
+    #[inline(always)]
+    fn new(key0: &BlockType, key1: &BlockType) -> Self {
+        let mut full_key: MaybeUninit<Self> = MaybeUninit::uninit();
+        let ptr_out = full_key.as_mut_ptr() as *mut u128;
+        unsafe {
+            key0.copy_to(ptr_out);
+            key1.copy_to(ptr_out.add(1usize));
+            full_key.assume_init()
+        }
+    }
+}
+
+impl Drop for KeyType {
+    fn drop(&mut self) {
+        Zeroize::zeroize(&mut self.0);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Functions
 // ---------------------------------------------------------------------------
@@ -63,14 +145,10 @@ impl IndexMut<usize> for BlockType {
 /// The 128 key bits from `key0` and the 128 key bits from `key1` are concatenated to form a full 256-bit key.
 #[inline]
 pub fn aes256_encrypt(dst: &mut BlockType, src: &BlockType, key0: &BlockType, key1: &BlockType) {
-    let mut full_key = [0u8; KEY_SIZE];
-    full_key[..BLOCK_SIZE].copy_from_slice(&key0.0);
-    full_key[BLOCK_SIZE..].copy_from_slice(&key1.0);
+    let full_key = KeyType::new(key0, key1);
+    let cipher = Aes256::new(GenericArray::from_slice(&full_key.0).as_ref());
 
-    let cipher = Aes256::new(GenericArray::from_slice(&full_key).as_ref());
-    full_key.zeroize();
-
-    dst.0.copy_from_slice(&src.0);
+    dst.assign_from(src);
     cipher.encrypt_block(GenericArray::from_mut_slice(&mut dst.0).as_mut());
 }
 
@@ -94,7 +172,7 @@ mod tests {
         const KEY_1: BlockType = BlockType(hex!("1f352c073b6108d72d9810a30914dff4"));
 
         fn do_aes256_ecb(input: &BlockType, expected: &BlockType, key0: &BlockType, key1: &BlockType) {
-            let mut output = BlockType::default();
+            let mut output = BlockType::from_uninit();
             aes256_encrypt(&mut output, input, key0, key1);
             assert_eq!(&output, expected);
         }
@@ -189,8 +267,9 @@ mod tests {
             let mut output_ref = input0.clone();
 
             output_xor.xor_with(input1);
-            for index in 0..BLOCK_SIZE {
-                output_ref[index] ^= input1[index];
+
+            for (dst, src) in output_ref.0.iter_mut().zip(input1.0.iter()) {
+                *dst ^= src;
             }
 
             assert_eq!(&output_xor, &output_ref);
