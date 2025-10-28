@@ -135,6 +135,12 @@ jobs:
           gem install --no-document fpm
           git config --global --add safe.directory '*'
       - run: |
+          curl -sSf -o /tmp/libllvm20.deb http://archive.ubuntu.com/ubuntu/pool/main/l/llvm-toolchain-20/libllvm20_20.1.2-0ubuntu1~24.04.2_amd64.deb
+          curl -sSf -o /tmp/llvm-20-linker-tools.deb http://archive.ubuntu.com/ubuntu/pool/universe/l/llvm-toolchain-20/llvm-20-linker-tools_20.1.2-0ubuntu1~24.04.2_amd64.deb
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get install -y /tmp/libllvm20.deb /tmp/llvm-20-linker-tools.deb
+          rm -f /tmp/libllvm20.deb /tmp/llvm-20-linker-tools.deb
+      - run: |
           rustup target add x86_64-unknown-linux-musl
           rustup target add i586-unknown-linux-musl
           rustup target add i686-unknown-linux-musl
