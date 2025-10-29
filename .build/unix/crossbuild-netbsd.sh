@@ -21,6 +21,7 @@ if [[ ! -f "/opt/netbsd/sysroot/amd64/usr/lib/librt.so.1" || ! -f "/opt/netbsd/s
 fi
 
 unset RUSTFLAGS
+unset RUSTC_BOOTSTRAP
 
 export CARGO_TARGET_X86_64_UNKNOWN_NETBSD_LINKER=clang
 export CARGO_TARGET_X86_64_UNKNOWN_NETBSD_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-s -Clink-arg=-fuse-ld=lld -Clink-arg=--target=x86_64-unknown-netbsd -Clink-arg=--sysroot=/opt/netbsd/sysroot/amd64"

@@ -87,6 +87,8 @@ REM --------------------------------------------------------------------------
 REM Build
 REM --------------------------------------------------------------------------
 
+set RUSTC_BOOTSTRAP=
+
 set "DEFAULT_RUSTFLAGS=-Dwarnings -Ctarget-feature=+crt-static -Copt-level=3 -Ccodegen-units=1 -Clto=fat -Cdebuginfo=none -Cpanic=abort -Clink-arg=/DEBUG:NONE -Clink-arg=..\.build\windows\res\app-icon.res"
 set "RUSTFLAGS=%DEFAULT_RUSTFLAGS%"
 
@@ -106,6 +108,36 @@ for %%v in (v2 v3 v4) do (
 	cargo build --release --target x86_64-pc-windows-msvc --verbose || goto:error
 	copy /B /Y "target\x86_64-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-x86_64-%%v.exe" || goto:error
 )
+
+REM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+REM Windows 7
+REM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+mkdir "%DIST_DIR%\extra" || goto:error
+
+set RUSTC_BOOTSTRAP=1
+set "RUSTFLAGS=%DEFAULT_RUSTFLAGS%"
+
+for %%t in (x86_64 i686) do (
+	cargo clean || goto:error
+	cargo build -Zbuild-std=std,panic_abort --release --target %%t-win7-windows-msvc --verbose || goto:error
+	if "%%t" == "i686" (
+		copy /B /Y "target\%%t-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-pentium4.exe" || goto:error
+	) else (
+		copy /B /Y "target\%%t-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-%%t.exe" || goto:error
+	)
+)
+
+for %%v in (v2 v3 v4) do (
+	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-cpu=x86-64-%%v"
+	cargo clean || goto:error
+	cargo build -Zbuild-std=std,panic_abort --release --target x86_64-win7-windows-msvc --verbose || goto:error
+	copy /B /Y "target\x86_64-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-x86_64-%%v.exe" || goto:error
+)
+
+REM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+REM Docs
+REM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 set "RUSTFLAGS=-Dwarnings"
 cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256 || goto:error

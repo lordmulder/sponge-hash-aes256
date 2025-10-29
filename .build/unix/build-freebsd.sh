@@ -11,6 +11,7 @@ if [ "$(uname -s)" != "FreeBSD" ]; then
 fi
 
 unset RUSTFLAGS
+unset RUSTC_BOOTSTRAP
 
 case "$(uname -m)" in
     i386)

@@ -3,7 +3,7 @@
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use build_time::build_time_utc;
-use clap::{command, ArgAction, Parser};
+use clap::{ArgAction, Parser};
 use const_format::formatcp;
 use rustc_version_const::rustc_version_full;
 use sponge_hash_aes256::version;

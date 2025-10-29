@@ -22,9 +22,9 @@
 //! ## Optional features
 //!
 //! Feature   | Meaning
-//! --------- | ----------------------------------------------------------------------------------------------------------------------
+//! --------- | -----------------------------------------------------------------------------------------------------------------------
 //! `tracing` | Dump the internal state to the logging sub-system (via `log::trace()`) after each step.
-//! `wide`    | Enable use of [`wide`](https://crates.io/crates/wide) crate to speed up some operation with SIMD on supported targets.
+//! `wide`    | Enable use of [`wide`](https://crates.io/crates/wide) crate to speed up some operations with SIMD on supported targets.
 //!
 //! ## Rust support
 //!

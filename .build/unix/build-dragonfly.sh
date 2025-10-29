@@ -10,6 +10,7 @@ if [ "$(uname -s)" != "DragonFly" ]; then
 fi
 
 unset RUSTFLAGS
+unset RUSTC_BOOTSTRAP
 
 case "$(uname -m)" in
     x86_64)

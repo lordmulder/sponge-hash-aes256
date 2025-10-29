@@ -18,6 +18,7 @@ else
 fi
 
 unset RUSTFLAGS
+unset RUSTC_BOOTSTRAP
 
 case "$(uname -m)" in
     i86pc)

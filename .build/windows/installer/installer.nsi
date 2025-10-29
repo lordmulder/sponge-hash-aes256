@@ -63,6 +63,11 @@ Section "Program files (required)"
   File "${SOURCE_PATH}\*.*"
 SectionEnd
 
+Section "Additional program files"
+  SetOutPath "$INSTDIR\extra"
+  File "${SOURCE_PATH}\extra\*.*"
+SectionEnd
+
 Section "Documentation"
   SetOutPath "$INSTDIR\doc"
   File /r "${SOURCE_PATH}\doc\*.*"

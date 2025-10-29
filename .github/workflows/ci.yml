@@ -181,6 +181,7 @@ jobs:
         with:
           toolchain: 1.90.0
           target: x86_64-pc-windows-msvc,i686-pc-windows-msvc,aarch64-pc-windows-msvc
+          components: rust-src
           cache: false
           rustflags: "-Dwarnings -Ctarget-feature=+crt-static"
       - run: |

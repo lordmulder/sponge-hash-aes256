@@ -2,7 +2,6 @@ SHELL = /bin/sh
 .SHELLFLAGS = -ec
 
 .ONESHELL:
-
 .PHONY: all build dist pkg clean
 
 all: pkg
@@ -10,6 +9,7 @@ all: pkg
 build:
 	rm -rf target && mkdir target && mkdir target/dist
 	cd ../../app
+	unset RUSTC_BOOTSTRAP
 	for t in x86_64 i686 aarch64; do
 		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-20/lib/LLVMgold.so -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
 		$(SHELL) -c "cargo clean && cargo build --release --target $$t-unknown-linux-musl --verbose"
