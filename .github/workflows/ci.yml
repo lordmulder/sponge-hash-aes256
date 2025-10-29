@@ -56,11 +56,15 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - run: |
-          for subdir in lib app; do
-            cargo test --manifest-path ${subdir}/Cargo.toml ${TEST_EXTRA_OPTS}
-            cargo test --manifest-path ${subdir}/Cargo.toml --release ${TEST_EXTRA_OPTS}
-          done
+      - working-directory: ${{ github.workspace }}/lib
+        run: |
+          cargo test ${TEST_EXTRA_OPTS}
+          cargo test --release ${TEST_EXTRA_OPTS}
+          cargo test --release --features wide ${TEST_EXTRA_OPTS}
+      - working-directory: ${{ github.workspace }}/app
+        run: |
+          cargo test ${TEST_EXTRA_OPTS}
+          cargo test --release ${TEST_EXTRA_OPTS}
 
   test-windows:
     runs-on: windows-latest
@@ -68,13 +72,14 @@ jobs:
     strategy:
       matrix:
         rust: [1.78.0, 1.90.0]
+        arch: [x86_64, i686]
     env:
       TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
     steps:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
-          target: x86_64-pc-windows-msvc,i686-pc-windows-msvc
+          target: ${{ matrix.arch }}-pc-windows-msvc
           cache: false
           rustflags: -Dwarnings
       - run: git config --global core.symlinks false
@@ -82,14 +87,17 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - run: |
+      - working-directory: ${{ github.workspace }}/lib
+        run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          foreach ($subdir in @("lib", "app")) {
-            foreach ($arch in @("x86_64", "i686")) {
-              iex "cargo test --manifest-path $subdir/Cargo.toml --target $arch-pc-windows-msvc $env:TEST_EXTRA_OPTS"
-              iex "cargo test --manifest-path $subdir/Cargo.toml --target $arch-pc-windows-msvc --release $env:TEST_EXTRA_OPTS"
-            }
-          }
+          iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc $env:TEST_EXTRA_OPTS"
+          iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc --release $env:TEST_EXTRA_OPTS"
+          iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc --release --features wide $env:TEST_EXTRA_OPTS"
+      - working-directory: ${{ github.workspace }}/app
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc $env:TEST_EXTRA_OPTS"
+          iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc --release $env:TEST_EXTRA_OPTS"
 
   test-macos:
     runs-on: macos-latest
@@ -97,26 +105,29 @@ jobs:
     strategy:
       matrix:
         rust: [1.78.0, 1.90.0]
+        arch: [x86_64, aarch64]
     env:
       TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
     steps:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ matrix.rust }}
-          target: x86_64-apple-darwin,aarch64-apple-darwin
+          target: ${{ matrix.arch }}-apple-darwin
           cache: false
           rustflags: -Dwarnings
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - run: |
-          for subdir in lib app; do
-            for arch in x86_64 aarch64; do
-              cargo test --manifest-path ${subdir}/Cargo.toml --target $arch-apple-darwin ${TEST_EXTRA_OPTS}
-              cargo test --manifest-path ${subdir}/Cargo.toml --target $arch-apple-darwin --release ${TEST_EXTRA_OPTS}
-            done
-          done
+      - working-directory: ${{ github.workspace }}/lib
+        run: |
+          cargo test --target ${{ matrix.arch }}-apple-darwin ${TEST_EXTRA_OPTS}
+          cargo test --target ${{ matrix.arch }}-apple-darwin --release ${TEST_EXTRA_OPTS}
+          cargo test --target ${{ matrix.arch }}-apple-darwin --release --features wide ${TEST_EXTRA_OPTS}
+      - working-directory: ${{ github.workspace }}/app
+        run: |
+          cargo test --target ${{ matrix.arch }}-apple-darwin ${TEST_EXTRA_OPTS}
+          cargo test --target ${{ matrix.arch }}-apple-darwin --release ${TEST_EXTRA_OPTS}
 
   # --------------------------------------------------------------------------
   # Build

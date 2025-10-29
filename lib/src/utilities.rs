@@ -7,6 +7,7 @@ use cipher::{BlockEncrypt, KeyInit};
 use core::{
     mem::MaybeUninit,
     ops::{Index, IndexMut, RangeTo},
+    ptr,
 };
 use generic_array::GenericArray;
 use zeroize::Zeroize;
@@ -24,7 +25,7 @@ pub const KEY_SIZE: usize = 2usize * BLOCK_SIZE;
 pub struct BlockType([u8; BLOCK_SIZE]);
 
 impl BlockType {
-    /// Create a new block that is initialized from the given `INIT_VALUE`
+    /// Create a new block that is initialized entirely from the given `INIT_VALUE`
     #[inline(always)]
     pub const fn new<const INIT_VALUE: u8>() -> Self {
         Self([INIT_VALUE; BLOCK_SIZE])
@@ -33,7 +34,7 @@ impl BlockType {
     /// Create a new block that is initialized to "zero" bytes
     #[inline(always)]
     pub const fn zero() -> Self {
-        Self::new::<0u8>()
+        unsafe { Self(MaybeUninit::zeroed().assume_init()) }
     }
 
     /// Create a new block with an "undefined" content that must be overwritten before it is read
@@ -41,16 +42,7 @@ impl BlockType {
     #[allow(clippy::uninit_assumed_init)]
     #[inline(always)]
     pub const fn from_uninit() -> Self {
-        unsafe { Self(MaybeUninit::<[u8; BLOCK_SIZE]>::uninit().assume_init()) }
-    }
-
-    /// Computes the bit-wise XOR of `other` and *self*, stores the result "in-place" in *self*
-    #[inline(always)]
-    pub fn xor_with(&mut self, other: &Self) {
-        let (ptr_self, ptr_other) = (self.0.as_mut_ptr() as *mut u128, other.0.as_ptr() as *const u128);
-        unsafe {
-            *ptr_self ^= *ptr_other;
-        }
+        unsafe { Self(MaybeUninit::uninit().assume_init()) }
     }
 
     /// Copy the content of `other` into *self*, replacing the previous content
@@ -59,11 +51,26 @@ impl BlockType {
         self.0 = other.0
     }
 
-    /// Copy content of this block to the address given by the "raw" `*mut u8` pointer
+    /// Computes the bit-wise XOR of `other` and *self*, stores the result "in-place" in *self*
+    #[cfg(feature = "wide")]
     #[inline(always)]
-    unsafe fn copy_to(&self, dest: *mut u128) {
-        let ptr_self = self.0.as_ptr() as *const u128;
-        *dest = *ptr_self;
+    pub fn xor_with(&mut self, other: &Self) {
+        self.0 = (wide::u8x16::new(self.0) ^ wide::u8x16::new(other.0)).into();
+    }
+
+    /// Computes the bit-wise XOR of `other` and *self*, stores the result "in-place" in *self*
+    #[cfg(not(feature = "wide"))]
+    #[inline(always)]
+    pub fn xor_with(&mut self, other: &Self) {
+        for (dst, src) in self.0.iter_mut().zip(other.0.iter()) {
+            *dst ^= *src;
+        }
+    }
+
+    /// Get a "raw" `*const u8` pointer to the contained data
+    #[inline(always)]
+    const fn as_ptr(&self) -> *const [u8; BLOCK_SIZE] {
+        self.0.as_ptr() as *const [u8; BLOCK_SIZE]
     }
 }
 
@@ -95,8 +102,11 @@ impl Index<RangeTo<usize>> for BlockType {
 impl PartialEq for BlockType {
     #[inline(always)]
     fn eq(&self, other: &Self) -> bool {
-        let (ptr_self, ptr_other) = (self.0.as_ptr() as *const u128, other.0.as_ptr() as *const u128);
-        (unsafe { *ptr_self ^ *ptr_other }) == 0u128
+        let mut diff = 0u8;
+        for (lhs, rhs) in self.0.iter().zip(other.0.iter()) {
+            diff |= lhs ^ rhs;
+        }
+        diff == 0u8
     }
 }
 
@@ -120,11 +130,11 @@ impl KeyType {
     #[allow(clippy::uninit_assumed_init)]
     #[inline(always)]
     fn new(key0: &BlockType, key1: &BlockType) -> Self {
-        let mut full_key: MaybeUninit<Self> = MaybeUninit::uninit();
-        let ptr_out = full_key.as_mut_ptr() as *mut u128;
+        let mut full_key = MaybeUninit::uninit();
+        let write_ptr = full_key.as_mut_ptr() as *mut [u8; BLOCK_SIZE];
         unsafe {
-            key0.copy_to(ptr_out);
-            key1.copy_to(ptr_out.add(1usize));
+            ptr::copy_nonoverlapping(key0.as_ptr(), write_ptr, 1usize);
+            ptr::copy_nonoverlapping(key1.as_ptr(), write_ptr.add(1usize), 1usize);
             full_key.assume_init()
         }
     }

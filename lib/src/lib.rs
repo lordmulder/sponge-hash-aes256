@@ -17,13 +17,14 @@
 //!
 //! This crate is **`#![no_std]`** compatible and does not link the Rust standard library.
 //!
-//! Required dependencies: [`aes`](https://crates.io/crates/aes), [`cipher`](https://crates.io/crates/cipher), [`zeroize`](https://crates.io/crates/zeroize)
+//! Required dependencies: [`aes`](https://crates.io/crates/aes), [`cipher`](https://crates.io/crates/cipher), [`wide`](https://crates.io/crates/wide), [`zeroize`](https://crates.io/crates/zeroize)
 //!
 //! ## Optional features
 //!
 //! Feature   | Meaning
-//! --------- | ------------------------------------------------------------------------------------------
-//! `tracing` | Dump the internal state to the loggging sub-system (via `log::trace()`) after each step.
+//! --------- | ----------------------------------------------------------------------------------------------------------------------
+//! `tracing` | Dump the internal state to the logging sub-system (via `log::trace()`) after each step.
+//! `wide`    | Enable use of [`wide`](https://crates.io/crates/wide) crate to speed up some operation with SIMD on supported targets.
 //!
 //! ## Rust support
 //!
