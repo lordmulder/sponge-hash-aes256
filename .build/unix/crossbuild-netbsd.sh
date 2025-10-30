@@ -26,4 +26,4 @@ unset RUSTC_BOOTSTRAP
 export CARGO_TARGET_X86_64_UNKNOWN_NETBSD_LINKER=clang
 export CARGO_TARGET_X86_64_UNKNOWN_NETBSD_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-s -Clink-arg=-fuse-ld=lld -Clink-arg=--target=x86_64-unknown-netbsd -Clink-arg=--sysroot=/opt/netbsd/sysroot/amd64"
 
-make MY_OS=netbsd MY_ARCH=x86_64 MY_RUSTFLAGS=
+make MY_OS=netbsd MY_ARCH=x86_64 MY_FEATURES=wide MY_RUSTFLAGS=

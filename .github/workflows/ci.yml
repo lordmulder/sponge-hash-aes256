@@ -60,11 +60,16 @@ jobs:
         run: |
           cargo test ${TEST_EXTRA_OPTS}
           cargo test --release ${TEST_EXTRA_OPTS}
-          cargo test --release --features wide ${TEST_EXTRA_OPTS}
       - working-directory: ${{ github.workspace }}/app
         run: |
           cargo test ${TEST_EXTRA_OPTS}
           cargo test --release ${TEST_EXTRA_OPTS}
+      - if: matrix.rust != '1.78.0-bookworm'
+        working-directory: ${{ github.workspace }}/lib
+        run: cargo test --release --features wide ${TEST_EXTRA_OPTS}
+      - if: matrix.rust != '1.78.0-bookworm'
+        working-directory: ${{ github.workspace }}/app
+        run: cargo test --release --features wide ${TEST_EXTRA_OPTS}
 
   test-windows:
     runs-on: windows-latest
@@ -92,12 +97,21 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc $env:TEST_EXTRA_OPTS"
           iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc --release $env:TEST_EXTRA_OPTS"
-          iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc --release --features wide $env:TEST_EXTRA_OPTS"
       - working-directory: ${{ github.workspace }}/app
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
           iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc $env:TEST_EXTRA_OPTS"
           iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc --release $env:TEST_EXTRA_OPTS"
+      - if: matrix.rust != '1.78.0'
+        working-directory: ${{ github.workspace }}/lib
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc --release --features wide $env:TEST_EXTRA_OPTS"
+      - if: matrix.rust != '1.78.0'
+        working-directory: ${{ github.workspace }}/app
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc --release --features wide $env:TEST_EXTRA_OPTS"
 
   test-macos:
     runs-on: macos-latest
@@ -123,11 +137,16 @@ jobs:
         run: |
           cargo test --target ${{ matrix.arch }}-apple-darwin ${TEST_EXTRA_OPTS}
           cargo test --target ${{ matrix.arch }}-apple-darwin --release ${TEST_EXTRA_OPTS}
-          cargo test --target ${{ matrix.arch }}-apple-darwin --release --features wide ${TEST_EXTRA_OPTS}
       - working-directory: ${{ github.workspace }}/app
         run: |
           cargo test --target ${{ matrix.arch }}-apple-darwin ${TEST_EXTRA_OPTS}
           cargo test --target ${{ matrix.arch }}-apple-darwin --release ${TEST_EXTRA_OPTS}
+      - if: matrix.rust != '1.78.0'
+        working-directory: ${{ github.workspace }}/lib
+        run: cargo test --target ${{ matrix.arch }}-apple-darwin --release --features wide ${TEST_EXTRA_OPTS}
+      - if: matrix.rust != '1.78.0'
+        working-directory: ${{ github.workspace }}/app
+        run: cargo test --target ${{ matrix.arch }}-apple-darwin --release --features wide ${TEST_EXTRA_OPTS}
 
   # --------------------------------------------------------------------------
   # Build

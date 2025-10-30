@@ -34,4 +34,4 @@ export CARGO_TARGET_I686_UNKNOWN_FREEBSD_RUSTFLAGS="-Dwarnings -Ctarget-feature=
 export CARGO_TARGET_X86_64_UNKNOWN_FREEBSD_LINKER=clang
 export CARGO_TARGET_X86_64_UNKNOWN_FREEBSD_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static -Clink-arg=-s -Clink-arg=-fuse-ld=lld -Clink-arg=--target=x86_64-unknown-freebsd -Clink-arg=--sysroot=/opt/freebsd/sysroot/amd64"
 
-make MY_OS=freebsd MY_ARCH="x86_64 i686" MY_RUSTFLAGS=
+make MY_OS=freebsd MY_ARCH="x86_64 i686" MY_FEATURES=wide MY_RUSTFLAGS=
