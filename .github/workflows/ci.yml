@@ -20,9 +20,9 @@ jobs:
     strategy:
       matrix:
         include:
-          - rust: 1.78.0-bookworm
+          - rust: 1.78-bookworm
             clippy_opts: "-Dwarnings -Aunknown_lints"
-          - rust: 1.90.0-trixie
+          - rust: 1.91-trixie
             clippy_opts: "-Dwarnings"
     steps:
       - run: rustup component add rustfmt clippy
@@ -30,12 +30,16 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - run: |
-          for subdir in lib app; do
-            cargo check --manifest-path ${subdir}/Cargo.toml --verbose
-            cargo fmt --manifest-path ${subdir}/Cargo.toml --all --check --verbose
-            cargo clippy --manifest-path ${subdir}/Cargo.toml -- ${{ matrix.clippy_opts }}
-          done
+      - working-directory: ${{ github.workspace }}/lib
+        run: |
+          cargo check --verbose
+          cargo clippy -- ${{ matrix.clippy_opts }}
+          cargo fmt --all --check --verbose
+      - working-directory: ${{ github.workspace }}/app
+        run: |
+          cargo check --verbose
+          cargo clippy -- ${{ matrix.clippy_opts }}
+          cargo fmt --all --check --verbose
 
   # --------------------------------------------------------------------------
   # Tests
@@ -48,7 +52,7 @@ jobs:
     needs: check
     strategy:
       matrix:
-        rust: [1.78.0-bookworm, 1.90.0-trixie]
+        rust: [1.78-bookworm, 1.91-trixie]
     env:
       TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
     steps:
@@ -64,11 +68,11 @@ jobs:
         run: |
           cargo test ${TEST_EXTRA_OPTS}
           cargo test --release ${TEST_EXTRA_OPTS}
-      - if: matrix.rust != '1.78.0-bookworm'
-        working-directory: ${{ github.workspace }}/lib
+      - working-directory: ${{ github.workspace }}/lib
+        if: ${{ !startsWith(matrix.rust, '1.78') }}
         run: cargo test --release --features wide ${TEST_EXTRA_OPTS}
-      - if: matrix.rust != '1.78.0-bookworm'
-        working-directory: ${{ github.workspace }}/app
+      - working-directory: ${{ github.workspace }}/app
+        if: ${{ !startsWith(matrix.rust, '1.78') }}
         run: cargo test --release --features wide ${TEST_EXTRA_OPTS}
 
   test-windows:
@@ -76,7 +80,7 @@ jobs:
     needs: check
     strategy:
       matrix:
-        rust: [1.78.0, 1.90.0]
+        rust: [1.78.0, 1.91.0]
         arch: [x86_64, i686]
     env:
       TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
@@ -102,13 +106,13 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc $env:TEST_EXTRA_OPTS"
           iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc --release $env:TEST_EXTRA_OPTS"
-      - if: matrix.rust != '1.78.0'
-        working-directory: ${{ github.workspace }}/lib
+      - working-directory: ${{ github.workspace }}/lib
+        if: ${{ !startsWith(matrix.rust, '1.78') }}
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
           iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc --release --features wide $env:TEST_EXTRA_OPTS"
-      - if: matrix.rust != '1.78.0'
-        working-directory: ${{ github.workspace }}/app
+      - working-directory: ${{ github.workspace }}/app
+        if: ${{ !startsWith(matrix.rust, '1.78') }}
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
           iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc --release --features wide $env:TEST_EXTRA_OPTS"
@@ -118,7 +122,7 @@ jobs:
     needs: check
     strategy:
       matrix:
-        rust: [1.78.0, 1.90.0]
+        rust: [1.78.0, 1.91.0]
         arch: [x86_64, aarch64]
     env:
       TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
@@ -141,11 +145,11 @@ jobs:
         run: |
           cargo test --target ${{ matrix.arch }}-apple-darwin ${TEST_EXTRA_OPTS}
           cargo test --target ${{ matrix.arch }}-apple-darwin --release ${TEST_EXTRA_OPTS}
-      - if: matrix.rust != '1.78.0'
-        working-directory: ${{ github.workspace }}/lib
+      - working-directory: ${{ github.workspace }}/lib
+        if: ${{ !startsWith(matrix.rust, '1.78') }}
         run: cargo test --target ${{ matrix.arch }}-apple-darwin --release --features wide ${TEST_EXTRA_OPTS}
-      - if: matrix.rust != '1.78.0'
-        working-directory: ${{ github.workspace }}/app
+      - working-directory: ${{ github.workspace }}/app
+        if: ${{ !startsWith(matrix.rust, '1.78') }}
         run: cargo test --target ${{ matrix.arch }}-apple-darwin --release --features wide ${TEST_EXTRA_OPTS}
 
   # --------------------------------------------------------------------------
@@ -155,7 +159,7 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     container:
-      image: rust:1.90.0-trixie
+      image: rust:1.91-trixie
     needs: [test-linux, test-windows, test-macos]
     steps:
       - run: |
@@ -165,11 +169,11 @@ jobs:
           gem install --no-document fpm
           git config --global --add safe.directory '*'
       - run: |
-          curl -sSf -o /tmp/libllvm20.deb http://archive.ubuntu.com/ubuntu/pool/main/l/llvm-toolchain-20/libllvm20_20.1.2-0ubuntu1~24.04.2_amd64.deb
-          curl -sSf -o /tmp/llvm-20-linker-tools.deb http://archive.ubuntu.com/ubuntu/pool/universe/l/llvm-toolchain-20/llvm-20-linker-tools_20.1.2-0ubuntu1~24.04.2_amd64.deb
+          curl -sSf -o /tmp/libllvm21.deb http://ftp.debian.org/debian/pool/main/l/llvm-toolchain-21/libllvm21_21.1.4-5_amd64.deb
+          curl -sSf -o /tmp/llvm-21-linker-tools.deb http://ftp.debian.org/debian/pool/main/l/llvm-toolchain-21/llvm-21-linker-tools_21.1.4-5_amd64.deb
+          curl -sSf -o /tmp/libxml2-16.deb http://ftp.debian.org/debian/pool/main/libx/libxml2/libxml2-16_2.15.1+dfsg-0.3_amd64.deb
           export DEBIAN_FRONTEND=noninteractive
-          apt-get install -y /tmp/libllvm20.deb /tmp/llvm-20-linker-tools.deb
-          rm -f /tmp/libllvm20.deb /tmp/llvm-20-linker-tools.deb
+          apt-get install -y /tmp/libxml2-16.deb /tmp/libllvm21.deb /tmp/llvm-21-linker-tools.deb
       - run: |
           rustup target add x86_64-unknown-linux-musl
           rustup target add i586-unknown-linux-musl
@@ -198,7 +202,7 @@ jobs:
           nsis-version: '3.11'
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.90.0
+          toolchain: 1.91.0
           target: x86_64-pc-windows-msvc,i686-pc-windows-msvc,aarch64-pc-windows-msvc
           components: rust-src
           cache: false
@@ -224,7 +228,7 @@ jobs:
       - run: git config --global --add safe.directory '*'
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          toolchain: 1.90.0
+          toolchain: 1.91.0
           target: x86_64-apple-darwin,aarch64-apple-darwin
           cache: false
           rustflags: "-Dwarnings -Ctarget-feature=+crt-static"
@@ -253,7 +257,7 @@ jobs:
           usesh: true
           prepare: |
             pkg install -y git curl
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.90.0
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.91.0
             . "$HOME/.cargo/env"
             rustup target add x86_64-unknown-freebsd i686-unknown-freebsd
             git config --global --add safe.directory '*'
@@ -279,7 +283,7 @@ jobs:
           usesh: true
           prepare: |
             /usr/sbin/pkg_add git curl
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.90.0
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.91.0
             git config --global --add safe.directory '*'
           run: |
             . "$HOME/.cargo/env"
@@ -371,7 +375,7 @@ jobs:
           usesh: true
           prepare: |
             pkg install developer/build-essential developer/versioning/git
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.90.0
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.91.0
             git config --global --add safe.directory '*'
           run: |
             . "$HOME/.cargo/env"
