@@ -13,6 +13,7 @@ no_std = true
 [dependencies]
 aes = { version = "0.8.4", default-features = false }
 cipher = { version = "0.4.4", default-features = false }
+const-str = { version = "0.7.0", default-features = false }
 zeroize = { version = "1.8.2", default-features = false }
 
 # Workaround for deprecation of generic-array v0.14

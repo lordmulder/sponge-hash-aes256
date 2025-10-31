@@ -4,6 +4,7 @@
 
 use aes::Aes256;
 use cipher::{BlockEncrypt, KeyInit};
+use const_str::eq_ignore_ascii_case;
 use core::{
     mem::MaybeUninit,
     ops::{Index, IndexMut, RangeTo},
@@ -166,6 +167,17 @@ pub fn aes256_encrypt(dst: &mut BlockType, src: &BlockType, key0: &BlockType, ke
 pub const fn version() -> &'static str {
     const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
     PKG_VERSION
+}
+
+/// Checks whether a specific feature is enabled in the library
+pub const fn feature_enabled(name: &str) -> bool {
+    if eq_ignore_ascii_case!(name, "wide") {
+        cfg!(feature = "wide")
+    } else if eq_ignore_ascii_case!(name, "tracing") {
+        cfg!(feature = "tracing")
+    } else {
+        panic!("The specified feature is unknown!")
+    }
 }
 
 // ---------------------------------------------------------------------------

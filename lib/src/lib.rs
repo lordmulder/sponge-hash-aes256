@@ -42,4 +42,4 @@ mod sponge_hash;
 mod utilities;
 
 pub use sponge_hash::{compute, compute_to_slice, SpongeHash256, DEFAULT_DIGEST_SIZE, DEFAULT_PERMUTE_ROUNDS};
-pub use utilities::version;
+pub use utilities::{feature_enabled, version};
