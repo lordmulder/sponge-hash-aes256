@@ -258,8 +258,11 @@ jobs:
           prepare: |
             pkg install -y git curl
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.91.0
+            mkdir -p /opt/sysroot/arm64
+            curl -sSf https://download.freebsd.org/ftp/releases/arm64/14.3-RELEASE/base.txz | tar -C /opt/sysroot/arm64 -xJ lib usr/lib
             . "$HOME/.cargo/env"
             rustup target add x86_64-unknown-freebsd i686-unknown-freebsd
+            rustup component add rust-src
             git config --global --add safe.directory '*'
           run: |
             . "$HOME/.cargo/env"
@@ -282,8 +285,13 @@ jobs:
           release: 10.1
           usesh: true
           prepare: |
-            /usr/sbin/pkg_add git curl
+            /usr/sbin/pkg_add git curl clang
             curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.91.0
+            mkdir -p /opt/sysroot/i386
+            curl -sSf https://cdn.netbsd.org/pub/NetBSD/NetBSD-10.1/i386/binary/sets/base.tgz | tar -C /opt/sysroot/i386 -xzf - lib usr/lib
+            curl -sSf https://cdn.netbsd.org/pub/NetBSD/NetBSD-10.1/i386/binary/sets/comp.tgz | tar -C /opt/sysroot/i386 -xzf - usr/lib
+            . "$HOME/.cargo/env"
+            rustup component add rust-src
             git config --global --add safe.directory '*'
           run: |
             . "$HOME/.cargo/env"
@@ -306,7 +314,10 @@ jobs:
           release: 7.8
           usesh: true
           prepare: |
-            pkg_add git rust
+            pkg_add git rust rust-src
+            mkdir -p /opt/sysroot/i386 /opt/sysroot/arm64
+            curl -sSf https://cdn.openbsd.org/pub/OpenBSD/7.8/i386/base78.tgz | tar -C /opt/sysroot/i386 -xzf - ./usr/lib
+            curl -sSf https://cdn.openbsd.org/pub/OpenBSD/7.8/arm64/base78.tgz | tar -C /opt/sysroot/arm64 -xzf - ./usr/lib
             git config --global --add safe.directory '*'
           run: |
             cd .build/unix && ./build-openbsd.sh
