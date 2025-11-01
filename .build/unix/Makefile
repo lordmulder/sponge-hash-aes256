@@ -1,4 +1,5 @@
 MY_ARCH = x86_64
+MY_BUILDOPTS = --verbose
 MY_FEATURES = wide
 MY_OS = unix
 MY_RUSTFLAGS = -Dwarnings
@@ -16,18 +17,18 @@ build:
 	for t in $(MY_ARCH); do \
 		cargo clean; \
 		if [ ! -z "$(MY_RUSTFLAGS)" ]; then \
-			RUSTFLAGS="$(MY_RUSTFLAGS)" cargo build --release --features "$(MY_FEATURES)" --target "$$t-$(MY_VENDOR)-$(MY_OS)" --verbose; \
+			RUSTFLAGS="$(MY_RUSTFLAGS)" cargo build --release --features "$(MY_FEATURES)" --target "$$t-$(MY_VENDOR)-$(MY_OS)" $(MY_BUILDOPTS); \
 		else \
-			cargo build --release --features "$(MY_FEATURES)" --target "$$t-$(MY_VENDOR)-$(MY_OS)" --verbose; \
+			cargo build --release --features "$(MY_FEATURES)" --target "$$t-$(MY_VENDOR)-$(MY_OS)" $(MY_BUILDOPTS); \
 		fi; \
 		mv -f target/$$t-$(MY_VENDOR)-$(MY_OS)/release/sponge256sum $${ORIGINAL_DIR}/target/dist/sponge256sum-$$t; \
 		chmod 555 $${ORIGINAL_DIR}/target/dist/sponge256sum-$$t; \
 	done; \
-	cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256; \
+	RUSTFLAGS="-Dwarnings" cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256; \
 	cp -rf target/doc $${ORIGINAL_DIR}/target/dist/; \
-	cargo pkgid | sed 's/^.*@//;s/^[[:space:]]*//;s/[[:space:]]*$$//' > $${ORIGINAL_DIR}/target/.PKG_VERSION; \
-	printf '%s\n\n' "`cargo --version --verbose`" > $${ORIGINAL_DIR}/target/.RUSTC_VERSION; \
-	printf '%s\n' "`cargo rustc -- --version --verbose`" >> $${ORIGINAL_DIR}/target/.RUSTC_VERSION;
+	RUSTFLAGS="-Dwarnings" cargo pkgid | sed 's/^.*@//;s/^[[:space:]]*//;s/[[:space:]]*$$//' > $${ORIGINAL_DIR}/target/.PKG_VERSION; \
+	printf '%s\n\n' "`RUSTFLAGS=-Dwarnings cargo --version --verbose`" > $${ORIGINAL_DIR}/target/.RUSTC_VERSION; \
+	printf '%s\n' "`RUSTFLAGS=-Dwarnings cargo rustc -- --version --verbose`" >> $${ORIGINAL_DIR}/target/.RUSTC_VERSION;
 
 dist: build
 	set -e; \
