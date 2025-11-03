@@ -165,7 +165,7 @@ jobs:
       - run: |
           export DEBIAN_FRONTEND=noninteractive
           apt-get update
-          apt-get install -y musl-tools crossbuild-essential-i386 crossbuild-essential-arm64 ruby-dev
+          apt-get install -y musl-tools crossbuild-essential-i386 crossbuild-essential-arm64 crossbuild-essential-riscv64 ruby-dev
           gem install --no-document fpm
           git config --global --add safe.directory '*'
       - run: |
@@ -176,9 +176,10 @@ jobs:
           apt-get install -y /tmp/libxml2-16.deb /tmp/libllvm21.deb /tmp/llvm-21-linker-tools.deb
       - run: |
           rustup target add x86_64-unknown-linux-musl
-          rustup target add i586-unknown-linux-musl
           rustup target add i686-unknown-linux-musl
           rustup target add aarch64-unknown-linux-musl
+          rustup target add riscv64gc-unknown-linux-musl
+          rustup target add i586-unknown-linux-musl
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -236,12 +237,12 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - working-directory: ${{ github.workspace }}/.build/macos
-        run: make
+      - working-directory: ${{ github.workspace }}/.build/unix
+        run: ./build-macos.sh
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-macos
-          path: ${{ github.workspace }}/.build/macos/target/*.dmg
+          path: ${{ github.workspace }}/.build/unix/target/*.*
 
   build-freebsd:
     runs-on: ubuntu-latest

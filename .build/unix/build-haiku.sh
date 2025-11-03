@@ -9,15 +9,15 @@ if [ "$(uname -s)" != "Haiku" ]; then
     exit 1
 fi
 
-unset RUSTFLAGS
+export RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
 unset RUSTC_BOOTSTRAP
 
 case "$(uname -m)" in
     BePC)
-        setarch x86 make MY_OS=haiku MY_ARCH=i686 MY_FEATURES=wide MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+        setarch x86 make MY_OS=haiku MY_ARCH=i686 MY_FEATURES=wide
         ;;
     x86_64)
-        make MY_OS=haiku MY_ARCH=x86_64 MY_FEATURES=wide MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+        make MY_OS=haiku MY_ARCH=x86_64 MY_FEATURES=wide
         ;;
     *)
         echo "Error: Unknown architecture!"

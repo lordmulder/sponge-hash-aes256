@@ -1,8 +1,13 @@
 #!/bin/sh
 set -e
 
-# Prerequisites:
-# - pkg_add rust
+# [Prerequisites (Solaris)]
+# - pkg install developer/gcc developer/versioning/git
+# - source <(curl -s https://raw.githubusercontent.com/psumbera/solaris-rust/refs/heads/main/sh.rust-web-install)
+
+# [Prerequisites (Illumos)]
+# - pkg install developer/build-essential developer/versioning/git
+# - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.91.0
 
 if [ "$(uname -s)" != "SunOS" ]; then
     echo "Error: This script is supposed to run on a SunOS system!"
@@ -17,17 +22,17 @@ else
     OS_VENDOR=pc
 fi
 
-unset RUSTFLAGS
+export RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
 unset RUSTC_BOOTSTRAP
 
 case "$(uname -m)" in
     i86pc)
         case "$(isainfo -n)" in
             i386)
-                make MY_OS=$OS_FLAVOR MY_VENDOR=$OS_VENDOR MY_FEATURES= MY_ARCH=i686 MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+                make MY_OS=$OS_FLAVOR MY_VENDOR=$OS_VENDOR MY_FEATURES= MY_ARCH=i686
                 ;;
             amd64)
-                make MY_OS=$OS_FLAVOR MY_VENDOR=$OS_VENDOR MY_FEATURES= MY_ARCH=x86_64 MY_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static"
+                make MY_OS=$OS_FLAVOR MY_VENDOR=$OS_VENDOR MY_FEATURES= MY_ARCH=x86_64
                 ;;
             *)
                 echo "Error: Unknown architecture!"

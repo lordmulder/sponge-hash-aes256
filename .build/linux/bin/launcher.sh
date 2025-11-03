@@ -37,6 +37,9 @@ if [ -z "${SPONGE256SUM_ARCH}" ]; then
     aarch64 | arm64)
         SPONGE256SUM_ARCH="aarch64"
         ;;
+    riscv64)
+        SPONGE256SUM_ARCH="riscv64gc"
+        ;;
     *)
         echo "Unknown architecture: $(uname -m)" >&2
         exit 1

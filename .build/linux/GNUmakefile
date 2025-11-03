@@ -1,8 +1,29 @@
+# [Prerequisites]
+# - sudo apt install crossbuild-essential-{i386,arm64,riscv64} ruby-dev
+# - sudo gem install --no-document fpm
+# - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.91.0
+# - rustup target add i686-unknown-linux-musl
+# - rustup target add aarch64-unknown-linux-musl
+# - rustup target add riscv64gc-unknown-linux-musl
+# - rustup target add i586-unknown-linux-musl
+# - curl -sSf -o /tmp/libllvm21.deb http://ftp.debian.org/debian/pool/main/l/llvm-toolchain-21/libllvm21_21.1.4-5_amd64.deb
+# - curl -sSf -o /tmp/llvm-21-linker-tools.deb http://ftp.debian.org/debian/pool/main/l/llvm-toolchain-21/llvm-21-linker-tools_21.1.4-5_amd64.deb
+# - curl -sSf -o /tmp/libxml2-16.deb http://ftp.debian.org/debian/pool/main/libx/libxml2/libxml2-16_2.15.1+dfsg-0.3_amd64.deb
+# - sudo apt install -y /tmp/libxml2-16.deb /tmp/libllvm21.deb /tmp/llvm-21-linker-tools.deb
+
 SHELL = /bin/sh
 .SHELLFLAGS = -ec
 
+ifneq (Linux, $(shell uname -s))
+$(error Error: This script is supposed to run on a Linux system!)
+endif
+
+ifneq (x86_64, $(shell uname -m))
+$(error Error: This script is supposed to run on the 'x86_64' architecture!)
+endif
+
 .ONESHELL:
-.PHONY: all build dist pkg clean
+.PHONY: all build dist doc pkg clean
 
 all: pkg
 
@@ -25,17 +46,26 @@ build:
 	done
 	for p in i586; do
 		RUSTFLAGS="-Dwarnings -Clinker=i686-linux-gnu-gcc -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-O3 -Ctarget-cpu=$$p" \
-		$(SHELL) -c "cargo clean && cargo build --release --features wide --target i586-unknown-linux-musl --verbose"
-		mv -vf target/i586-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$p
+		$(SHELL) -c "cargo clean && cargo build --release --features wide --target $$p-unknown-linux-musl --verbose"
+		mv -vf target/$$p-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$p
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-$$p
 	done
-	cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256
-	cp -rf target/doc $(CURDIR)/target/dist/
-	cargo pkgid | grep -Eo '[^@]+$$' | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//' > $(CURDIR)/target/.PKG_VERSION
-	printf '%s\n\n' "`cargo --version --verbose`" > $(CURDIR)/target/.RUSTC_VERSION
-	printf '%s\n' "`cargo rustc -- --version --verbose`" >> $(CURDIR)/target/.RUSTC_VERSION
+	for p in riscv64gc; do
+		RUSTFLAGS="-Dwarnings -Clinker=riscv64-linux-gnu-gcc -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-O3" \
+		$(SHELL) -c "cargo clean && cargo build --release --features wide --target $$p-unknown-linux-musl --verbose"
+		mv -vf target/$$p-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$p
+		chmod 555 $(CURDIR)/target/dist/sponge256sum-$$p
+	done
 
-dist: build
+doc: build
+	cd ../../app
+	RUSTFLAGS=-Dwarnings cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256
+	cp -rf target/doc $(CURDIR)/target/dist/
+	RUSTFLAGS= cargo pkgid | grep -Eo '[^@]+$$' | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//' > $(CURDIR)/target/.PKG_VERSION
+	printf '%s\n\n' "`RUSTFLAGS= cargo --version --verbose`" > $(CURDIR)/target/.RUSTC_VERSION
+	printf '%s\n' "`RUSTFLAGS= cargo rustc -- --version --verbose`" >> $(CURDIR)/target/.RUSTC_VERSION
+
+dist: doc
 	cp -f ../../.assets/html/index.html target/dist/doc/index.html
 	cp -f ../../LICENSE target/dist/LICENSE
 	printf 'Revision: %s\n' "`git describe --long --tags --always --dirty`" > target/dist/BUILD_INFO
