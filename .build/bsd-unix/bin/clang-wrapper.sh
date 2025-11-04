@@ -9,7 +9,9 @@ for arg in "$@"; do
         if [ "$arg" == "-L" ]; then
             skip_next=1
         else
-            filtered_args="$filtered_args \"$arg\""
+            if [ "$arg" != "-L/usr/lib" ]; then
+                filtered_args="$filtered_args \"$arg\""
+            fi
         fi
     fi
 done

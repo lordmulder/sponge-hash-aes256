@@ -4,13 +4,13 @@ MY_OS = unix
 MY_OUTFILENAME = $(MY_OS)
 MY_VENDOR = unknown
 
-.PHONY: all build dist doc pkg clean
+.PHONY: all build xbuild doc dist pkg clean
 
-all: pkg
+all: clean pkg
 
-build: clean
+build:
 	set -e; \
-	rm -rf target && mkdir target && mkdir target/dist; \
+	mkdir -p target/dist; \
 	ORIGINAL_DIR="`pwd`"; \
 	cd ../../app; \
 	for t in $(MY_ARCH); do \
@@ -19,6 +19,12 @@ build: clean
 		mv -f target/$$t-$(MY_VENDOR)-$(MY_OS)/release/sponge256sum $${ORIGINAL_DIR}/target/dist/sponge256sum-$$t; \
 		chmod 555 $${ORIGINAL_DIR}/target/dist/sponge256sum-$$t; \
 	done; \
+
+xbuild:
+	set -e; \
+	mkdir -p target/dist; \
+	ORIGINAL_DIR="`pwd`"; \
+	cd ../../app; \
 	for t in $(MY_XARCH); do \
 		cargo clean; \
 		RUSTC_BOOTSTRAP=1 cargo build --release --features "$(MY_FEATURES)" --target "$$t-$(MY_VENDOR)-$(MY_OS)" -Zbuild-std=std,panic_abort --verbose; \
@@ -26,8 +32,9 @@ build: clean
 		chmod 555 $${ORIGINAL_DIR}/target/dist/sponge256sum-$$t; \
 	done
 
-doc: build
+doc:
 	set -e; \
+	mkdir -p target/dist; \
 	ORIGINAL_DIR="`pwd`"; \
 	cd ../../app; \
 	RUSTFLAGS=-Dwarnings cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256; \
@@ -36,7 +43,7 @@ doc: build
 	printf '%s\n\n' "`RUSTFLAGS= cargo --version --verbose`" > $${ORIGINAL_DIR}/target/.RUSTC_VERSION; \
 	printf '%s\n' "`RUSTFLAGS= cargo rustc -- --version --verbose`" >> $${ORIGINAL_DIR}/target/.RUSTC_VERSION;
 
-dist: doc
+dist: build xbuild doc
 	set -e; \
 	cp -f ../../.assets/html/index.html target/dist/doc/index.html; \
 	cp -f ../../LICENSE target/dist/LICENSE; \

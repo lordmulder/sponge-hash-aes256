@@ -37,6 +37,9 @@ if [ -z "${SPONGE256SUM_ARCH}" ]; then
     aarch64 | arm64)
         SPONGE256SUM_ARCH="aarch64"
         ;;
+    ppc64le)
+        SPONGE256SUM_ARCH="powerpc64le"
+        ;;
     riscv64)
         SPONGE256SUM_ARCH="riscv64gc"
         ;;

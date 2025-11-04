@@ -1,18 +1,8 @@
 # [Prerequisites]
-# - sudo apt install crossbuild-essential-{i386,arm64,riscv64} ruby-dev
-# - sudo gem install --no-document fpm
-# - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.91.0
-# - rustup target add i686-unknown-linux-musl
-# - rustup target add aarch64-unknown-linux-musl
-# - rustup target add riscv64gc-unknown-linux-musl
-# - rustup target add i586-unknown-linux-musl
-# - curl -sSf -o /tmp/libllvm21.deb http://ftp.debian.org/debian/pool/main/l/llvm-toolchain-21/libllvm21_21.1.4-5_amd64.deb
-# - curl -sSf -o /tmp/llvm-21-linker-tools.deb http://ftp.debian.org/debian/pool/main/l/llvm-toolchain-21/llvm-21-linker-tools_21.1.4-5_amd64.deb
-# - curl -sSf -o /tmp/libxml2-16.deb http://ftp.debian.org/debian/pool/main/libx/libxml2/libxml2-16_2.15.1+dfsg-0.3_amd64.deb
-# - sudo apt install -y /tmp/libxml2-16.deb /tmp/libllvm21.deb /tmp/llvm-21-linker-tools.deb
+# Please see: https://github.com/lordmulder/rust-xbuild/blob/master/Dockerfile
 
-SHELL = /bin/sh
-.SHELLFLAGS = -ec
+SHELL = /bin/bash
+.SHELLFLAGS = -eo pipefail -c
 
 ifneq (Linux, $(shell uname -s))
 $(error Error: This script is supposed to run on a Linux system!)
@@ -22,15 +12,17 @@ ifneq (x86_64, $(shell uname -m))
 $(error Error: This script is supposed to run on the 'x86_64' architecture!)
 endif
 
-.ONESHELL:
-.PHONY: all build dist doc pkg clean
+override RUSTC_BOOTSTRAP :=
+unexport RUSTC_BOOTSTRAP
 
-all: pkg
+.ONESHELL:
+.PHONY: all build vbuild xbuild dist doc pkg clean
+
+all: clean pkg
 
 build:
-	rm -rf target && mkdir target && mkdir target/dist
+	mkdir -p target/dist
 	cd ../../app
-	unset RUSTC_BOOTSTRAP
 	for t in x86_64 i686 aarch64; do
 		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
 		$(SHELL) -c "cargo clean && cargo build --release --features wide --target $$t-unknown-linux-musl --verbose"
@@ -38,26 +30,30 @@ build:
 		mv -vf target/$$t-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$suffix
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-$$suffix
 	done
+
+vbuild:
+	mkdir -p target/dist
+	cd ../../app
 	for v in v2 v3 v4; do
 		RUSTFLAGS="-Dwarnings -Clinker=x86_64-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast -Ctarget-cpu=x86-64-$$v" \
 		$(SHELL) -c "cargo clean && cargo build --release --features wide --target x86_64-unknown-linux-musl --verbose"
 		mv -vf target/x86_64-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-x86_64-$$v
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-x86_64-$$v
 	done
-	for p in i586; do
-		RUSTFLAGS="-Dwarnings -Clinker=i686-linux-gnu-gcc -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-O3 -Ctarget-cpu=$$p" \
-		$(SHELL) -c "cargo clean && cargo build --release --features wide --target $$p-unknown-linux-musl --verbose"
-		mv -vf target/$$p-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$p
-		chmod 555 $(CURDIR)/target/dist/sponge256sum-$$p
-	done
-	for p in riscv64gc; do
-		RUSTFLAGS="-Dwarnings -Clinker=riscv64-linux-gnu-gcc -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-O3" \
-		$(SHELL) -c "cargo clean && cargo build --release --features wide --target $$p-unknown-linux-musl --verbose"
-		mv -vf target/$$p-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$p
-		chmod 555 $(CURDIR)/target/dist/sponge256sum-$$p
+
+xbuild:
+	mkdir -p target/dist
+	cd ../../app
+	for p in i586:i686 riscv64gc:riscv64 powerpc64le:powerpc64le; do
+		IFS=":" read -r -a q <<< "$$p"
+		RUSTFLAGS="-Dwarnings -Clinker=$${q[1]}-linux-gnu-gcc -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
+		$(SHELL) -c "cargo clean && cargo build --release --features wide --target $${q[0]}-unknown-linux-musl --verbose"
+		mv -vf target/$${q[0]}-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$${q[0]}
+		chmod 555 $(CURDIR)/target/dist/sponge256sum-$${q[0]}
 	done
 
-doc: build
+doc:
+	mkdir -p target/dist
 	cd ../../app
 	RUSTFLAGS=-Dwarnings cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256
 	cp -rf target/doc $(CURDIR)/target/dist/
@@ -65,7 +61,7 @@ doc: build
 	printf '%s\n\n' "`RUSTFLAGS= cargo --version --verbose`" > $(CURDIR)/target/.RUSTC_VERSION
 	printf '%s\n' "`RUSTFLAGS= cargo rustc -- --version --verbose`" >> $(CURDIR)/target/.RUSTC_VERSION
 
-dist: doc
+dist: build vbuild xbuild doc
 	cp -f ../../.assets/html/index.html target/dist/doc/index.html
 	cp -f ../../LICENSE target/dist/LICENSE
 	printf 'Revision: %s\n' "`git describe --long --tags --always --dirty`" > target/dist/BUILD_INFO

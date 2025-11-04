@@ -47,9 +47,9 @@ jobs:
 
   test-linux:
     runs-on: ubuntu-latest
+    needs: check
     container:
       image: rust:${{ matrix.rust }}
-    needs: check
     strategy:
       matrix:
         rust: [1.78-bookworm, 1.91-trixie]
@@ -158,28 +158,10 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-latest
-    container:
-      image: rust:1.91-trixie
     needs: [test-linux, test-windows, test-macos]
+    container:
+      image: lordmulder/rust-xbuild:1.91-trixie-r1
     steps:
-      - run: |
-          export DEBIAN_FRONTEND=noninteractive
-          apt-get update
-          apt-get install -y musl-tools crossbuild-essential-i386 crossbuild-essential-arm64 crossbuild-essential-riscv64 ruby-dev
-          gem install --no-document fpm
-          git config --global --add safe.directory '*'
-      - run: |
-          curl -sSf -o /tmp/libllvm21.deb http://ftp.debian.org/debian/pool/main/l/llvm-toolchain-21/libllvm21_21.1.4-5_amd64.deb
-          curl -sSf -o /tmp/llvm-21-linker-tools.deb http://ftp.debian.org/debian/pool/main/l/llvm-toolchain-21/llvm-21-linker-tools_21.1.4-5_amd64.deb
-          curl -sSf -o /tmp/libxml2-16.deb http://ftp.debian.org/debian/pool/main/libx/libxml2/libxml2-16_2.15.1+dfsg-0.3_amd64.deb
-          export DEBIAN_FRONTEND=noninteractive
-          apt-get install -y /tmp/libxml2-16.deb /tmp/libllvm21.deb /tmp/llvm-21-linker-tools.deb
-      - run: |
-          rustup target add x86_64-unknown-linux-musl
-          rustup target add i686-unknown-linux-musl
-          rustup target add aarch64-unknown-linux-musl
-          rustup target add riscv64gc-unknown-linux-musl
-          rustup target add i586-unknown-linux-musl
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -237,12 +219,12 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - working-directory: ${{ github.workspace }}/.build/unix
+      - working-directory: ${{ github.workspace }}/.build/bsd-unix
         run: ./build-macos.sh
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-macos
-          path: ${{ github.workspace }}/.build/unix/target/*.*
+          path: ${{ github.workspace }}/.build/bsd-unix/target/*.*
 
   build-freebsd:
     runs-on: ubuntu-latest
@@ -267,11 +249,11 @@ jobs:
             git config --global --add safe.directory '*'
           run: |
             . "$HOME/.cargo/env"
-            cd .build/unix && ./build-freebsd.sh
+            ( cd .build/bsd-unix && ./build-freebsd.sh )
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-freebsd
-          path: ${{ github.workspace }}/.build/unix/target/*.tar.xz
+          path: ${{ github.workspace }}/.build/bsd-unix/target/*.tar.xz
 
   build-netbsd:
     runs-on: ubuntu-latest
@@ -296,11 +278,11 @@ jobs:
             git config --global --add safe.directory '*'
           run: |
             . "$HOME/.cargo/env"
-            cd .build/unix && ./build-netbsd.sh
+            ( cd .build/bsd-unix && ./build-netbsd.sh )
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-netbsd
-          path: ${{ github.workspace }}/.build/unix/target/*.tar.xz
+          path: ${{ github.workspace }}/.build/bsd-unix/target/*.tar.xz
 
   build-openbsd:
     runs-on: ubuntu-latest
@@ -321,11 +303,12 @@ jobs:
             curl -sSf https://cdn.openbsd.org/pub/OpenBSD/7.8/arm64/base78.tgz | tar -C /opt/sysroot/arm64 -xzf - ./usr/lib
             git config --global --add safe.directory '*'
           run: |
-            cd .build/unix && ./build-openbsd.sh
+            cd .build/bsd-unix
+            ./build-openbsd.sh
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-openbsd
-          path: ${{ github.workspace }}/.build/unix/target/*.tar.xz
+          path: ${{ github.workspace }}/.build/bsd-unix/target/*.tar.xz
 
   build-dragonfly:
     runs-on: ubuntu-latest
@@ -343,11 +326,12 @@ jobs:
             pkg install -y rust
             git config --global --add safe.directory '*'
           run: |
-            cd .build/unix && ./build-dragonfly.sh
+            cd .build/bsd-unix
+            ./build-dragonfly.sh
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-dragonfly
-          path: ${{ github.workspace }}/.build/unix/target/*.tar.xz
+          path: ${{ github.workspace }}/.build/bsd-unix/target/*.tar.xz
 
   build-solaris:
     runs-on: ubuntu-latest
@@ -366,12 +350,12 @@ jobs:
             source <(curl -s https://raw.githubusercontent.com/psumbera/solaris-rust/refs/heads/main/sh.rust-web-install)
             git config --global --add safe.directory '*'
           run: |
-            export PATH=/root/.rust_solaris/bin:$PATH
-            cd .build/unix && ./build-solaris.sh
+            export PATH="/root/.rust_solaris/bin:$PATH"
+            ( cd .build/bsd-unix && ./build-solaris.sh )
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-solaris
-          path: ${{ github.workspace }}/.build/unix/target/*.tar.xz
+          path: ${{ github.workspace }}/.build/bsd-unix/target/*.tar.xz
 
   build-illumos:
     runs-on: ubuntu-latest
@@ -391,11 +375,11 @@ jobs:
             git config --global --add safe.directory '*'
           run: |
             . "$HOME/.cargo/env"
-            cd .build/unix && ./build-solaris.sh
+            ( cd .build/bsd-unix && ./build-solaris.sh )
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-illumos
-          path: ${{ github.workspace }}/.build/unix/target/*.tar.xz
+          path: ${{ github.workspace }}/.build/bsd-unix/target/*.tar.xz
 
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   # Deploy pages
