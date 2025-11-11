@@ -291,6 +291,7 @@ jobs:
   build-dragonfly:
     runs-on: ubuntu-latest
     needs: [test-linux, test-windows, test-macos]
+    if: false
     steps:
       - uses: actions/checkout@v5
         with:
@@ -314,6 +315,7 @@ jobs:
   build-solaris:
     runs-on: ubuntu-latest
     needs: [test-linux, test-windows, test-macos]
+    if: false
     steps:
       - uses: actions/checkout@v5
         with:

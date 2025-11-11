@@ -94,7 +94,7 @@ set "RUSTFLAGS=%DEFAULT_RUSTFLAGS%"
 
 for %%t in (x86_64 i686 aarch64) do (
 	cargo clean || goto:error
-	cargo build --release --features wide --target %%t-pc-windows-msvc --verbose || goto:error
+	cargo build --release --target %%t-pc-windows-msvc --verbose || goto:error
 	if "%%t" == "i686" (
 		copy /B /Y "target\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-pentium4.exe" || goto:error
 	) else (
@@ -105,7 +105,7 @@ for %%t in (x86_64 i686 aarch64) do (
 for %%v in (v2 v3 v4) do (
 	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-cpu=x86-64-%%v"
 	cargo clean || goto:error
-	cargo build --release --features wide --target x86_64-pc-windows-msvc --verbose || goto:error
+	cargo build --release --target x86_64-pc-windows-msvc --verbose || goto:error
 	copy /B /Y "target\x86_64-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-x86_64-%%v.exe" || goto:error
 )
 
@@ -120,7 +120,7 @@ set "RUSTFLAGS=%DEFAULT_RUSTFLAGS%"
 
 for %%t in (x86_64 i686) do (
 	cargo clean || goto:error
-	cargo build -Zbuild-std=std,panic_abort --release --features wide --target %%t-win7-windows-msvc --verbose || goto:error
+	cargo build -Zbuild-std=std,panic_abort --release --target %%t-win7-windows-msvc --verbose || goto:error
 	if "%%t" == "i686" (
 		copy /B /Y "target\%%t-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-pentium4.exe" || goto:error
 	) else (
@@ -131,7 +131,7 @@ for %%t in (x86_64 i686) do (
 for %%v in (v2 v3 v4) do (
 	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-cpu=x86-64-%%v"
 	cargo clean || goto:error
-	cargo build -Zbuild-std=std,panic_abort --release --features wide --target x86_64-win7-windows-msvc --verbose || goto:error
+	cargo build -Zbuild-std=std,panic_abort --release --target x86_64-win7-windows-msvc --verbose || goto:error
 	copy /B /Y "target\x86_64-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-x86_64-%%v.exe" || goto:error
 )
 
