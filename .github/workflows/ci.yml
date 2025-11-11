@@ -20,7 +20,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - rust: 1.78-bookworm
+          - rust: 1.89-bookworm
             clippy_opts: "-Dwarnings -Aunknown_lints"
           - rust: 1.91-trixie
             clippy_opts: "-Dwarnings"
@@ -52,7 +52,7 @@ jobs:
       image: rust:${{ matrix.rust }}
     strategy:
       matrix:
-        rust: [1.78-bookworm, 1.91-trixie]
+        rust: [1.89-bookworm, 1.91-trixie]
     env:
       TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
     steps:
@@ -68,19 +68,13 @@ jobs:
         run: |
           cargo test ${TEST_EXTRA_OPTS}
           cargo test --release ${TEST_EXTRA_OPTS}
-      - working-directory: ${{ github.workspace }}/lib
-        if: ${{ !startsWith(matrix.rust, '1.78') }}
-        run: cargo test --release --features wide ${TEST_EXTRA_OPTS}
-      - working-directory: ${{ github.workspace }}/app
-        if: ${{ !startsWith(matrix.rust, '1.78') }}
-        run: cargo test --release --features wide ${TEST_EXTRA_OPTS}
 
   test-windows:
     runs-on: windows-latest
     needs: check
     strategy:
       matrix:
-        rust: [1.78.0, 1.91.0]
+        rust: [1.89.0, 1.91.0]
         arch: [x86_64, i686]
     env:
       TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
@@ -106,23 +100,13 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc $env:TEST_EXTRA_OPTS"
           iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc --release $env:TEST_EXTRA_OPTS"
-      - working-directory: ${{ github.workspace }}/lib
-        if: ${{ !startsWith(matrix.rust, '1.78') }}
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc --release --features wide $env:TEST_EXTRA_OPTS"
-      - working-directory: ${{ github.workspace }}/app
-        if: ${{ !startsWith(matrix.rust, '1.78') }}
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc --release --features wide $env:TEST_EXTRA_OPTS"
 
   test-macos:
     runs-on: macos-latest
     needs: check
     strategy:
       matrix:
-        rust: [1.78.0, 1.91.0]
+        rust: [1.89.0, 1.91.0]
         arch: [x86_64, aarch64]
     env:
       TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
@@ -145,12 +129,6 @@ jobs:
         run: |
           cargo test --target ${{ matrix.arch }}-apple-darwin ${TEST_EXTRA_OPTS}
           cargo test --target ${{ matrix.arch }}-apple-darwin --release ${TEST_EXTRA_OPTS}
-      - working-directory: ${{ github.workspace }}/lib
-        if: ${{ !startsWith(matrix.rust, '1.78') }}
-        run: cargo test --target ${{ matrix.arch }}-apple-darwin --release --features wide ${TEST_EXTRA_OPTS}
-      - working-directory: ${{ github.workspace }}/app
-        if: ${{ !startsWith(matrix.rust, '1.78') }}
-        run: cargo test --target ${{ matrix.arch }}-apple-darwin --release --features wide ${TEST_EXTRA_OPTS}
 
   # --------------------------------------------------------------------------
   # Build
