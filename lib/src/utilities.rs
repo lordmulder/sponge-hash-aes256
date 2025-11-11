@@ -141,6 +141,7 @@ impl KeyType {
 }
 
 impl Drop for KeyType {
+    #[inline(always)]
     fn drop(&mut self) {
         Zeroize::zeroize(self.0.as_mut_slice());
     }

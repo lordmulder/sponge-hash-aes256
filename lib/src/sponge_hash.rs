@@ -17,6 +17,11 @@ pub const DEFAULT_PERMUTE_ROUNDS: usize = 1usize;
 /// The size of the internal hash computation state, in 128-Bit (16 byte) blocks.
 const STATE_LEN: usize = 3usize;
 
+/// Pre-define round keys
+static ROUND_KEY_X: BlockType = BlockType::new::<0x5Cu8>();
+static ROUND_KEY_Y: BlockType = BlockType::new::<0x36u8>();
+static ROUND_KEY_Z: BlockType = BlockType::new::<0x6Au8>();
+
 // ---------------------------------------------------------------------------
 // Tracing
 // ---------------------------------------------------------------------------
@@ -144,10 +149,6 @@ pub struct SpongeHash256<const R: usize = DEFAULT_PERMUTE_ROUNDS> {
 }
 
 impl<const R: usize> SpongeHash256<R> {
-    const ROUND_KEY_X: BlockType = BlockType::new::<0x5Cu8>();
-    const ROUND_KEY_Y: BlockType = BlockType::new::<0x36u8>();
-    const ROUND_KEY_Z: BlockType = BlockType::new::<0x6Au8>();
-
     /// Creates a new SpongeHash-AES256 instance and initializes the hash computation.
     ///
     /// **Note:** This function implies an *empty* [`info`](Self::with_info()) string.
@@ -232,7 +233,7 @@ impl<const R: usize> SpongeHash256<R> {
 
         self.state[0usize][self.offset] ^= 0x80u8;
         self.permute();
-        self.state[0usize].xor_with(&Self::ROUND_KEY_Z);
+        self.state[0usize].xor_with(&ROUND_KEY_Z);
 
         let mut pos = 0usize;
         while pos < digest_out.len() {
@@ -258,8 +259,8 @@ impl<const R: usize> SpongeHash256<R> {
             self.state[1usize].xor_with(&self.temp[1usize]);
             self.state[2usize].xor_with(&self.temp[2usize]);
 
-            self.state[1usize].xor_with(&Self::ROUND_KEY_X);
-            self.state[2usize].xor_with(&Self::ROUND_KEY_Y);
+            self.state[1usize].xor_with(&ROUND_KEY_X);
+            self.state[2usize].xor_with(&ROUND_KEY_Y);
         }
 
         trace!(self, "permfn::leave");
