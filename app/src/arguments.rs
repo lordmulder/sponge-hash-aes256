@@ -4,9 +4,9 @@
 
 use build_time::build_time_utc;
 use clap::{ArgAction, Parser};
-use const_format::{concatcp, formatcp};
+use const_format::formatcp;
 use rustc_version_const::rustc_version_full;
-use sponge_hash_aes256::{feature_enabled, version};
+use sponge_hash_aes256::version;
 use std::{
     env::consts::{ARCH, OS},
     num::NonZeroUsize,
@@ -15,32 +15,14 @@ use std::{
 use wild::args_os;
 
 // ---------------------------------------------------------------------------
-// Macros
-// ---------------------------------------------------------------------------
-
-macro_rules! have_feature {
-    ($version:expr, $feature:literal) => {
-        // Use cfg! to check the feature at compile time
-        if feature_enabled($feature) {
-            concatcp!($version, " [", $feature, "]")
-        } else {
-            $version
-        }
-    };
-}
-
-// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
 /// Build profile
 const BUILD_PROFILE: &str = if cfg!(debug_assertions) { "debug" } else { "release" };
 
-/// Internal version string
-const RAW_VERSION: &str = formatcp!("v{} [SpongeHash-AES256 v{}] [{OS}] [{ARCH}] [{BUILD_PROFILE}]", env!("CARGO_PKG_VERSION"), version());
-
 /// Version string
-pub const VERSION: &str = have_feature!(have_feature!(RAW_VERSION, "wide"), "tracing");
+pub const VERSION: &str = formatcp!("v{} [SpongeHash-AES256 v{}] [{OS}] [{ARCH}] [{BUILD_PROFILE}]", env!("CARGO_PKG_VERSION"), version());
 
 /// Full version string
 pub const LONG_VERSION: &str = formatcp!("{VERSION}\nBuilt on: {}\nCompiled using rustc version: {}", build_time_utc!("%F, %T"), rustc_version_full());

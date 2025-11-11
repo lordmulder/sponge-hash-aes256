@@ -29,4 +29,4 @@ unset RUSTC_BOOTSTRAP
 export CARGO_TARGET_X86_64_UNKNOWN_NETBSD_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort"
 export CARGO_TARGET_I586_UNKNOWN_NETBSD_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Ctarget-cpu=i586 -Clinker=clang -Clink-arg=--target=i586-unknown-netbsd -Clink-arg=--sysroot=/opt/sysroot/i386"
 
-make MY_OS=netbsd MY_ARCH=x86_64 MY_XARCH=i586 MY_FEATURES=wide
+make MY_OS=netbsd MY_ARCH=x86_64 MY_XARCH=i586

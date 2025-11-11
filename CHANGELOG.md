@@ -17,7 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Fixed a performance regression in version 1.5.1.
+- Fixed a performance regression in version 1.5.0.
 
 ## Version 1.5.0
 

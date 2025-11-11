@@ -33,4 +33,4 @@ export CARGO_TARGET_X86_64_UNKNOWN_OPENBSD_RUSTFLAGS="-Dwarnings -Ctarget-featur
 export CARGO_TARGET_I686_UNKNOWN_OPENBSD_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clinker=../.build/bsd-unix/bin/clang-wrapper.sh -Clink-arg=--target=i686-unknown-openbsd -Clink-arg=--sysroot=/opt/sysroot/i386"
 export CARGO_TARGET_AARCH64_UNKNOWN_OPENBSD_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clinker=../.build/bsd-unix/bin/clang-wrapper.sh -Clink-arg=--target=aarch64-unknown-openbsd -Clink-arg=--sysroot=/opt/sysroot/arm64"
 
-make MY_OS=openbsd MY_ARCH=x86_64 MY_XARCH="i686 aarch64" MY_FEATURES=
+make MY_OS=openbsd MY_ARCH=x86_64 MY_XARCH="i686 aarch64"

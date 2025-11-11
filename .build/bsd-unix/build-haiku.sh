@@ -14,10 +14,10 @@ unset RUSTC_BOOTSTRAP
 
 case "$(uname -m)" in
     BePC)
-        setarch x86 make MY_OS=haiku MY_ARCH=i686 MY_FEATURES=wide
+        setarch x86 make MY_OS=haiku MY_ARCH=i686
         ;;
     x86_64)
-        make MY_OS=haiku MY_ARCH=x86_64 MY_FEATURES=wide
+        make MY_OS=haiku MY_ARCH=x86_64
         ;;
     *)
         echo "Error: Unknown architecture!"

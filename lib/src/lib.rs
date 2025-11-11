@@ -24,7 +24,6 @@
 //! Feature   | Meaning
 //! --------- | -----------------------------------------------------------------------------------------------------------------------
 //! `tracing` | Dump the internal state to the logging sub-system (via `log::trace()`) after each step.
-//! `wide`    | Enable use of [`wide`](https://crates.io/crates/wide) crate to speed up some operations with SIMD on supported targets.
 //!
 //! ## Rust support
 //!
@@ -42,4 +41,4 @@ mod sponge_hash;
 mod utilities;
 
 pub use sponge_hash::{compute, compute_to_slice, SpongeHash256, DEFAULT_DIGEST_SIZE, DEFAULT_PERMUTE_ROUNDS};
-pub use utilities::{feature_enabled, version};
+pub use utilities::version;

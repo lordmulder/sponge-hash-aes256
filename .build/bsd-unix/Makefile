@@ -1,5 +1,4 @@
 MY_ARCH = x86_64
-MY_FEATURES = wide
 MY_OS = unix
 MY_OUTFILENAME = $(MY_OS)
 MY_VENDOR = unknown
@@ -15,7 +14,7 @@ build:
 	cd ../../app; \
 	for t in $(MY_ARCH); do \
 		cargo clean; \
-		cargo build --release --features "$(MY_FEATURES)" --target "$$t-$(MY_VENDOR)-$(MY_OS)" --verbose; \
+		cargo build --release --target "$$t-$(MY_VENDOR)-$(MY_OS)" --verbose; \
 		mv -f target/$$t-$(MY_VENDOR)-$(MY_OS)/release/sponge256sum $${ORIGINAL_DIR}/target/dist/sponge256sum-$$t; \
 		chmod 555 $${ORIGINAL_DIR}/target/dist/sponge256sum-$$t; \
 	done; \
@@ -27,7 +26,7 @@ xbuild:
 	cd ../../app; \
 	for t in $(MY_XARCH); do \
 		cargo clean; \
-		RUSTC_BOOTSTRAP=1 cargo build --release --features "$(MY_FEATURES)" --target "$$t-$(MY_VENDOR)-$(MY_OS)" -Zbuild-std=std,panic_abort --verbose; \
+		RUSTC_BOOTSTRAP=1 cargo build --release --target "$$t-$(MY_VENDOR)-$(MY_OS)" -Zbuild-std=std,panic_abort --verbose; \
 		mv -f target/$$t-$(MY_VENDOR)-$(MY_OS)/release/sponge256sum $${ORIGINAL_DIR}/target/dist/sponge256sum-$$t; \
 		chmod 555 $${ORIGINAL_DIR}/target/dist/sponge256sum-$$t; \
 	done

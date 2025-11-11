@@ -30,4 +30,4 @@ export CARGO_TARGET_X86_64_UNKNOWN_FREEBSD_RUSTFLAGS="-Dwarnings -Ctarget-featur
 export CARGO_TARGET_I686_UNKNOWN_FREEBSD_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort"
 export CARGO_TARGET_AARCH64_UNKNOWN_FREEBSD_RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=--sysroot=/opt/sysroot/arm64"
 
-make MY_OS=freebsd MY_ARCH="x86_64 i686" MY_XARCH=aarch64 MY_FEATURES=wide
+make MY_OS=freebsd MY_ARCH="x86_64 i686" MY_XARCH=aarch64

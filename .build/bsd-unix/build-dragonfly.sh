@@ -14,7 +14,7 @@ unset RUSTC_BOOTSTRAP
 
 case "$(uname -m)" in
     x86_64)
-        make MY_OS=dragonfly MY_ARCH=x86_64 MY_FEATURES=
+        make MY_OS=dragonfly MY_ARCH=x86_64
         ;;
     *)
         echo "Error: Unknown architecture!"

@@ -25,7 +25,7 @@ build:
 	cd ../../app
 	for t in x86_64 i686 aarch64; do
 		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
-		$(SHELL) -c "cargo clean && cargo build --release --features wide --target $$t-unknown-linux-musl --verbose"
+		$(SHELL) -c "cargo clean && cargo build --release --target $$t-unknown-linux-musl --verbose"
 		[ "$$t" = "i686" ] && suffix=pentium4 || suffix=$$t
 		mv -vf target/$$t-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$suffix
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-$$suffix
@@ -36,7 +36,7 @@ vbuild:
 	cd ../../app
 	for v in v2 v3 v4; do
 		RUSTFLAGS="-Dwarnings -Clinker=x86_64-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast -Ctarget-cpu=x86-64-$$v" \
-		$(SHELL) -c "cargo clean && cargo build --release --features wide --target x86_64-unknown-linux-musl --verbose"
+		$(SHELL) -c "cargo clean && cargo build --release --target x86_64-unknown-linux-musl --verbose"
 		mv -vf target/x86_64-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-x86_64-$$v
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-x86_64-$$v
 	done
@@ -47,7 +47,7 @@ xbuild:
 	for p in i586:i686 riscv64gc:riscv64 powerpc64le:powerpc64le; do
 		IFS=":" read -r -a q <<< "$$p"
 		RUSTFLAGS="-Dwarnings -Clinker=$${q[1]}-linux-gnu-gcc -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
-		$(SHELL) -c "cargo clean && cargo build --release --features wide --target $${q[0]}-unknown-linux-musl --verbose"
+		$(SHELL) -c "cargo clean && cargo build --release --target $${q[0]}-unknown-linux-musl --verbose"
 		mv -vf target/$${q[0]}-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$${q[0]}
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-$${q[0]}
 	done

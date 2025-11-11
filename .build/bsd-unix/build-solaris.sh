@@ -29,10 +29,10 @@ case "$(uname -m)" in
     i86pc)
         case "$(isainfo -n)" in
             i386)
-                make MY_OS=$OS_FLAVOR MY_VENDOR=$OS_VENDOR MY_FEATURES= MY_ARCH=i686
+                make MY_OS=$OS_FLAVOR MY_VENDOR=$OS_VENDOR MY_ARCH=i686
                 ;;
             amd64)
-                make MY_OS=$OS_FLAVOR MY_VENDOR=$OS_VENDOR MY_FEATURES= MY_ARCH=x86_64
+                make MY_OS=$OS_FLAVOR MY_VENDOR=$OS_VENDOR MY_ARCH=x86_64
                 ;;
             *)
                 echo "Error: Unknown architecture!"
