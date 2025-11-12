@@ -121,21 +121,19 @@ pub struct KeyType(Key<Aes256>);
 
 impl KeyType {
     /// Concatenate the two 128-bit blocks `key0` and `key1` to from a full 256-bit key
-    #[allow(clippy::uninit_assumed_init)]
     #[inline(always)]
-    fn new(key0: &BlockType, key1: &BlockType) -> Self {
-        unsafe {
-            let mut full_key = MaybeUninit::uninit();
-            let write_ptr = full_key.as_mut_ptr() as *mut [u8; BLOCK_SIZE];
-            ptr::copy_nonoverlapping(key0.as_ptr(), write_ptr, 1usize);
-            ptr::copy_nonoverlapping(key1.as_ptr(), write_ptr.add(1usize), 1usize);
-            full_key.assume_init()
-        }
+    pub const fn new() -> Self {
+        unsafe { MaybeUninit::zeroed().assume_init() }
     }
 
-    /// Get a reference to the wrapped 256-bit key
+    /// Concatenate the two 128-bit blocks `key0` and `key1` to from a full 256-bit key
     #[inline(always)]
-    fn as_key(&self) -> &Key<Aes256> {
+    pub fn concat(&mut self, key0: &BlockType, key1: &BlockType) -> &Key<Aes256> {
+        unsafe {
+            let write_ptr = self.0.as_mut_ptr() as *mut [u8; BLOCK_SIZE];
+            ptr::copy_nonoverlapping(key0.as_ptr(), write_ptr, 1usize);
+            ptr::copy_nonoverlapping(key1.as_ptr(), write_ptr.add(1usize), 1usize);
+        }
         &self.0
     }
 }
@@ -148,17 +146,36 @@ impl Drop for KeyType {
 }
 
 // ---------------------------------------------------------------------------
-// Functions
+// AES-256 Utility
 // ---------------------------------------------------------------------------
 
-/// Encrypes the 128-bit block `src` with AES-256 and stores the result in `dst`.
-///
-/// The 128 key bits from `key0` and the 128 key bits from `key1` are concatenated to form a full 256-bit key.
-#[inline]
-pub fn aes256_encrypt(dst: &mut BlockType, src: &BlockType, key0: &BlockType, key1: &BlockType) {
-    let cipher = Aes256::new(KeyType::new(key0, key1).as_key());
-    cipher.encrypt_block_b2b(src.as_array().into(), dst.as_mut_array().into());
+/// Handles encryption with the AES-256 block cipher
+pub struct Aes256Crypto {
+    key: KeyType,
 }
+
+impl Aes256Crypto {
+    /// Encrypes the 128-bit block `src` with AES-256 and stores the result in `dst`.
+    ///
+    /// The 128 key bits from `key0` and the 128 key bits from `key1` are concatenated to form a full 256-bit key.
+    #[inline]
+    pub fn encrypt(&mut self, dst: &mut BlockType, src: &BlockType, key0: &BlockType, key1: &BlockType) {
+        let cipher = Aes256::new(self.key.concat(key0, key1));
+        cipher.encrypt_block_b2b(src.as_array().into(), dst.as_mut_array().into());
+    }
+}
+
+impl Default for Aes256Crypto {
+    /// Creates a new `Aes256Processor` instance
+    #[inline]
+    fn default() -> Self {
+        Self { key: KeyType::new() }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Functions
+// ---------------------------------------------------------------------------
 
 /// Returns the version of the library as a string
 pub const fn version() -> &'static str {
@@ -181,7 +198,7 @@ mod tests {
 
         fn do_aes256_ecb(input: &BlockType, expected: &BlockType, key0: &BlockType, key1: &BlockType) {
             let mut output = BlockType::zero();
-            aes256_encrypt(&mut output, input, key0, key1);
+            Aes256Crypto::default().encrypt(&mut output, input, key0, key1);
             assert_eq!(&output, expected);
         }
 

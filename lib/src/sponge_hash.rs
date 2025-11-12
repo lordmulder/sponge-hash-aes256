@@ -2,7 +2,7 @@
 // SpongeHash-AES256
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use crate::utilities::{aes256_encrypt, BlockType, BLOCK_SIZE};
+use crate::utilities::{Aes256Crypto, BlockType, BLOCK_SIZE};
 
 /// Default digest size, in bytes
 ///
@@ -143,6 +143,7 @@ impl<const N: usize> NoneZeroArg<N> {
 /// Following the final input block, a 128-bit block filled entirely with `0x6A` bytes is absorbed into the state.
 #[repr(align(32))]
 pub struct SpongeHash256<const R: usize = DEFAULT_PERMUTE_ROUNDS> {
+    aes256: Aes256Crypto,
     state: [BlockType; STATE_LEN],
     temp: [BlockType; STATE_LEN],
     offset: usize,
@@ -162,6 +163,7 @@ impl<const R: usize> SpongeHash256<R> {
     pub fn with_info(info: &str) -> Self {
         let () = NoneZeroArg::<R>::OK;
         let mut hash = Self {
+            aes256: Aes256Crypto::default(),
             state: [BlockType::zero(), BlockType::zero(), BlockType::zero()],
             temp: [BlockType::zero(), BlockType::zero(), BlockType::zero()],
             offset: 0usize,
@@ -251,9 +253,9 @@ impl<const R: usize> SpongeHash256<R> {
         trace!(self, "permfn::enter");
 
         for _ in 0..R {
-            aes256_encrypt(&mut self.temp[0usize], &self.state[0usize], &self.state[1usize], &self.state[2usize]);
-            aes256_encrypt(&mut self.temp[1usize], &self.state[1usize], &self.state[2usize], &self.state[0usize]);
-            aes256_encrypt(&mut self.temp[2usize], &self.state[2usize], &self.state[0usize], &self.state[1usize]);
+            self.aes256.encrypt(&mut self.temp[0usize], &self.state[0usize], &self.state[1usize], &self.state[2usize]);
+            self.aes256.encrypt(&mut self.temp[1usize], &self.state[1usize], &self.state[2usize], &self.state[0usize]);
+            self.aes256.encrypt(&mut self.temp[2usize], &self.state[2usize], &self.state[0usize], &self.state[1usize]);
 
             self.state[0usize].xor_with(&self.temp[0usize]);
             self.state[1usize].xor_with(&self.temp[1usize]);
