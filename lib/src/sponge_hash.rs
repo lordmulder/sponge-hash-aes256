@@ -14,9 +14,6 @@ pub const DEFAULT_DIGEST_SIZE: usize = 2usize * BLOCK_SIZE;
 /// The default number of permutation rounds is currently defined as **1**.
 pub const DEFAULT_PERMUTE_ROUNDS: usize = 1usize;
 
-/// The size of the internal hash computation state, in 128-Bit (16 byte) blocks.
-const STATE_LEN: usize = 3usize;
-
 /// Pre-define round keys
 static ROUND_KEY_X: BlockType = BlockType::new::<0x5Cu8>();
 static ROUND_KEY_Y: BlockType = BlockType::new::<0x36u8>();
@@ -54,6 +51,23 @@ struct NoneZeroArg<const N: usize>;
 
 impl<const N: usize> NoneZeroArg<N> {
     const OK: () = assert!(N > 0, "Const generic argument must be a non-zero value!");
+}
+
+// ---------------------------------------------------------------------------
+// Scratch buffer
+// ---------------------------------------------------------------------------
+
+/// Encapsulates the temporary computation state.
+#[repr(align(32))]
+struct Scratch {
+    aes256: Aes256Crypto,
+    temp: (BlockType, BlockType, BlockType),
+}
+
+impl Default for Scratch {
+    fn default() -> Self {
+        Self { aes256: Aes256Crypto::default(), temp: (BlockType::uninit(), BlockType::uninit(), BlockType::uninit()) }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -143,9 +157,7 @@ impl<const N: usize> NoneZeroArg<N> {
 /// Following the final input block, a 128-bit block filled entirely with `0x6A` bytes is absorbed into the state.
 #[repr(align(32))]
 pub struct SpongeHash256<const R: usize = DEFAULT_PERMUTE_ROUNDS> {
-    aes256: Aes256Crypto,
-    state: [BlockType; STATE_LEN],
-    temp: [BlockType; STATE_LEN],
+    state: (BlockType, BlockType, BlockType),
     offset: usize,
 }
 
@@ -162,12 +174,7 @@ impl<const R: usize> SpongeHash256<R> {
     /// **Note:** The length of the `info` string **must not** exceed a length of 255 characters!
     pub fn with_info(info: &str) -> Self {
         let () = NoneZeroArg::<R>::OK;
-        let mut hash = Self {
-            aes256: Aes256Crypto::default(),
-            state: [BlockType::zero(), BlockType::zero(), BlockType::zero()],
-            temp: [BlockType::zero(), BlockType::zero(), BlockType::zero()],
-            offset: 0usize,
-        };
+        let mut hash = Self { state: (BlockType::zero(), BlockType::zero(), BlockType::zero()), offset: 0usize };
         hash.initialize(info.as_bytes());
         hash
     }
@@ -194,13 +201,14 @@ impl<const R: usize> SpongeHash256<R> {
     /// The internal state of the hash computation is updated by this function.
     pub fn update<T: AsRef<[u8]>>(&mut self, chunk: T) {
         trace!(self, "update::enter");
+        let mut scratch_buffer = Scratch::default();
 
         for byte in chunk.as_ref() {
-            self.state[0usize][self.offset] ^= byte;
+            self.state.0[self.offset] ^= byte;
             self.offset += 1usize;
 
             if self.offset >= BLOCK_SIZE {
-                self.permute();
+                self.permute(&mut scratch_buffer);
                 self.offset = 0usize;
             }
         }
@@ -233,15 +241,18 @@ impl<const R: usize> SpongeHash256<R> {
         trace!(self, "digest::enter");
         assert!(!digest_out.is_empty(), "Digest output size must be positive!");
 
-        self.state[0usize][self.offset] ^= 0x80u8;
-        self.permute();
-        self.state[0usize].xor_with(&ROUND_KEY_Z);
+        let mut scratch_buffer = Scratch::default();
+
+        self.state.0[self.offset] ^= 0x80u8;
+        self.permute(&mut scratch_buffer);
+        self.state.0.xor_with(&ROUND_KEY_Z);
 
         let mut pos = 0usize;
+
         while pos < digest_out.len() {
-            self.permute();
+            self.permute(&mut scratch_buffer);
             let copy_len = BLOCK_SIZE.min(digest_out.len() - pos);
-            digest_out[pos..(pos + copy_len)].copy_from_slice(&self.state[0usize][..copy_len]);
+            digest_out[pos..(pos + copy_len)].copy_from_slice(&self.state.0[..copy_len]);
             pos += copy_len;
         }
 
@@ -249,20 +260,20 @@ impl<const R: usize> SpongeHash256<R> {
     }
 
     /// Pseudorandom permutation, based on the AES-256 block cipher
-    fn permute(&mut self) {
+    fn permute(&mut self, work: &mut Scratch) {
         trace!(self, "permfn::enter");
 
         for _ in 0..R {
-            self.aes256.encrypt(&mut self.temp[0usize], &self.state[0usize], &self.state[1usize], &self.state[2usize]);
-            self.aes256.encrypt(&mut self.temp[1usize], &self.state[1usize], &self.state[2usize], &self.state[0usize]);
-            self.aes256.encrypt(&mut self.temp[2usize], &self.state[2usize], &self.state[0usize], &self.state[1usize]);
+            work.aes256.encrypt(&mut work.temp.0, &self.state.0, &self.state.1, &self.state.2);
+            work.aes256.encrypt(&mut work.temp.1, &self.state.1, &self.state.2, &self.state.0);
+            work.aes256.encrypt(&mut work.temp.2, &self.state.2, &self.state.0, &self.state.1);
 
-            self.state[0usize].xor_with(&self.temp[0usize]);
-            self.state[1usize].xor_with(&self.temp[1usize]);
-            self.state[2usize].xor_with(&self.temp[2usize]);
+            self.state.0.xor_with(&work.temp.0);
+            self.state.1.xor_with(&work.temp.1);
+            self.state.2.xor_with(&work.temp.2);
 
-            self.state[1usize].xor_with(&ROUND_KEY_X);
-            self.state[2usize].xor_with(&ROUND_KEY_Y);
+            self.state.1.xor_with(&ROUND_KEY_X);
+            self.state.2.xor_with(&ROUND_KEY_Y);
         }
 
         trace!(self, "permfn::leave");

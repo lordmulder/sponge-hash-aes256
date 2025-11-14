@@ -46,6 +46,14 @@ impl BlockType {
         unsafe { Self(MaybeUninit::zeroed().assume_init()) }
     }
 
+    /// Create a new block that is *not* initialized to any particular state
+    #[allow(invalid_value)]
+    #[allow(clippy::uninit_assumed_init)]
+    #[inline(always)]
+    pub const fn uninit() -> Self {
+        unsafe { Self(MaybeUninit::uninit().assume_init()) }
+    }
+
     /// Computes the bit-wise XOR of `other` and *self*, stores the result "in-place" in *self*
     #[inline(always)]
     pub fn xor_with(&mut self, other: &Self) {
@@ -107,7 +115,7 @@ impl PartialEq for BlockType {
 impl Drop for BlockType {
     #[inline(always)]
     fn drop(&mut self) {
-        Zeroize::zeroize(self.0.as_mut_array());
+        self.0.as_mut_array().zeroize();
     }
 }
 
@@ -121,9 +129,11 @@ pub struct KeyType(Key<Aes256>);
 
 impl KeyType {
     /// Concatenate the two 128-bit blocks `key0` and `key1` to from a full 256-bit key
+    #[allow(invalid_value)]
+    #[allow(clippy::uninit_assumed_init)]
     #[inline(always)]
-    pub const fn new() -> Self {
-        unsafe { MaybeUninit::zeroed().assume_init() }
+    pub const fn uninit() -> Self {
+        unsafe { MaybeUninit::uninit().assume_init() }
     }
 
     /// Concatenate the two 128-bit blocks `key0` and `key1` to from a full 256-bit key
@@ -141,7 +151,7 @@ impl KeyType {
 impl Drop for KeyType {
     #[inline(always)]
     fn drop(&mut self) {
-        Zeroize::zeroize(self.0.as_mut_slice());
+        self.0.as_mut_slice().zeroize();
     }
 }
 
@@ -169,7 +179,7 @@ impl Default for Aes256Crypto {
     /// Creates a new `Aes256Processor` instance
     #[inline]
     fn default() -> Self {
-        Self { key: KeyType::new() }
+        Self { key: KeyType::uninit() }
     }
 }
 
