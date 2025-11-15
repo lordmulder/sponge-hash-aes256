@@ -96,7 +96,7 @@ for %%t in (x86_64 i686 aarch64) do (
 	cargo clean || goto:error
 	cargo build --release --target %%t-pc-windows-msvc --verbose || goto:error
 	if "%%t" == "i686" (
-		copy /B /Y "target\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-pentium4.exe" || goto:error
+		copy /B /Y "target\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-i686-sse2.exe" || goto:error
 	) else (
 		copy /B /Y "target\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-%%t.exe" || goto:error
 	)
@@ -107,6 +107,24 @@ for %%v in (v2 v3 v4) do (
 	cargo clean || goto:error
 	cargo build --release --target x86_64-pc-windows-msvc --verbose || goto:error
 	copy /B /Y "target\x86_64-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-x86_64-%%v.exe" || goto:error
+)
+
+for %%t in (x86_64 i686) do (
+	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-feature=+aes"
+	cargo clean || goto:error
+	cargo build --release --target %%t-pc-windows-msvc --verbose || goto:error
+	if "%%t" == "i686" (
+		copy /B /Y "target\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-i686-sse2-aes_ni.exe" || goto:error
+	) else (
+		copy /B /Y "target\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-%%t-aes_ni.exe" || goto:error
+	)
+)
+
+for %%v in (v2 v3 v4) do (
+	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-cpu=x86-64-%%v -Ctarget-feature=+aes"
+	cargo clean || goto:error
+	cargo build --release --target x86_64-pc-windows-msvc --verbose || goto:error
+	copy /B /Y "target\x86_64-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-x86_64-%%v-aes_ni.exe" || goto:error
 )
 
 REM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -122,7 +140,7 @@ for %%t in (x86_64 i686) do (
 	cargo clean || goto:error
 	cargo build -Zbuild-std=std,panic_abort --release --target %%t-win7-windows-msvc --verbose || goto:error
 	if "%%t" == "i686" (
-		copy /B /Y "target\%%t-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-pentium4.exe" || goto:error
+		copy /B /Y "target\%%t-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-i686-sse2.exe" || goto:error
 	) else (
 		copy /B /Y "target\%%t-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-%%t.exe" || goto:error
 	)
@@ -133,6 +151,24 @@ for %%v in (v2 v3 v4) do (
 	cargo clean || goto:error
 	cargo build -Zbuild-std=std,panic_abort --release --target x86_64-win7-windows-msvc --verbose || goto:error
 	copy /B /Y "target\x86_64-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-x86_64-%%v.exe" || goto:error
+)
+
+for %%t in (x86_64 i686) do (
+	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-feature=+aes"
+	cargo clean || goto:error
+	cargo build -Zbuild-std=std,panic_abort --release --target %%t-win7-windows-msvc --verbose || goto:error
+	if "%%t" == "i686" (
+		copy /B /Y "target\%%t-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-i686-sse2-aes_ni.exe" || goto:error
+	) else (
+		copy /B /Y "target\%%t-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-%%t-aes_ni.exe" || goto:error
+	)
+)
+
+for %%v in (v2 v3 v4) do (
+	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-cpu=x86-64-%%v -Ctarget-feature=+aes"
+	cargo clean || goto:error
+	cargo build -Zbuild-std=std,panic_abort --release --target x86_64-win7-windows-msvc --verbose || goto:error
+	copy /B /Y "target\x86_64-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-x86_64-%%v-aes_ni.exe" || goto:error
 )
 
 REM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~

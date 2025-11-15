@@ -16,7 +16,7 @@ override RUSTC_BOOTSTRAP :=
 unexport RUSTC_BOOTSTRAP
 
 .ONESHELL:
-.PHONY: all build vbuild xbuild dist doc pkg clean
+.PHONY: all build vbuild wbuild xbuild dist doc pkg clean
 
 all: clean pkg
 
@@ -26,7 +26,7 @@ build:
 	for t in x86_64 i686 aarch64; do
 		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
 		$(SHELL) -c "cargo clean && cargo build --release --target $$t-unknown-linux-musl --verbose"
-		[ "$$t" = "i686" ] && suffix=pentium4 || suffix=$$t
+		[ "$$t" = "i686" ] && suffix=i686-sse2 || suffix=$$t
 		mv -vf target/$$t-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$suffix
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-$$suffix
 	done
@@ -39,6 +39,23 @@ vbuild:
 		$(SHELL) -c "cargo clean && cargo build --release --target x86_64-unknown-linux-musl --verbose"
 		mv -vf target/x86_64-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-x86_64-$$v
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-x86_64-$$v
+	done
+
+wbuild:
+	mkdir -p target/dist
+	cd ../../app
+	for t in x86_64 i686; do
+		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static,+aes -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
+		$(SHELL) -c "cargo clean && cargo build --release --target $$t-unknown-linux-musl --verbose"
+		[ "$$t" = "i686" ] && suffix=i686-sse2-aes_ni || suffix=$$t-aes_ni
+		mv -vf target/$$t-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$suffix
+		chmod 555 $(CURDIR)/target/dist/sponge256sum-$$suffix
+	done
+	for v in v2 v3 v4; do
+		RUSTFLAGS="-Dwarnings -Clinker=x86_64-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static,+aes -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast -Ctarget-cpu=x86-64-$$v" \
+		$(SHELL) -c "cargo clean && cargo build --release --target x86_64-unknown-linux-musl --verbose"
+		mv -vf target/x86_64-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-x86_64-$$v-aes_ni
+		chmod 555 $(CURDIR)/target/dist/sponge256sum-x86_64-$$v-aes_ni
 	done
 
 xbuild:
@@ -61,7 +78,7 @@ doc:
 	printf '%s\n\n' "`RUSTFLAGS= cargo --version --verbose`" > $(CURDIR)/target/.RUSTC_VERSION
 	printf '%s\n' "`RUSTFLAGS= cargo rustc -- --version --verbose`" >> $(CURDIR)/target/.RUSTC_VERSION
 
-dist: build vbuild xbuild doc
+dist: build vbuild wbuild xbuild doc
 	cp -f ../../.assets/html/index.html target/dist/doc/index.html
 	cp -f ../../LICENSE target/dist/LICENSE
 	printf 'Revision: %s\n' "`git describe --long --tags --always --dirty`" > target/dist/BUILD_INFO
