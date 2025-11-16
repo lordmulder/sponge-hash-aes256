@@ -102,7 +102,7 @@ for %%t in (x86_64 i686 aarch64) do (
 	)
 )
 
-for %%v in (v2 v3 v4) do (
+for %%v in (v2 v3) do (
 	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-cpu=x86-64-%%v"
 	cargo clean || goto:error
 	cargo build --release --target x86_64-pc-windows-msvc --verbose || goto:error
@@ -120,7 +120,7 @@ for %%t in (x86_64 i686) do (
 	)
 )
 
-for %%v in (v2 v3 v4) do (
+for %%v in (v2 v3) do (
 	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-cpu=x86-64-%%v -Ctarget-feature=+aes"
 	cargo clean || goto:error
 	cargo build --release --target x86_64-pc-windows-msvc --verbose || goto:error
@@ -146,7 +146,7 @@ for %%t in (x86_64 i686) do (
 	)
 )
 
-for %%v in (v2 v3 v4) do (
+for %%v in (v2 v3) do (
 	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-cpu=x86-64-%%v"
 	cargo clean || goto:error
 	cargo build -Zbuild-std=std,panic_abort --release --target x86_64-win7-windows-msvc --verbose || goto:error
@@ -164,7 +164,7 @@ for %%t in (x86_64 i686) do (
 	)
 )
 
-for %%v in (v2 v3 v4) do (
+for %%v in (v2 v3) do (
 	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-cpu=x86-64-%%v -Ctarget-feature=+aes"
 	cargo clean || goto:error
 	cargo build -Zbuild-std=std,panic_abort --release --target x86_64-win7-windows-msvc --verbose || goto:error

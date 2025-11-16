@@ -22,9 +22,6 @@ if [[ ! -v SPONGE256SUM_ARCH || -z "${SPONGE256SUM_ARCH}" ]]; then
                 SPONGE256SUM_ARCH="x86_64-v2"
                 if cpu_features avx avx2 bmi1 bmi2 f16c fma abm movbe xsave; then
                     SPONGE256SUM_ARCH="x86_64-v3"
-                    if cpu_features avx512f avx512bw avx512cd avx512dq avx512vl; then
-                        SPONGE256SUM_ARCH="x86_64-v4"
-                    fi
                 fi
             fi
             if cpu_features aes; then

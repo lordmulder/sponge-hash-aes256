@@ -34,7 +34,7 @@ build:
 vbuild:
 	mkdir -p target/dist
 	cd ../../app
-	for v in v2 v3 v4; do
+	for v in v2 v3; do
 		RUSTFLAGS="-Dwarnings -Clinker=x86_64-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast -Ctarget-cpu=x86-64-$$v" \
 		$(SHELL) -c "cargo clean && cargo build --release --target x86_64-unknown-linux-musl --verbose"
 		mv -vf target/x86_64-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-x86_64-$$v
@@ -51,7 +51,7 @@ wbuild:
 		mv -vf target/$$t-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-$$suffix
 		chmod 555 $(CURDIR)/target/dist/sponge256sum-$$suffix
 	done
-	for v in v2 v3 v4; do
+	for v in v2 v3; do
 		RUSTFLAGS="-Dwarnings -Clinker=x86_64-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static,+aes -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast -Ctarget-cpu=x86-64-$$v" \
 		$(SHELL) -c "cargo clean && cargo build --release --target x86_64-unknown-linux-musl --verbose"
 		mv -vf target/x86_64-unknown-linux-musl/release/sponge256sum $(CURDIR)/target/dist/sponge256sum-x86_64-$$v-aes_ni
