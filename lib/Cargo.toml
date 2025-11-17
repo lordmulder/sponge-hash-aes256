@@ -12,7 +12,7 @@ no_std = true
 
 [dependencies]
 aes = { version = "0.9.0-rc.2", default-features = false }
-wide = { version = "0.8.2", default-features = false }
+wide = { version = "0.8.3", default-features = false }
 zeroize = { version = "1.8.2", default-features = false }
 
 # Optional dependencies

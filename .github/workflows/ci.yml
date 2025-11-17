@@ -53,21 +53,24 @@ jobs:
     strategy:
       matrix:
         rust: [1.89-bookworm, 1.91-trixie]
+        proj: [lib, app]
+        arch: [x86_64, i686]
     env:
       TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
     steps:
+      - if:  ${{ matrix.arch == 'i686' }}
+        run: |
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update -qq && apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386
+          rustup target add i686-unknown-linux-gnu
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - working-directory: ${{ github.workspace }}/lib
+      - working-directory: ${{ github.workspace }}/${{ matrix.proj }}
         run: |
-          cargo test ${TEST_EXTRA_OPTS}
-          cargo test --release ${TEST_EXTRA_OPTS}
-      - working-directory: ${{ github.workspace }}/app
-        run: |
-          cargo test ${TEST_EXTRA_OPTS}
-          cargo test --release ${TEST_EXTRA_OPTS}
+          cargo test --target ${{ matrix.arch }}-unknown-linux-gnu ${TEST_EXTRA_OPTS}
+          cargo test --target ${{ matrix.arch }}-unknown-linux-gnu --release ${TEST_EXTRA_OPTS}
 
   test-windows:
     runs-on: windows-latest
@@ -75,6 +78,7 @@ jobs:
     strategy:
       matrix:
         rust: [1.89.0, 1.91.1]
+        proj: [lib, app]
         arch: [x86_64, i686]
     env:
       TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
@@ -90,12 +94,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - working-directory: ${{ github.workspace }}/lib
-        run: |
-          $PSNativeCommandUseErrorActionPreference = $true
-          iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc $env:TEST_EXTRA_OPTS"
-          iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc --release $env:TEST_EXTRA_OPTS"
-      - working-directory: ${{ github.workspace }}/app
+      - working-directory: ${{ github.workspace }}/${{ matrix.proj }}
         run: |
           $PSNativeCommandUseErrorActionPreference = $true
           iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc $env:TEST_EXTRA_OPTS"
@@ -107,6 +106,7 @@ jobs:
     strategy:
       matrix:
         rust: [1.89.0, 1.91.1]
+        proj: [lib, app]
         arch: [x86_64, aarch64]
     env:
       TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
@@ -121,11 +121,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - working-directory: ${{ github.workspace }}/lib
-        run: |
-          cargo test --target ${{ matrix.arch }}-apple-darwin ${TEST_EXTRA_OPTS}
-          cargo test --target ${{ matrix.arch }}-apple-darwin --release ${TEST_EXTRA_OPTS}
-      - working-directory: ${{ github.workspace }}/app
+      - working-directory: ${{ github.workspace }}/${{ matrix.proj }}
         run: |
           cargo test --target ${{ matrix.arch }}-apple-darwin ${TEST_EXTRA_OPTS}
           cargo test --target ${{ matrix.arch }}-apple-darwin --release ${TEST_EXTRA_OPTS}
