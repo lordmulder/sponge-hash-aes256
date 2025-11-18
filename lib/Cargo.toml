@@ -20,7 +20,7 @@ log = { version = "0.4.28", default-features = false, optional = true }
 
 [dev-dependencies]
 hex = { version = "0.4.3", default-features = false }
-hex-literal = { version = "=0.4.1", default-features = false }
+hex-literal = { version = "1.1.0", default-features = false }
 semver = { version = "1.0.27", default-features = false }
 simple_logger = { version = "5.1.0", default-features = false }
 

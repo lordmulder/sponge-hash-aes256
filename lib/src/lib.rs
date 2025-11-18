@@ -27,7 +27,7 @@
 //!
 //! ## Rust support
 //!
-//! This crate uses Rust edition 2021, and requires `rustc` version 1.78.0 or newer.
+//! This crate uses Rust edition 2021, and requires `rustc` version 1.89.0 or newer.
 //!
 //! ## License
 //!

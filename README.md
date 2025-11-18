@@ -117,7 +117,7 @@ Following the final input block, a 128-bit block filled entirely with `0x6A` byt
 
 ## Platform support
 
-This crate uses Rust edition 2021, and requires `rustc` version 1.78.0 or newer.
+This crate uses Rust edition 2021, and requires `rustc` version 1.89.0 or newer.
 
 The following targets are officially supported, other platforms may function but are **not** guaranteed:
 

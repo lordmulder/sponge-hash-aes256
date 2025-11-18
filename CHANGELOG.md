@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 1.6.0
+
+### Added
+
+- Added dedicated i686 and x86-64 builds with AES-NI enabled to the GitHub CI workflow.
+
+### Changed
+
+- Various significant performance improvements in the "core" library.
+- Updated `aes` from version 0.8.4 to version 0.9.0 (rc-2) and dropped `generic_array` dependency.
+- Updated GitHub workflow (CI) to create builds with Rust version 1.91.1 (2025-11-10).
+
+### Removed
+
+- Removed `wide` feature, as the `wide` dependency is now always enabled.
+
 ## Version 1.5.1
 
 ### Added
