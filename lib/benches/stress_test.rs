@@ -3,6 +3,7 @@
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use hex::encode_to_slice;
+use rolling_median::Median;
 use sponge_hash_aes256::{compute as compute_hash, DEFAULT_DIGEST_SIZE};
 use std::{
     borrow::Cow,
@@ -15,17 +16,27 @@ use std::{
 };
 
 // ---------------------------------------------------------------------------
+// Environment
+// ---------------------------------------------------------------------------
+
+macro_rules! trim_env {
+    ($name:expr) => {
+        option_env!($name).map(str::trim).filter(|str| !str.is_empty())
+    };
+}
+
+// ---------------------------------------------------------------------------
 // Stress test
 // ---------------------------------------------------------------------------
 
-const PROGRESS_UPDATE_CYCLE: usize = 9973usize;
+const PROGRESS_UPDATE_CYCLE: usize = 99839usize;
 
-fn stress_test() {
+fn stress_test() -> Duration {
     let mut set: HashSet<[u8; DEFAULT_DIGEST_SIZE]> = HashSet::new();
     let mut counter = 1usize;
 
-    let input_file_name: Cow<Path> = match option_env!("SPONGE_BENCH_INPUT_FILE").map(str::trim) {
-        Some(path) if !path.is_empty() => Path::new(path).into(),
+    let input_file_name: Cow<Path> = match trim_env!("SPONGE_BENCH_SOURCE") {
+        Some(path) => Path::new(path).into(),
         _ => Path::new(env!("CARGO_MANIFEST_DIR")).join("benches").join("data").join("input.txt").into(),
     };
 
@@ -36,6 +47,8 @@ fn stress_test() {
             process::exit(1);
         }
     };
+
+    let start_time = Instant::now();
 
     for line in BufReader::new(file).lines() {
         match line {
@@ -52,8 +65,12 @@ fn stress_test() {
         }
     }
 
+    let time_elapsed = start_time.elapsed();
+
     println!("All items inserted.");
     println!("Total number of unique items is: {}", set.len());
+
+    time_elapsed
 }
 
 #[inline(always)]
@@ -81,20 +98,14 @@ fn process_input(set: &mut HashSet<[u8; DEFAULT_DIGEST_SIZE]>, counter: &mut usi
 // Main
 // ---------------------------------------------------------------------------
 
-const NUM_RUNS: usize = 3usize;
-
 fn main() {
-    let mut measurements = [Duration::default(); NUM_RUNS];
+    let passes = trim_env!("SPONGE_BENCH_PASSES").and_then(|str| str.parse().ok()).filter(|val| *val >= 1u16).unwrap_or(3u16);
+    let mut rolling_median = Median::new();
 
-    for i in 0usize..NUM_RUNS {
-        let start_time = Instant::now();
-        stress_test();
-        measurements[i] = start_time.elapsed();
+    for _i in 0u16..passes {
+        rolling_median.push(stress_test().as_secs_f64());
         println!("--------");
     }
 
-    measurements.sort();
-    let median = measurements[NUM_RUNS / 2usize];
-
-    println!("Median execution time: {:.2} seconds.", median.as_secs_f64());
+    println!("Median execution time: {:.2} seconds.", rolling_median.get().unwrap_or(f64::MAX));
 }
