@@ -12,7 +12,7 @@ use core::{
     ptr,
 };
 use wide::u8x16;
-use zeroize::Zeroize;
+use zeroize::zeroize_flat_type;
 
 pub const BLOCK_SIZE: usize = 16usize;
 pub const ZERO: u8x16 = u8x16::ZERO;
@@ -115,7 +115,9 @@ impl PartialEq for BlockType {
 impl Drop for BlockType {
     #[inline(always)]
     fn drop(&mut self) {
-        self.0.as_mut_array().zeroize();
+        unsafe {
+            zeroize_flat_type(self);
+        }
     }
 }
 
@@ -151,7 +153,9 @@ impl KeyType {
 impl Drop for KeyType {
     #[inline(always)]
     fn drop(&mut self) {
-        self.0.as_mut_slice().zeroize();
+        unsafe {
+            zeroize_flat_type(self);
+        }
     }
 }
 
