@@ -4,7 +4,7 @@
 
 use aes::{
     cipher::{BlockCipherEncrypt, Key, KeyInit},
-    Aes256,
+    Aes256Enc,
 };
 use core::{
     mem::MaybeUninit,
@@ -125,7 +125,7 @@ impl Drop for BlockType {
 
 /// Represents an aligned 256-Bit key
 #[repr(align(32))]
-pub struct KeyType(Key<Aes256>);
+pub struct KeyType(Key<Aes256Enc>);
 
 impl KeyType {
     /// Concatenate the two 128-bit blocks `key0` and `key1` to from a full 256-bit key
@@ -138,7 +138,7 @@ impl KeyType {
 
     /// Concatenate the two 128-bit blocks `key0` and `key1` to from a full 256-bit key
     #[inline(always)]
-    pub fn concat(&mut self, key0: &BlockType, key1: &BlockType) -> &Key<Aes256> {
+    pub fn concat(&mut self, key0: &BlockType, key1: &BlockType) -> &Key<Aes256Enc> {
         unsafe {
             let write_ptr = self.0.as_mut_ptr() as *mut [u8; BLOCK_SIZE];
             ptr::copy_nonoverlapping(key0.as_ptr(), write_ptr, 1usize);
@@ -170,7 +170,7 @@ impl Aes256Crypto {
     /// The 128 key bits from `key0` and the 128 key bits from `key1` are concatenated to form a full 256-bit key.
     #[inline]
     pub fn encrypt(&mut self, dst: &mut BlockType, src: &BlockType, key0: &BlockType, key1: &BlockType) {
-        let cipher = Aes256::new(self.key.concat(key0, key1));
+        let cipher = Aes256Enc::new(self.key.concat(key0, key1));
         cipher.encrypt_block_b2b(src.as_array().into(), dst.as_mut_array().into());
     }
 }
