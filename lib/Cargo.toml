@@ -1,11 +1,14 @@
 [package]
 name = "sponge-hash-aes256"
 description = "A sponge-based secure hash function that uses AES-256 as its internal PRF"
+authors = ["LoRd_MuldeR <mulder2@gmx.de>"]
 license = "0BSD"
 repository = "https://github.com/lordmulder/sponge-hash-aes256/"
 readme = "../README.crates.md"
 edition = "2021"
 version = "1.6.1"
+categories = ["algorithms", "cryptography", "no-std", "security"]
+keywords = ["hash", "digest", "sponge", "crypto", "aes"]
 
 [package.metadata]
 no_std = true
@@ -27,7 +30,7 @@ simple_logger = { version = "5.1.0", default-features = false }
 
 [features]
 default = []
-tracing = [ "dep:log" ]
+tracing = ["dep:log"]
 
 [profile.release]
 opt-level = 3

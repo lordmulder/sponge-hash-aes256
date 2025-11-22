@@ -1,17 +1,20 @@
 [package]
 name = "sponge256sum"
 description = "A sponge-based secure hash function that uses AES-256 as its internal PRF"
+authors = ["LoRd_MuldeR <mulder2@gmx.de>"]
 license = "0BSD"
 repository = "https://github.com/lordmulder/sponge-hash-aes256/"
 readme = "../README.crates.md"
 edition = "2021"
 version = "1.6.1"
+categories = ["algorithms", "cryptography", "no-std", "security"]
+keywords = ["hash", "digest", "sponge", "crypto", "aes"]
 
 [dependencies]
 build-time = { version = "0.1.3", default-features = false }
-clap = { version = "4.5.53", default-features = false, features = [ "std", "derive", "help", "usage", "error-context" ] }
+clap = { version = "4.5.53", default-features = false, features = ["std", "derive", "help", "usage", "error-context"] }
 const_format = { version = "0.2.35", default-features = false }
-crossbeam-channel = { version = "0.5.15", default-features = false, features = [ "std" ] }
+crossbeam-channel = { version = "0.5.15", default-features = false, features = ["std"] }
 ctrlc = { version = "3.5.1", default-features = false }
 hex = { version = "0.4.3", default-features = true }
 hex-literal = { version = "1.1.0", default-features = false }
@@ -24,7 +27,7 @@ sponge-hash-aes256 = { path = "../lib", default-features = false }
 wild = { version = "2.2.1", default-features = false }
 
 [dev-dependencies]
-regex = { version = "1.12.2", default-features = false, features = [ "unicode" ] }
+regex = { version = "1.12.2", default-features = false, features = ["unicode"] }
 
 [profile.release]
 opt-level = 3
