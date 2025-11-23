@@ -193,7 +193,7 @@ impl Default for Aes256Crypto {
 
 /// Returns the version of the library as a string
 pub const fn version() -> &'static str {
-    const PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
+    static PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
     PKG_VERSION
 }
 
