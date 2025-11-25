@@ -2,7 +2,8 @@
 // SpongeHash-AES256
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use crate::utilities::{Aes256Crypto, BlockType, BLOCK_SIZE};
+use crate::utilities::{length, Aes256Crypto, BlockType, BLOCK_SIZE};
+use core::ops::Range;
 
 /// Default digest size, in bytes
 ///
@@ -180,6 +181,7 @@ impl<const R: usize> SpongeHash256<R> {
     }
 
     /// Initializes the internal state with the given `info` string
+    #[inline]
     fn initialize(&mut self, info_data: &[u8]) {
         trace!(self, "initlz::enter");
 
@@ -199,21 +201,59 @@ impl<const R: usize> SpongeHash256<R> {
     /// A `chunk` can be of *any* type that implements the [`AsRef<[u8]>`](AsRef<T>) trait, e.g., `&[u8]`, `&str` or `String`.
     ///
     /// The internal state of the hash computation is updated by this function.
+    #[inline]
     pub fn update<T: AsRef<[u8]>>(&mut self, chunk: T) {
         trace!(self, "update::enter");
-        let mut scratch_buffer = Scratch::default();
 
-        for byte in chunk.as_ref() {
-            self.state.0[self.offset] ^= byte;
-            self.offset += 1usize;
-
-            if self.offset >= BLOCK_SIZE {
-                self.permute(&mut scratch_buffer);
-                self.offset = 0usize;
+        let source = chunk.as_ref().as_ptr_range();
+        if !source.is_empty() {
+            unsafe {
+                self.update_range(source);
             }
         }
 
         trace!(self, "update::leave");
+    }
+
+    /// Processes the next chunk of "raw" bytes, as specified by the [`Range<*const u8>`](slice::as_ptr_range) in the `source` parameter.
+    ///
+    /// The internal state of the hash computation is updated by this function.
+    ///
+    /// # Safety
+    ///
+    /// The caller **must** ensure that *all* byte addresses in the range from `source.start` up to but excluding `source.end` are valid!
+    #[inline]
+    pub unsafe fn update_range(&mut self, source: Range<*const u8>) {
+        let mut source_next = source.start;
+        let mut scratch_buffer = Scratch::default();
+
+        while (self.offset != 0usize) && (source_next < source.end) {
+            self.state.0[self.offset] ^= *source_next;
+            self.offset += 1usize;
+            if self.offset >= BLOCK_SIZE {
+                self.permute(&mut scratch_buffer);
+                self.offset = 0usize;
+            }
+            source_next = source_next.add(1usize);
+        }
+
+        if source_next < source.end {
+            while length(source_next, source.end) >= BLOCK_SIZE {
+                self.state.0.xor_with_u8_ptr(source_next);
+                self.permute(&mut scratch_buffer);
+                source_next = source_next.add(BLOCK_SIZE);
+            }
+
+            while source_next < source.end {
+                self.state.0[self.offset] ^= *source_next;
+                self.offset += 1usize;
+                if self.offset >= BLOCK_SIZE {
+                    self.permute(&mut scratch_buffer);
+                    self.offset = 0usize;
+                }
+                source_next = source_next.add(1usize);
+            }
+        }
     }
 
     /// Concludes the hash computation and returns the final digest.
@@ -260,6 +300,7 @@ impl<const R: usize> SpongeHash256<R> {
     }
 
     /// Pseudorandom permutation, based on the AES-256 block cipher
+    #[inline]
     fn permute(&mut self, work: &mut Scratch) {
         trace!(self, "permfn::enter");
 

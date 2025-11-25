@@ -1,11 +1,11 @@
 @echo off
-cd /d "%~dp0"
+cd /d "%~dp0.."
 
 for %%i in (lib app) do (
 	echo -------------------------------
 	echo -------------[%%i]-------------
 	echo -------------------------------
-	pushd "..\%%~i" || goto:error
+	pushd "%%~i" || goto:error
 	cargo clean || goto:error
 	cargo upgrade || goto:error
 	cargo update || goto:error

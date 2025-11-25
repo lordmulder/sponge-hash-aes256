@@ -60,8 +60,15 @@ impl BlockType {
         self.0 ^= other.0;
     }
 
+    /// Computes the bit-wise XOR of `raw_data` and *self*, stores the result "in-place" in *self*
+    #[inline(always)]
+    pub fn xor_with_u8_ptr(&mut self, raw_data: *const u8) {
+        unsafe {
+            self.0 ^= u8x16::new(*raw_data.cast::<[u8; BLOCK_SIZE]>());
+        }
+    }
+
     /// Get a `&[u8; BLOCK_SIZE]` reference to the contained data
-    #[allow(dead_code)]
     #[inline(always)]
     fn as_array(&self) -> &[u8; BLOCK_SIZE] {
         self.0.as_array()
@@ -190,6 +197,13 @@ impl Default for Aes256Crypto {
 // ---------------------------------------------------------------------------
 // Functions
 // ---------------------------------------------------------------------------
+
+/// Determines the length, in bytes, of the range specified by two "raw" adjacent pointers
+#[inline(always)]
+pub fn length(from: *const u8, to: *const u8) -> usize {
+    debug_assert!(to >= from);
+    unsafe { to.offset_from(from) as usize }
+}
 
 /// Returns the version of the library as a string
 pub const fn version() -> &'static str {
