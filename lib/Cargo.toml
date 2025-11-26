@@ -39,5 +39,9 @@ codegen-units = 1
 strip = true
 
 [[bench]]
+name = "perf_test"
+harness = false
+
+[[bench]]
 name = "stress_test"
 harness = false

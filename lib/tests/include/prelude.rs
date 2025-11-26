@@ -13,6 +13,19 @@ fn encode<'a>(buffer: &'a mut [u8], data: &[u8]) -> &'a str {
     }
 }
 
+fn digest_equal(digest_a: &[u8], digest_b: &[u8]) -> bool {
+    if digest_a.len() != digest_b.len() {
+        return false;
+    }
+
+    let mut bit_diff = 0u8;
+    for (x, y) in digest_a.iter().cloned().zip(digest_b.iter().cloned()) {
+        bit_diff |= x ^ y;
+    }
+
+    bit_diff == 0u8
+}
+
 fn assert_digest_eq<const N: usize>(computed: &[u8; N], expected: &[u8; N]) {
     const BUFF_SIZE: usize = 64usize;
 
@@ -20,9 +33,8 @@ fn assert_digest_eq<const N: usize>(computed: &[u8; N], expected: &[u8; N]) {
     let mut hex_expected = [0u8; BUFF_SIZE];
 
     assert!(BUFF_SIZE >= 2usize * N);
-    assert_eq!(
-        computed, expected,
-        "Hash mismatch detected:\nexpected=0x{},\ncomputed=0x{}",
-        encode(&mut hex_expected, expected), encode(&mut hex_computed, computed)
+    assert!(
+        digest_equal(computed, expected),
+        "Hash mismatch detected:\nexpected=0x{},\ncomputed=0x{}", encode(&mut hex_expected, expected), encode(&mut hex_computed, computed)
     );
 }

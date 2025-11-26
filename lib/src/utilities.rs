@@ -317,15 +317,18 @@ mod tests {
 
         fn do_xor_arrays(input0: &BlockType, input1: &BlockType) {
             let mut output_xor = input0.clone();
+            let mut output_ptr = input0.clone();
             let mut output_ref = input0.clone();
 
             output_xor.xor_with(input1);
+            output_ptr.xor_with_u8_ptr(input1.as_array().as_ptr());
 
             for (dst, src) in output_ref.as_mut_array().iter_mut().zip(input1.as_array().iter()) {
                 *dst ^= src;
             }
 
             assert_eq!(&output_xor, &output_ref);
+            assert_eq!(&output_ptr, &output_ref);
         }
 
         #[test]
@@ -357,6 +360,50 @@ mod tests {
             do_xor_arrays(
                 &BlockType::from_array(hex!("710180b32b5a982ee21d8e76d287e509")),
                 &BlockType::from_array(hex!("389b742402576214410c0633722c593a")),
+            );
+        }
+    }
+
+    mod concat_keys {
+        use super::super::*;
+        use hex_literal::hex;
+
+        fn do_concat_keys(input0: &BlockType, input1: &BlockType) {
+            let mut buffer = KeyType::uninit();
+            let key_data = buffer.concat(input0, input1).as_slice();
+            assert_eq!(input0, &BlockType::from_array(key_data[..BLOCK_SIZE].try_into().unwrap()));
+            assert_eq!(input1, &BlockType::from_array(key_data[BLOCK_SIZE..].try_into().unwrap()));
+        }
+
+        #[test]
+        fn test_concat_keys_1a() {
+            do_concat_keys(
+                &BlockType::from_array(hex!("000102030405060708090A0B0C0D0E0F")),
+                &BlockType::from_array(hex!("F0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFF")),
+            );
+        }
+
+        #[test]
+        fn test_concat_keys_1b() {
+            do_concat_keys(
+                &BlockType::from_array(hex!("F0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFF")),
+                &BlockType::from_array(hex!("000102030405060708090A0B0C0D0E0F")),
+            );
+        }
+
+        #[test]
+        fn test_concat_keys_2a() {
+            do_concat_keys(
+                &BlockType::from_array(hex!("00102030405060708090A0B0C0D0E0F0")),
+                &BlockType::from_array(hex!("0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFFF")),
+            );
+        }
+
+        #[test]
+        fn test_concat_keys_2b() {
+            do_concat_keys(
+                &BlockType::from_array(hex!("0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFFF")),
+                &BlockType::from_array(hex!("00102030405060708090A0B0C0D0E0F0")),
             );
         }
     }
