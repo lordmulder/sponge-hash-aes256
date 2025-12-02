@@ -44,7 +44,7 @@ const HELP_TEXT: &str = "If no input files are specified, reads input data from 
 // ---------------------------------------------------------------------------
 
 /// SpongeHash-AES256 command-line tool
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Clone)]
 #[command(about = ABOUT_TEXT)]
 #[command(after_help = HELP_TEXT)]
 #[command(before_help = HEADER_LINE)]

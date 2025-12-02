@@ -148,20 +148,21 @@ mod common;
 mod digest;
 mod io;
 mod process;
+mod process_files;
 mod self_test;
 mod verify;
 
-use crossbeam_channel::{bounded, SendTimeoutError, Sender};
+use crossbeam_channel::{bounded, Sender};
 use num::Integer;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
-use std::{io::stdout, process::ExitCode, sync::Arc, time::Duration};
+use std::{io::stdout, process::ExitCode, sync::Arc};
 
 use crate::process::process_from_stdin;
 use crate::verify::{verify_files, verify_from_stdin};
 use crate::{
     arguments::Args,
     common::{MAX_DIGEST_SIZE, MAX_SNAIL_LEVEL},
-    process::process_files,
+    process_files::process_files,
     self_test::self_test,
 };
 
@@ -217,9 +218,8 @@ fn main() -> ExitCode {
     }
 
     // Install the interrupt handler
-    let (stop_tx, stop_rx) = bounded(0usize);
-    let args_rc = Arc::clone(&args);
-    let _ = ctrlc::set_handler(move || sigint_handler(&args_rc, &stop_tx));
+    let (stop_tx, stop_rx) = bounded(32usize);
+    let _ = ctrlc::set_handler(move || sigint_handler(&stop_tx));
 
     // Acquire stdout handle
     let mut output = stdout().lock();
@@ -238,7 +238,7 @@ fn main() -> ExitCode {
         if args.files.is_empty() {
             process_from_stdin(&mut output, digest_size, &args, stop_rx)
         } else {
-            process_files(args.files.iter(), &mut output, digest_size, &args, stop_rx)
+            process_files(&mut output, digest_size, &args, stop_rx)
         }
     };
 
@@ -254,8 +254,11 @@ fn main() -> ExitCode {
 // ---------------------------------------------------------------------------
 
 /// Try to send the "stop" signal for at most 5 secs, then exit immediately
-fn sigint_handler(args: &Args, channel_tx: &Sender<()>) {
-    if matches!(channel_tx.send_timeout((), Duration::from_secs(5u64)), Err(SendTimeoutError::Timeout(_))) {
-        abort!(args);
+fn sigint_handler(channel_tx: &Sender<()>) {
+    let capacity = channel_tx.capacity().unwrap_or(usize::MAX);
+    for _ in 0..capacity {
+        if channel_tx.try_send(()).is_err() {
+            break;
+        }
     }
 }

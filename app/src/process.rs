@@ -237,6 +237,7 @@ fn process_directory(path: &PathBuf, visited: &SetType, output: &mut impl Write,
 }
 
 /// Iterate a list of input files
+#[allow(dead_code)]
 pub fn process_files(files: Iter<'_, PathBuf>, output: &mut impl Write, digest_size: usize, args: &Args, running: Flag) -> bool {
     let mut errors = 0usize;
     let handle_dirs = args.dirs || args.recursive;
