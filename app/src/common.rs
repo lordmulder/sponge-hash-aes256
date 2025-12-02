@@ -2,9 +2,14 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use crossbeam_channel::Receiver;
 use lazy_static::lazy_static;
-use std::{collections::HashMap, env, fmt::Display, io::Error as IoError, sync::Mutex};
+use std::{
+    collections::HashMap,
+    env,
+    fmt::Display,
+    io::Error as IoError,
+    sync::{atomic::AtomicBool, Mutex},
+};
 
 // ---------------------------------------------------------------------------
 // Common definitions
@@ -16,8 +21,8 @@ pub const MAX_SNAIL_LEVEL: u8 = 4u8;
 /// Maximum allowable digest size, specified in bytes
 pub const MAX_DIGEST_SIZE: usize = 256usize;
 
-/// Cancellation flag
-pub type Flag = Receiver<()>;
+/// Atomic flag
+pub type Flag = AtomicBool;
 
 // ---------------------------------------------------------------------------
 // Environment
@@ -107,13 +112,13 @@ macro_rules! handle_error {
 /// Check whether the process has been interrupted
 #[macro_export]
 macro_rules! check_running {
-    ($channel_rx:ident) => {
-        if $channel_rx.try_recv().is_ok() {
+    ($halt:ident) => {
+        if $halt.load(Ordering::Relaxed) {
             return Err(Error::Aborted);
         }
     };
-    ($args:ident, $channel_rx:ident) => {
-        if $channel_rx.try_recv().is_ok() {
+    ($args:ident, $halt:ident) => {
+        if $halt.load(Ordering::Relaxed) {
             $crate::abort!($args)
         }
     };

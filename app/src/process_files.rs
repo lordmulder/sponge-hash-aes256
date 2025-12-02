@@ -14,7 +14,7 @@ use std::{
     io::Write,
     iter,
     path::PathBuf,
-    sync::{Arc, OnceLock},
+    sync::{atomic::Ordering, Arc, OnceLock},
     thread,
 };
 
@@ -105,7 +105,7 @@ type PathResult = Result<PathBuf, ErrorType>;
 
 /// Iterate all files and sub-directories in a directory
 #[allow(clippy::unnecessary_map_or)]
-fn process_directory(files_tx: &Sender<PathResult>, path: &PathBuf, visited: &FileIdSet, args: &Arc<Args>, stop_rx: &Flag) -> bool {
+fn process_directory(files_tx: &Sender<PathResult>, path: &PathBuf, visited: &FileIdSet, args: &Arc<Args>, halt: &Arc<Flag>) -> bool {
     let dir_iter = match fs::read_dir(path) {
         Ok(dir_iter) => dir_iter,
         Err(_) => {
@@ -118,7 +118,7 @@ fn process_directory(files_tx: &Sender<PathResult>, path: &PathBuf, visited: &Fi
     let mut dir_queue = if breadth_first { Vec::with_capacity(32usize) } else { Vec::new() };
 
     for element in dir_iter {
-        if stop_rx.try_recv().is_ok() {
+        if halt.load(Ordering::Relaxed) {
             return false;
         }
         match element {
@@ -129,7 +129,7 @@ fn process_directory(files_tx: &Sender<PathResult>, path: &PathBuf, visited: &Fi
                         if file_id.map_or(true, |id| !visited.contains(&id)) {
                             if breadth_first {
                                 dir_queue.push((file_id, dir_entry.path()));
-                            } else if !(process_directory(files_tx, &dir_entry.path(), &append(visited, file_id), args, stop_rx) || args.keep_going) {
+                            } else if !(process_directory(files_tx, &dir_entry.path(), &append(visited, file_id), args, halt) || args.keep_going) {
                                 return false;
                             }
                         }
@@ -148,7 +148,7 @@ fn process_directory(files_tx: &Sender<PathResult>, path: &PathBuf, visited: &Fi
 
     if breadth_first {
         for (file_id, dir_name) in dir_queue.into_iter() {
-            if !(process_directory(files_tx, &dir_name, &append(visited, file_id), args, stop_rx) || args.keep_going) {
+            if !(process_directory(files_tx, &dir_name, &append(visited, file_id), args, halt) || args.keep_going) {
                 return false;
             }
         }
@@ -158,17 +158,17 @@ fn process_directory(files_tx: &Sender<PathResult>, path: &PathBuf, visited: &Fi
 }
 
 /// Iterate a list of input files
-fn iterate_files(files_tx: Sender<PathResult>, args: Arc<Args>, stop_rx: Flag) {
+fn iterate_files(files_tx: Sender<PathResult>, args: &Arc<Args>, halt: &Arc<Flag>) {
     let handle_dirs = args.dirs || args.recursive;
 
     for file_name in args.files.iter().cloned() {
-        if stop_rx.try_recv().is_ok() {
+        if halt.load(Ordering::Relaxed) {
             break;
         }
         let dir_info = if handle_dirs { fs::metadata(&file_name).ok().filter(|meta| meta.is_dir()) } else { None };
         if let Some(meta_data) = dir_info {
             let visited = file_id::get(&meta_data).map_or_else(FileIdSet::new, |dir_id| iter::once(dir_id).collect());
-            if !(process_directory(&files_tx, &file_name, &visited, &args, &stop_rx) || args.keep_going) {
+            if !(process_directory(&files_tx, &file_name, &visited, args, halt) || args.keep_going) {
                 break;
             }
         } else if files_tx.send(Ok(file_name)).is_err() {
@@ -183,11 +183,12 @@ fn iterate_files(files_tx: Sender<PathResult>, args: Arc<Args>, stop_rx: Flag) {
 
 /// Process all input files
 #[allow(dead_code)]
-pub fn process_files(output: &mut impl Write, _digest_size: usize, args: &Arc<Args>, stop_rx: Flag) -> bool {
+pub fn process_files(output: &mut impl Write, _digest_size: usize, args: &Arc<Args>, halt: &Arc<Flag>) -> bool {
     let (path_tx, path_rx) = bounded::<PathResult>(128usize);
 
     let args_cloned = args.clone();
-    let thread_iter = thread::spawn(move || iterate_files(path_tx, args_cloned, stop_rx));
+    let halt_cloned = halt.clone();
+    let thread_iter = thread::spawn(move || iterate_files(path_tx, &args_cloned, &halt_cloned));
 
     while let Ok(path) = path_rx.recv() {
         if writeln!(output, "Path: {:?}", path).is_err() {

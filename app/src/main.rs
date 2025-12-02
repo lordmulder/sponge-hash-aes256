@@ -152,9 +152,9 @@ mod process_files;
 mod self_test;
 mod verify;
 
-use crossbeam_channel::{bounded, Sender};
 use num::Integer;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{io::stdout, process::ExitCode, sync::Arc};
 
 use crate::process::process_from_stdin;
@@ -217,28 +217,29 @@ fn main() -> ExitCode {
         return ExitCode::FAILURE;
     }
 
-    // Install the interrupt handler
-    let (stop_tx, stop_rx) = bounded(32usize);
-    let _ = ctrlc::set_handler(move || sigint_handler(&stop_tx));
+    // Install the interrupt (CTRL+C) handling routine
+    let halt = Arc::new(AtomicBool::new(false));
+    let halt_cloned = halt.clone();
+    let _ = ctrlc::set_handler(move || halt_cloned.store(true, Ordering::SeqCst));
 
     // Acquire stdout handle
     let mut output = stdout().lock();
 
     // Run built-in self-test, if it was requested by the user
     let success = if args.self_test {
-        self_test(&mut output, &args, stop_rx)
+        self_test(&mut output, &args, &halt)
     } else if args.check {
         if args.files.is_empty() {
-            verify_from_stdin(&mut output, &args, stop_rx)
+            verify_from_stdin(&mut output, &args, &halt)
         } else {
-            verify_files(args.files.iter(), &mut output, &args, stop_rx)
+            verify_files(args.files.iter(), &mut output, &args, &halt)
         }
     } else {
         // Process all files and directories that were given on the command-line
         if args.files.is_empty() {
-            process_from_stdin(&mut output, digest_size, &args, stop_rx)
+            process_from_stdin(&mut output, digest_size, &args, &halt)
         } else {
-            process_files(&mut output, digest_size, &args, stop_rx)
+            process_files(&mut output, digest_size, &args, &halt)
         }
     };
 
@@ -246,19 +247,5 @@ fn main() -> ExitCode {
         ExitCode::SUCCESS
     } else {
         ExitCode::FAILURE
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Ctrl+C handler routine
-// ---------------------------------------------------------------------------
-
-/// Try to send the "stop" signal for at most 5 secs, then exit immediately
-fn sigint_handler(channel_tx: &Sender<()>) {
-    let capacity = channel_tx.capacity().unwrap_or(usize::MAX);
-    for _ in 0..capacity {
-        if channel_tx.try_send(()).is_err() {
-            break;
-        }
     }
 }

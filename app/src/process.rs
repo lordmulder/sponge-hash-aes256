@@ -13,7 +13,7 @@ use std::{
     path::PathBuf,
     slice::Iter,
     str::from_utf8,
-    sync::OnceLock,
+    sync::{atomic::Ordering, Arc, OnceLock},
 };
 
 use crate::{
@@ -146,7 +146,7 @@ fn read_file(path: &PathBuf, output: &mut impl Write, size: usize, args: &Args, 
 }
 
 /// Read data from the `stdin` stream
-pub fn process_from_stdin(output: &mut impl Write, size: usize, args: &Args, running: Flag) -> bool {
+pub fn process_from_stdin(output: &mut impl Write, size: usize, args: &Args, halt: &Arc<Flag>) -> bool {
     let mut input = match DataSource::from_stdin() {
         Ok(stream) => stream,
         Err(error) => {
@@ -155,7 +155,7 @@ pub fn process_from_stdin(output: &mut impl Write, size: usize, args: &Args, run
         }
     };
 
-    match process_file(&mut input, output, &STDIN_NAME, size, args, &running) {
+    match process_file(&mut input, output, &STDIN_NAME, size, args, halt) {
         Ok(_) => true,
         Err(Error::Aborted) => abort!(args),
         Err(error) => {

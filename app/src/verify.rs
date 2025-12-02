@@ -10,6 +10,8 @@ use std::{
     io::{BufRead, BufReader, Read, Write},
     path::PathBuf,
     slice::Iter,
+    sync::atomic::Ordering,
+    sync::Arc,
 };
 
 use crate::{
@@ -77,13 +79,13 @@ fn verify_checksum(input: &mut dyn Read, digest_expected: &[u8], output: &mut im
 }
 
 /// Verify checksum of a single file
-fn verify_file(path: &OsStr, digest_expected: &[u8], output: &mut impl Write, args: &Args, running: &Flag, errors: &mut usize, faults: &mut usize) -> bool {
+fn verify_file(path: &OsStr, digest_expected: &[u8], output: &mut impl Write, args: &Args, halt: &Arc<Flag>, errors: &mut usize, faults: &mut usize) -> bool {
     match DataSource::from_path(path) {
         Ok(mut file) => {
             if file.is_directory() {
                 handle_error!(args, errors, "Input file is a directory: {:?}", path);
             } else {
-                match verify_checksum(&mut file, digest_expected, output, path, args, running) {
+                match verify_checksum(&mut file, digest_expected, output, path, args, halt) {
                     Ok(true) => {}
                     Ok(false) => {
                         if args.keep_going {
@@ -125,17 +127,25 @@ fn parse_line<'a, 'b>(line: &'a str, digest: &'b mut [u8; MAX_DIGEST_SIZE], _arg
 }
 
 /// Process a single input file
-fn verify_checksums(input: &mut dyn Read, output: &mut impl Write, name: &OsStr, args: &Args, running: &Flag, errors: &mut usize, faults: &mut usize) -> bool {
+fn verify_checksums(
+    input: &mut dyn Read,
+    output: &mut impl Write,
+    name: &OsStr,
+    args: &Args,
+    halt: &Arc<Flag>,
+    errors: &mut usize,
+    faults: &mut usize,
+) -> bool {
     let mut digest_buffer = [0u8; MAX_DIGEST_SIZE];
 
     for (line_no, line) in BufReader::new(input).lines().enumerate() {
-        check_running!(args, running);
+        check_running!(args, halt);
         match line {
             Ok(line) => {
                 let line_trimmed = line.trim_start();
                 if !line_trimmed.is_empty() {
                     if let Some((file_name, digest_expected)) = parse_line(line_trimmed, &mut digest_buffer, args) {
-                        if !verify_file(file_name, digest_expected, output, args, running, errors, faults) {
+                        if !verify_file(file_name, digest_expected, output, args, halt, errors, faults) {
                             return false;
                         }
                     } else {
@@ -155,13 +165,13 @@ fn verify_checksums(input: &mut dyn Read, output: &mut impl Write, name: &OsStr,
 // ---------------------------------------------------------------------------
 
 /// Read checksums from a file
-fn read_checksum_file(path: &PathBuf, output: &mut impl Write, args: &Args, running: &Flag, errors: &mut usize, faults: &mut usize) -> bool {
+fn read_checksum_file(path: &PathBuf, output: &mut impl Write, args: &Args, halt: &Arc<Flag>, errors: &mut usize, faults: &mut usize) -> bool {
     match File::open(path) {
         Ok(mut file) => {
             if file.metadata().is_ok_and(|meta| meta.is_dir()) {
                 handle_error!(args, errors, "Checksum file is a directory: {:?}", path);
             } else {
-                return verify_checksums(&mut file, output, path.as_os_str(), args, running, errors, faults);
+                return verify_checksums(&mut file, output, path.as_os_str(), args, halt, errors, faults);
             }
         }
         Err(error) => handle_error!(args, errors, "Failed to open checksum file: {:?} ({})", path, error),
@@ -170,7 +180,7 @@ fn read_checksum_file(path: &PathBuf, output: &mut impl Write, args: &Args, runn
     true
 }
 
-pub fn verify_from_stdin(output: &mut impl Write, args: &Args, running: Flag) -> bool {
+pub fn verify_from_stdin(output: &mut impl Write, args: &Args, halt: &Arc<Flag>) -> bool {
     let mut input = match DataSource::from_stdin() {
         Ok(stream) => stream,
         Err(error) => {
@@ -181,7 +191,7 @@ pub fn verify_from_stdin(output: &mut impl Write, args: &Args, running: Flag) ->
 
     let (mut errors, mut faults) = (0usize, 0usize);
 
-    if !verify_checksums(&mut input, output, &STDIN_NAME, args, &running, &mut errors, &mut faults) {
+    if !verify_checksums(&mut input, output, &STDIN_NAME, args, halt, &mut errors, &mut faults) {
         return false;
     }
 
@@ -193,12 +203,12 @@ pub fn verify_from_stdin(output: &mut impl Write, args: &Args, running: Flag) ->
 // ---------------------------------------------------------------------------
 
 /// Iterate a list of checksum files
-pub fn verify_files(files: Iter<'_, PathBuf>, output: &mut impl Write, args: &Args, running: Flag) -> bool {
+pub fn verify_files(files: Iter<'_, PathBuf>, output: &mut impl Write, args: &Args, halt: &Arc<Flag>) -> bool {
     let (mut errors, mut faults) = (0usize, 0usize);
 
     for file_name in files {
-        check_running!(args, running);
-        if !read_checksum_file(file_name, output, args, &running, &mut errors, &mut faults) {
+        check_running!(args, halt);
+        if !read_checksum_file(file_name, output, args, halt, &mut errors, &mut faults) {
             return false;
         }
     }

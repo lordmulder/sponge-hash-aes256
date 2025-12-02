@@ -3,7 +3,10 @@
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use sponge_hash_aes256::SpongeHash256;
-use std::io::{BufRead, BufReader, Read};
+use std::{
+    io::{BufRead, BufReader, Read},
+    sync::atomic::Ordering,
+};
 
 use crate::{
     arguments::Args,
