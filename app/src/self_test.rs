@@ -10,16 +10,37 @@ use rand_pcg::{
 };
 use rolling_median::Median;
 use sponge_hash_aes256::{SpongeHash256, DEFAULT_DIGEST_SIZE};
-use std::{io::Write, str::from_utf8, sync::atomic::Ordering, sync::Arc, time::Instant};
+use std::{
+    io::{Error as IoError, Result as IoResult, Write},
+    num::NonZeroU16,
+    str::from_utf8,
+    sync::atomic::Ordering,
+    time::Instant,
+};
 
 use crate::{
-    abort,
     arguments::{Args, HEADER_LINE},
-    check_running,
-    common::{get_env, Error, Flag},
+    common::Flag,
     digest::digest_equal,
+    environment::get_selftest_passes,
     print_error,
 };
+
+// ---------------------------------------------------------------------------
+// Error type
+// ---------------------------------------------------------------------------
+
+#[derive(Debug)]
+enum SelfTestError {
+    Aborted,
+    IoError,
+}
+
+impl From<IoError> for SelfTestError {
+    fn from(_io_error: IoError) -> Self {
+        Self::IoError
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Utility functions
@@ -38,18 +59,27 @@ fn format_bytes(mut value: f64) -> (f64, &'static str) {
     (value, BIN_UNITS[index])
 }
 
-fn print_digest<T: AsRef<[u8]>>(output: &mut impl Write, prefix: &str, digest: T) -> Result<(), Error> {
-    assert!(digest.as_ref().len() <= DEFAULT_DIGEST_SIZE, "Length of digest exceeds capacity!");
+fn print_digest<T: AsRef<[u8]>>(output: &mut impl Write, prefix: &str, digest: T) -> IoResult<()> {
+    assert!(digest.as_ref().len() <= DEFAULT_DIGEST_SIZE, "Digest length exceeds capacity!");
 
     let mut hex_buffer = [0u8; DEFAULT_DIGEST_SIZE * 2usize];
     let hex_str = &mut hex_buffer[..digest.as_ref().len().checked_mul(2usize).unwrap()];
 
     encode_to_slice(digest, hex_str).unwrap();
-    Ok(writeln!(output, "{prefix} {}", from_utf8(hex_str).unwrap())?)
+    writeln!(output, "{prefix} {}", from_utf8(hex_str).unwrap())
+}
+
+/// Check if the computation has been aborted
+macro_rules! check_cancelled {
+    ($halt:ident) => {
+        if $halt.load(Ordering::Relaxed) {
+            return Err(SelfTestError::Aborted);
+        }
+    };
 }
 
 // ---------------------------------------------------------------------------
-// Self-test
+// Test runner
 // ---------------------------------------------------------------------------
 
 const PCG64_SEEDVALUE: [u64; 2usize] = [18446744073709551557u64, 18446744073709551533u64];
@@ -61,7 +91,7 @@ const MAX_ITERATION: u32 = 249989u32;
 
 const TOTAL_BYTES: u64 = (BUFFER_SIZE as u64) * (MAX_ITERATION as u64) * (PCG64_SEEDVALUE.len() as u64);
 
-fn do_test(seed: u64, digest_expected: &[u8; DEFAULT_DIGEST_SIZE], output: &mut impl Write, counter: &mut u64, running: &Flag) -> Result<bool, Error> {
+fn do_test(seed: u64, digest_expected: &[u8; DEFAULT_DIGEST_SIZE], output: &mut impl Write, counter: &mut u64, halt: &Flag) -> Result<bool, SelfTestError> {
     let mut source = Pcg64Mcg::seed_from_u64(seed);
     let mut buffer = [0u8; BUFFER_SIZE];
     let mut hasher = SpongeHash256::default();
@@ -70,7 +100,7 @@ fn do_test(seed: u64, digest_expected: &[u8; DEFAULT_DIGEST_SIZE], output: &mut 
         source.fill_bytes(&mut buffer);
         hasher.update(buffer);
         *counter += buffer.len() as u64;
-        check_running!(running);
+        check_cancelled!(halt);
     }
 
     let digest_computed: [u8; DEFAULT_DIGEST_SIZE] = hasher.digest();
@@ -85,13 +115,11 @@ fn do_test(seed: u64, digest_expected: &[u8; DEFAULT_DIGEST_SIZE], output: &mut 
     Ok(success)
 }
 
-fn test_runner(output: &mut impl Write, halt: &Arc<Flag>) -> Result<bool, Error> {
+fn test_runner(output: &mut impl Write, passes: NonZeroU16, halt: &Flag) -> Result<bool, SelfTestError> {
     writeln!(output, "{}\n", HEADER_LINE)?;
-
-    let passes = get_env("SPONGE256SUM_SELFTEST_PASSES").and_then(|str| str.parse().ok()).filter(|val| *val >= 1u16).unwrap_or(3u16);
     let mut elapsed_median = Median::new();
 
-    for i in 0..passes {
+    for i in 0u16..passes.get() {
         writeln!(output, "Self-test pass {} of {} is running...", (i as u32) + 1u32, passes)?;
         output.flush()?;
 
@@ -99,6 +127,7 @@ fn test_runner(output: &mut impl Write, halt: &Arc<Flag>) -> Result<bool, Error>
         let mut total = 0u64;
 
         for (seed_value, digest_expected) in PCG64_SEEDVALUE.iter().zip(DIGEST_EXPECTED.iter()) {
+            check_cancelled!(halt);
             if !do_test(*seed_value, digest_expected, output, &mut total, halt)? {
                 return Ok(false);
             }
@@ -118,13 +147,25 @@ fn test_runner(output: &mut impl Write, halt: &Arc<Flag>) -> Result<bool, Error>
     Ok(true)
 }
 
-pub fn self_test(output: &mut impl Write, args: &Args, halt: &Arc<Flag>) -> bool {
-    match test_runner(output, halt) {
-        Err(Error::Aborted) => abort!(args),
+// ---------------------------------------------------------------------------
+// Self-test
+// ---------------------------------------------------------------------------
+
+pub fn self_test(output: &mut impl Write, args: &Args, halt: &Flag) -> bool {
+    let passes = match get_selftest_passes() {
+        Ok(value) => value,
         Err(error) => {
-            print_error!(args, "Self-test encountered an error: {}", error);
+            print_error!(args, "Error: Invalid number of self-test passes \"{}\" specified!", error);
+            return false;
+        }
+    };
+
+    match test_runner(output, passes, halt) {
+        Ok(result) => result,
+        Err(SelfTestError::Aborted) => false,
+        Err(error) => {
+            print_error!(args, "Self-test encountered an error: {:?}", error);
             false
         }
-        Ok(result) => result,
     }
 }

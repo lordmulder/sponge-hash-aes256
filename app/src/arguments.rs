@@ -99,7 +99,11 @@ pub struct Args {
     #[arg(short = '0', long, alias = "zero", short_alias = 'z')]
     pub null: bool,
 
-    /// Explicitely flush 'stdout' stream after printing a digest
+    /// Enable multi-threaded processing of input files
+    #[arg(short, long)]
+    pub multi_threading: bool,
+
+    /// Explicitly flush 'stdout' stream after printing a digest
     #[arg(short, long)]
     pub flush: bool,
 

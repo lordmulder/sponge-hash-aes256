@@ -6,7 +6,7 @@ license = "0BSD"
 repository = "https://github.com/lordmulder/sponge-hash-aes256/"
 readme = "../README.crates.md"
 edition = "2021"
-version = "1.7.0"
+version = "1.8.0"
 categories = ["algorithms", "cryptography", "no-std", "security"]
 keywords = ["hash", "digest", "sponge", "crypto", "aes"]
 
@@ -20,6 +20,7 @@ hex = { version = "0.4.3", default-features = true }
 hex-literal = { version = "1.1.0", default-features = false }
 lazy_static = { version = "1.5.0", default-features = false }
 num = { version = "0.4.3", default-features = false }
+num_cpus = "1.17.0"
 rand_pcg = { version = "0.9.0", default-features = false }
 rolling-median = { version = "1.2.0", default-features = false }
 rustc-version-const = { version = "1.1.0", default-features = false }

@@ -25,7 +25,7 @@ In order to use this crate, add it under `[dependencies]` to your **`Cargo.toml`
 
 ```
 [dependencies]
-sponge-hash-aes256 = "1.7.0"
+sponge-hash-aes256 = "1.8.0"
 ```
 
 ### Usage
@@ -78,7 +78,8 @@ Options:
   -q, --quiet            Do not output any error messages or warnings
   -p, --plain            Print digest(s) in plain format, i.e., without file names
   -0, --null             Separate digest(s) by NULL characters instead of newlines
-  -f, --flush            Explicitely flush 'stdout' stream after printing a digest
+  -m, --multi-threading  Enable multi-threaded processing of input files
+  -f, --flush            Explicitly flush 'stdout' stream after printing a digest
   -T, --self-test        Run the built-in self-test (BIST)
   -h, --help             Print help
   -V, --version          Print version

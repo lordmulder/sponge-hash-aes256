@@ -35,7 +35,8 @@
 //!   -q, --quiet            Do not output any error messages or warnings
 //!   -p, --plain            Print digest(s) in plain format, i.e., without file names
 //!   -0, --null             Separate digest(s) by NULL characters instead of newlines
-//!   -f, --flush            Explicitely flush 'stdout' stream after printing a digest
+//!   -m, --multi-threading  Enable multi-threaded processing of input files
+//!   -f, --flush            Explicitly flush 'stdout' stream after printing a digest
 //!   -T, --self-test        Run the built-in self-test (BIST)
 //!   -h, --help             Print help
 //!   -V, --version          Print version
@@ -111,16 +112,29 @@
 //!
 //!   Unlike in “binary” mode (the default), platform-specific line endings will be normalized to a single `\n` character.
 //!
+//! - **Multi-threading**
+//!
+//!   The `--multi-threading` option enables [multithreading](https://en.wikipedia.org/wiki/Thread_(computing)) mode, in which multiple files can be processed concurrently.
+//!
+//!   Note that, in this mode, the order in which the files will be processed is ***undefined***.
+//!
+//!   Also note that each file still is processed by a single thread, so this mode is only useful when processing *many* files.
+//!
 //! ## Environment
 //!
 //! The following environment variables are recognized:
 //!
-//! - **`SPONGE256SUM_SELFTEST_PASSES`**:  
-//!   Specifies the number of passes to be executed in “self-test” mode. Default is **3**.
+//! - **`SPONGE256SUM_THREAD_COUNT`**:  
+//!   Specifies the number of threads to be used in `--multi-threading` mode.  
+//!   If set to **0**, which is the default, the number of CPU cores is detected automatically at runtime.  
+//!   Please note that the number of threads is currently limited to the range from 1 to 32.
 //!
 //! - **`SPONGE256SUM_DIRWALK_STRATEGY`**:  
-//!   Selects the search strategy to be used for walking the directory tree in “recursive” mode.  
+//!   Selects the search strategy to be used for walking the directory tree in `--recursive` mode.  
 //!   This can be `BFS` (breadth-first search) or `DFS` (depath-first search). Default is `BFS`.
+//!
+//! - **`SPONGE256SUM_SELFTEST_PASSES`**:  
+//!   Specifies the number of passes to be executed in `--self-test` mode. Default is **3**.
 //!
 //! ## Platform support
 //!
@@ -146,18 +160,18 @@
 mod arguments;
 mod common;
 mod digest;
+mod environment;
 mod io;
-mod process;
 mod process_files;
 mod self_test;
 mod verify;
 
 use num::Integer;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
+use std::process;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{io::stdout, process::ExitCode, sync::Arc};
 
-use crate::process::process_from_stdin;
 use crate::verify::{verify_files, verify_from_stdin};
 use crate::{
     arguments::Args,
@@ -237,11 +251,18 @@ fn main() -> ExitCode {
     } else {
         // Process all files and directories that were given on the command-line
         if args.files.is_empty() {
-            process_from_stdin(&mut output, digest_size, &args, &halt)
+            //process_from_stdin(&mut output, digest_size, &args, &halt)
+            unimplemented!("Not yet implemented!")
         } else {
             process_files(&mut output, digest_size, &args, &halt)
         }
     };
+
+    // Check if the process has been aborted (CTRL+C)
+    if halt.load(Ordering::SeqCst) {
+        print_error!(args, "Aborted: The process has been interrupted by the user!");
+        process::exit(130i32);
+    }
 
     if success {
         ExitCode::SUCCESS

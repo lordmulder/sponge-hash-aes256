@@ -2,28 +2,44 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use crate::{
-    arguments::Args,
-    common::{get_env, parse_enum, Flag},
-};
-use crossbeam_channel::{bounded, Sender};
+use crossbeam_channel::{bounded, Receiver, Sender};
+use hex::encode_to_slice;
 use std::{
     borrow::Cow,
     collections::BTreeSet,
+    ffi::OsStr,
     fs::{self, DirEntry, Metadata},
-    io::Write,
+    io::{Result as IoResult, Write},
     iter,
     path::PathBuf,
-    sync::{atomic::Ordering, Arc, OnceLock},
+    str::from_utf8,
+    sync::{atomic::Ordering, Arc},
     thread,
 };
+
+use crate::{
+    arguments::Args,
+    common::{Flag, MAX_DIGEST_SIZE},
+    digest::{compute_digest, DigestError},
+    environment::{get_search_strategy, get_thread_count},
+    io::DataSource,
+    print_error,
+};
+
+// ---------------------------------------------------------------------------
+// Error Type
+// ---------------------------------------------------------------------------
 
 /// Error type for processing files
 #[derive(Debug)]
 #[allow(dead_code)]
 enum ErrorType {
-    DirOpenError(PathBuf),
-    DirReadError(PathBuf),
+    DirOpen(PathBuf),
+    DirRead(PathBuf),
+    SrcIsDir(PathBuf),
+    FileOpen(PathBuf),
+    FileRead(PathBuf),
+    Aborted,
 }
 
 // ---------------------------------------------------------------------------
@@ -87,14 +103,107 @@ fn append(visited: &'_ FileIdSet, file_id: Option<FileId>) -> Cow<'_, FileIdSet>
     })
 }
 
-/// Enable breadth-first search?
-#[inline]
-fn parse_search_strategy() -> bool {
-    static SEARCH_STRATEGY: OnceLock<bool> = OnceLock::new();
-    *SEARCH_STRATEGY.get_or_init(|| {
-        let strategy = get_env("SPONGE256SUM_DIRWALK_STRATEGY").and_then(|value| parse_enum(value, &["BFS", "DFS"]));
-        strategy.map(|pos| pos == 0usize).unwrap_or(true)
-    })
+/// Check if the computation has been aborted
+macro_rules! check_cancelled {
+    ($halt:ident) => {
+        if $halt.load(Ordering::Relaxed) {
+            return Default::default();
+        }
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Print results
+// ---------------------------------------------------------------------------
+
+fn print_result(output: &mut impl Write, digest_result: &DigestResult, digest_size: usize, args: &Args) -> bool {
+    match digest_result {
+        Ok(digest) => print_digest(output, digest.1.as_os_str(), &digest.0, digest_size, args).is_ok(),
+        Err(error) => {
+            match error {
+                ErrorType::DirOpen(path) => print_error!(args, "Failed to open directory: {:?}", path),
+                ErrorType::DirRead(path) => print_error!(args, "Failed to read directory: {:?}", path),
+                ErrorType::SrcIsDir(path) => print_error!(args, "Input file is a directory: {:?}", path),
+                ErrorType::FileOpen(path) => print_error!(args, "Failed to open input file: {:?}", path),
+                ErrorType::FileRead(path) => print_error!(args, "Failed to read input file: {:?}", path),
+                ErrorType::Aborted => unreachable!(),
+            }
+            true
+        }
+    }
+}
+
+fn print_digest(output: &mut impl Write, file_name: &OsStr, digest: &[u8; MAX_DIGEST_SIZE], digest_size: usize, args: &Args) -> IoResult<()> {
+    let mut hex_buffer = [0u8; MAX_DIGEST_SIZE * 2usize];
+    let hex_slice = &mut hex_buffer[..digest_size.checked_mul(2usize).unwrap()];
+
+    encode_to_slice(&digest[..digest_size], hex_slice).unwrap();
+
+    if args.null {
+        if args.plain {
+            write!(output, "{}\0", from_utf8(hex_slice).unwrap())?;
+        } else {
+            write!(output, "{} {}\0", from_utf8(hex_slice).unwrap(), file_name.to_string_lossy())?;
+        }
+    } else if args.plain {
+        writeln!(output, "{}", from_utf8(hex_slice).unwrap())?;
+    } else {
+        writeln!(output, "{} {}", from_utf8(hex_slice).unwrap(), file_name.to_string_lossy())?;
+    }
+
+    if args.flush {
+        output.flush()?;
+    }
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Compute file digest
+// ---------------------------------------------------------------------------
+
+type DigestResult = Result<([u8; MAX_DIGEST_SIZE], PathBuf), ErrorType>;
+
+fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt: &Flag) -> DigestResult {
+    match DataSource::from_path(&file_name) {
+        Ok(mut source) => {
+            if source.is_directory() {
+                Err(ErrorType::SrcIsDir(file_name))
+            } else {
+                let mut digest = [0u8; MAX_DIGEST_SIZE];
+                match compute_digest(&mut source, &mut digest[..digest_size], args, halt) {
+                    Ok(_) => Ok((digest, file_name)),
+                    Err(DigestError::IoError) => Err(ErrorType::FileRead(file_name)),
+                    Err(DigestError::Aborted) => Err(ErrorType::Aborted),
+                }
+            }
+        }
+        Err(_) => Err(ErrorType::FileOpen(file_name)),
+    }
+}
+
+fn compute_thread(path_rx: &Receiver<PathResult>, digest_tx: &Sender<DigestResult>, digest_size: usize, args: &Args, halt: &Flag) {
+    while let Ok(path_result) = path_rx.recv() {
+        check_cancelled!(halt);
+        match path_result {
+            Ok(path) => {
+                let digest_result = compute_file_digest(path, digest_size, args, halt);
+                if matches!(digest_result, Err(ErrorType::Aborted)) {
+                    break;
+                } else {
+                    let success = digest_result.is_ok();
+                    if !(digest_tx.send(digest_result).is_ok() && (success || args.keep_going)) {
+                        break;
+                    }
+                }
+            }
+            Err(error) => {
+                if digest_tx.send(Err(error)).is_err() {
+                    break;
+                }
+            }
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -105,31 +214,28 @@ type PathResult = Result<PathBuf, ErrorType>;
 
 /// Iterate all files and sub-directories in a directory
 #[allow(clippy::unnecessary_map_or)]
-fn process_directory(path_tx: &Sender<PathResult>, path: &PathBuf, visited: &FileIdSet, args: &Arc<Args>, halt: &Arc<Flag>) -> bool {
-    let dir_iter = match fs::read_dir(path) {
+fn iterate_directory(path_tx: &Sender<PathResult>, dir_name: PathBuf, visited: &FileIdSet, breadth_first: bool, args: &Args, halt: &Flag) -> bool {
+    let dir_iter = match fs::read_dir(&dir_name) {
         Ok(dir_iter) => dir_iter,
         Err(_) => {
-            let _ = path_tx.send(Err(ErrorType::DirOpenError(path.clone())));
+            let _ = path_tx.send(Err(ErrorType::DirOpen(dir_name.to_path_buf())));
             return false;
         }
     };
 
-    let breadth_first = if args.recursive { parse_search_strategy() } else { false };
     let mut dir_queue = if breadth_first { Vec::with_capacity(32usize) } else { Vec::new() };
 
     for element in dir_iter {
-        if halt.load(Ordering::Relaxed) {
-            return false;
-        }
         match element {
             Ok(dir_entry) => {
+                check_cancelled!(halt);
                 if let Some(meta_data) = is_directory(&dir_entry) {
                     if args.recursive {
                         let file_id = file_id::get(&meta_data);
                         if file_id.map_or(true, |id| !visited.contains(&id)) {
                             if breadth_first {
                                 dir_queue.push((file_id, dir_entry.path()));
-                            } else if !(process_directory(path_tx, &dir_entry.path(), &append(visited, file_id), args, halt) || args.keep_going) {
+                            } else if !(iterate_directory(path_tx, dir_entry.path(), &append(visited, file_id), breadth_first, args, halt) || args.keep_going) {
                                 return false;
                             }
                         }
@@ -139,7 +245,7 @@ fn process_directory(path_tx: &Sender<PathResult>, path: &PathBuf, visited: &Fil
                 }
             }
             Err(_) => {
-                let _ = path_tx.send(Err(ErrorType::DirReadError(path.clone())));
+                let _ = path_tx.send(Err(ErrorType::DirRead(dir_name)));
                 return false;
             }
         }
@@ -147,7 +253,8 @@ fn process_directory(path_tx: &Sender<PathResult>, path: &PathBuf, visited: &Fil
 
     if breadth_first {
         for (file_id, dir_name) in dir_queue.into_iter() {
-            if !(process_directory(path_tx, &dir_name, &append(visited, file_id), args, halt) || args.keep_going) {
+            check_cancelled!(halt);
+            if !(iterate_directory(path_tx, dir_name, &append(visited, file_id), breadth_first, args, halt) || args.keep_going) {
                 return false;
             }
         }
@@ -157,17 +264,15 @@ fn process_directory(path_tx: &Sender<PathResult>, path: &PathBuf, visited: &Fil
 }
 
 /// Iterate a list of input files
-fn iterate_files(path_tx: &Sender<PathResult>, args: &Arc<Args>, halt: &Arc<Flag>) {
+fn iterate_thread(path_tx: &Sender<PathResult>, breadth_first: bool, args: &Args, halt: &Flag) {
     let handle_dirs = args.dirs || args.recursive;
 
     for file_name in args.files.iter().cloned() {
-        if halt.load(Ordering::Relaxed) {
-            break;
-        }
+        check_cancelled!(halt);
         let dir_info = if handle_dirs { fs::metadata(&file_name).ok().filter(|meta| meta.is_dir()) } else { None };
         if let Some(meta_data) = dir_info {
             let visited = file_id::get(&meta_data).map_or_else(FileIdSet::new, |dir_id| iter::once(dir_id).collect());
-            if !(process_directory(path_tx, &file_name, &visited, args, halt) || args.keep_going) {
+            if !(iterate_directory(path_tx, file_name, &visited, breadth_first, args, halt) || args.keep_going) {
                 break;
             }
         } else if path_tx.send(Ok(file_name)).is_err() {
@@ -182,20 +287,68 @@ fn iterate_files(path_tx: &Sender<PathResult>, args: &Arc<Args>, halt: &Arc<Flag
 
 /// Process all input files
 #[allow(dead_code)]
-pub fn process_files(output: &mut impl Write, _digest_size: usize, args: &Arc<Args>, halt: &Arc<Flag>) -> bool {
-    let (path_tx, path_rx) = bounded::<PathResult>(128usize);
+pub fn process_files(output: &mut impl Write, digest_size: usize, args: &Arc<Args>, halt: &Arc<Flag>) -> bool {
+    // Determine number of threads
+    let thread_count = match get_thread_count(args.multi_threading) {
+        Ok(value) => value.get(),
+        Err(error) => {
+            print_error!(args, "Error: Invalid thread count \"{}\" specified!", error);
+            return false;
+        }
+    };
 
+    // Determine directory walking strategy
+    let breadth_first = match get_search_strategy() {
+        Ok(value) => value,
+        Err(error) => {
+            print_error!(args, "Error: Invalid directory walking strategy \"{}\" specified!", error);
+            return false;
+        }
+    };
+
+    // Initialize thread pool
+    let mut thread_pool = Vec::with_capacity(thread_count.saturating_add(1usize));
+    let (path_tx, path_rx) = bounded::<PathResult>(thread_count.saturating_mul(16usize));
+    let (digest_tx, digest_rx) = bounded::<DigestResult>(thread_count);
+
+    // Start the file iteration thread
     let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
-    let thread_iter = thread::spawn(move || iterate_files(&path_tx, &args_cloned, &halt_cloned));
+    thread_pool.push(thread::spawn(move || iterate_thread(&path_tx, breadth_first, &args_cloned, &halt_cloned)));
 
-    while let Ok(path) = path_rx.recv() {
-        if writeln!(output, "Path: {:?}", path).is_err() {
+    // Start the worker threads
+    for (path_rx, digest_tx) in iter::repeat_n(path_rx, thread_count).zip(iter::repeat_n(digest_tx, thread_count)) {
+        let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
+        thread_pool.push(thread::spawn(move || compute_thread(&path_rx, &digest_tx, digest_size, &args_cloned, &halt_cloned)));
+    }
+
+    // Process all digest results
+    let (mut file_errors, mut write_error) = (u64::MIN, false);
+    while let Ok(digest_result) = digest_rx.recv() {
+        if !print_result(output, &digest_result, digest_size, args) {
+            write_error = true;
             break;
+        } else if digest_result.is_err() {
+            file_errors = file_errors.saturating_add(1u64);
+            if !args.keep_going {
+                break;
+            }
         }
     }
 
-    drop(path_rx);
+    // Wait until all threads have completed
+    drop(digest_rx);
+    for thread in thread_pool.drain(..) {
+        thread.join().expect("Failed to join worker thread!");
+    }
 
-    thread_iter.join().expect("Failed to join 'iterate_files' thread!");
-    true
+    // Check if process has been cancelled
+    check_cancelled!(halt);
+
+    // Print warning if any file(s) have been skipped
+    if args.keep_going && (file_errors > 0u64) {
+        print_error!(args, "WARNING: {} file(s) were skipped due to errors.", file_errors);
+    }
+
+    // Check for errors
+    (file_errors == u64::MIN) && (!write_error)
 }

@@ -4,15 +4,18 @@
 
 use sponge_hash_aes256::SpongeHash256;
 use std::{
-    io::{BufRead, BufReader, Read},
+    io::{BufRead, BufReader, Error as IoError, Read},
     sync::atomic::Ordering,
 };
 
 use crate::{
     arguments::Args,
-    check_running,
-    common::{Error, Flag, MAX_SNAIL_LEVEL},
+    common::{Flag, MAX_SNAIL_LEVEL},
 };
+
+// ---------------------------------------------------------------------------
+// Platform support
+// ---------------------------------------------------------------------------
 
 #[cfg(target_pointer_width = "64")]
 const IO_BUFFER_SIZE: usize = 8192usize;
@@ -20,6 +23,21 @@ const IO_BUFFER_SIZE: usize = 8192usize;
 const IO_BUFFER_SIZE: usize = 4096usize;
 #[cfg(target_pointer_width = "16")]
 const IO_BUFFER_SIZE: usize = 2048usize;
+
+// ---------------------------------------------------------------------------
+// Error type
+// ---------------------------------------------------------------------------
+
+pub enum DigestError {
+    IoError,
+    Aborted,
+}
+
+impl From<IoError> for DigestError {
+    fn from(_io_error: IoError) -> Self {
+        Self::IoError
+    }
+}
 
 // ---------------------------------------------------------------------------
 // SpongeHash256 wrapper
@@ -89,14 +107,24 @@ impl Hasher {
 // Compute digest
 // ---------------------------------------------------------------------------
 
+/// Check if the computation has been aborted
+macro_rules! check_cancelled {
+    ($halt:ident) => {
+        if $halt.load(Ordering::Relaxed) {
+            return Err(DigestError::Aborted);
+        }
+    };
+}
+
 /// Process a single input file
-pub fn compute_digest(input: &mut dyn Read, digest_out: &mut [u8], args: &Args, running: &Flag) -> Result<(), Error> {
+pub fn compute_digest(input: &mut dyn Read, digest_out: &mut [u8], args: &Args, halt: &Flag) -> Result<(), DigestError> {
+    static LINE_BREAK: &str = "\n";
     let mut hasher = Hasher::new(&args.info, args.snail);
 
     if !args.text {
         let mut buffer = [0u8; IO_BUFFER_SIZE];
         loop {
-            check_running!(running);
+            check_cancelled!(halt);
             match input.read(&mut buffer)? {
                 0 => break,
                 length => hasher.update(&buffer[..length]),
@@ -104,11 +132,10 @@ pub fn compute_digest(input: &mut dyn Read, digest_out: &mut [u8], args: &Args, 
         }
     } else {
         let mut lines = BufReader::new(input).lines();
-        const LINE_BREAK: &str = "\n";
         if let Some(line) = lines.next() {
             hasher.update(&(line?));
             for line in lines {
-                check_running!(running);
+                check_cancelled!(halt);
                 hasher.update(LINE_BREAK);
                 hasher.update(&(line?));
             }

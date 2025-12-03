@@ -2,14 +2,7 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use lazy_static::lazy_static;
-use std::{
-    collections::HashMap,
-    env,
-    fmt::Display,
-    io::Error as IoError,
-    sync::{atomic::AtomicBool, Mutex},
-};
+use std::sync::atomic::AtomicBool;
 
 // ---------------------------------------------------------------------------
 // Common definitions
@@ -19,68 +12,13 @@ use std::{
 pub const MAX_SNAIL_LEVEL: u8 = 4u8;
 
 /// Maximum allowable digest size, specified in bytes
-pub const MAX_DIGEST_SIZE: usize = 256usize;
+pub const MAX_DIGEST_SIZE: usize = 64usize;
+
+/// Maximum number of threads
+pub const MAX_THREADS: usize = 32usize;
 
 /// Atomic flag
 pub type Flag = AtomicBool;
-
-// ---------------------------------------------------------------------------
-// Environment
-// ---------------------------------------------------------------------------
-
-lazy_static! {
-    pub static ref ENV_CACHE: Mutex<HashMap<&'static str, Option<&'static str>>> = Mutex::new(HashMap::new());
-}
-
-#[inline(always)]
-fn str_to_static(str: &str) -> &'static str {
-    static EMPTY_STRING: &str = "";
-    if !str.is_empty() {
-        Box::leak(Box::new(str.to_owned()))
-    } else {
-        EMPTY_STRING
-    }
-}
-
-pub fn get_env(name: &'static str) -> Option<&'static str> {
-    let mut cache = ENV_CACHE.lock().unwrap();
-    *cache.entry(name).or_insert_with(|| match env::var(name).ok().as_ref().map(|str| str.trim()) {
-        Some(str) if !str.is_empty() => Some(str_to_static(str)),
-        _ => None,
-    })
-}
-
-pub fn parse_enum(value: &str, options: &[&str]) -> Option<usize> {
-    if value.is_empty() || options.is_empty() {
-        None
-    } else {
-        options.iter().position(|str| value.eq_ignore_ascii_case(str))
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Error type
-// ---------------------------------------------------------------------------
-
-pub enum Error {
-    Aborted,
-    Io(IoError),
-}
-
-impl From<IoError> for Error {
-    fn from(error: IoError) -> Self {
-        Error::Io(error)
-    }
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Io(error) => Display::fmt(error, f),
-            Self::Aborted => write!(f, "Interrupted by user!"),
-        }
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Helper macros
@@ -94,41 +32,4 @@ macro_rules! print_error {
             eprintln!(concat!("[sponge256sum] ", $fmt) $(, $arg)*);
         }
     };
-}
-
-/// Unified error handling routine
-#[macro_export]
-macro_rules! handle_error {
-    ($args:ident, $err_counter:ident, $($message:tt)*) => {{
-        print_error!($args, $($message)*);
-        if $args.keep_going {
-            *$err_counter += 1usize;
-        } else {
-            return false;
-        }
-    }};
-}
-
-/// Check whether the process has been interrupted
-#[macro_export]
-macro_rules! check_running {
-    ($halt:ident) => {
-        if $halt.load(Ordering::Relaxed) {
-            return Err(Error::Aborted);
-        }
-    };
-    ($args:ident, $halt:ident) => {
-        if $halt.load(Ordering::Relaxed) {
-            $crate::abort!($args)
-        }
-    };
-}
-
-/// Abort process, e.g., after it has been interrupted
-#[macro_export]
-macro_rules! abort {
-    ($args:ident) => {{
-        $crate::print_error!($args, "Aborted: The process has been interrupted by the user!");
-        std::process::exit(130i32);
-    }};
 }

@@ -10,17 +10,13 @@ use std::{
     io::{BufRead, BufReader, Read, Write},
     path::PathBuf,
     slice::Iter,
-    sync::atomic::Ordering,
     sync::Arc,
 };
 
 use crate::{
-    abort,
     arguments::Args,
-    check_running,
-    common::{Error, Flag, MAX_DIGEST_SIZE},
-    digest::{compute_digest, digest_equal},
-    handle_error,
+    common::{Flag, MAX_DIGEST_SIZE},
+    digest::{compute_digest, digest_equal, DigestError},
     io::{DataSource, STDIN_NAME},
     print_error,
 };
@@ -44,6 +40,18 @@ fn print_summary(errors: &usize, faults: &usize, args: &Args) -> bool {
     (*errors == 0usize) && (*faults == 0usize)
 }
 
+/// Unified error handling routine
+macro_rules! handle_error {
+    ($args:ident, $err_counter:ident, $($message:tt)*) => {{
+        print_error!($args, $($message)*);
+        if $args.keep_going {
+            *$err_counter += 1usize;
+        } else {
+            return false;
+        }
+    }};
+}
+
 // ---------------------------------------------------------------------------
 // Verify checksum
 // ---------------------------------------------------------------------------
@@ -52,7 +60,14 @@ fn print_summary(errors: &usize, faults: &usize, args: &Args) -> bool {
 static VERIFICATION_STATUS: [&str; 2usize] = ["FAILED", "OK"];
 
 /// Compute checksum and compare to expected value
-fn verify_checksum(input: &mut dyn Read, digest_expected: &[u8], output: &mut impl Write, name: &OsStr, args: &Args, running: &Flag) -> Result<bool, Error> {
+fn verify_checksum(
+    input: &mut dyn Read,
+    digest_expected: &[u8],
+    output: &mut impl Write,
+    name: &OsStr,
+    args: &Args,
+    running: &Flag,
+) -> Result<bool, DigestError> {
     let digest_size = digest_expected.len();
     let mut digest_computed = [0u8; MAX_DIGEST_SIZE];
 
@@ -94,8 +109,8 @@ fn verify_file(path: &OsStr, digest_expected: &[u8], output: &mut impl Write, ar
                             return false;
                         }
                     }
-                    Err(Error::Aborted) => abort!(args),
-                    Err(error) => handle_error!(args, errors, "Failed to verify file: {:?} ({})", path, error),
+                    Err(DigestError::Aborted) => return false,
+                    Err(DigestError::IoError) => handle_error!(args, errors, "Failed to verify file: {:?}", path),
                 }
             }
         }
@@ -139,7 +154,7 @@ fn verify_checksums(
     let mut digest_buffer = [0u8; MAX_DIGEST_SIZE];
 
     for (line_no, line) in BufReader::new(input).lines().enumerate() {
-        check_running!(args, halt);
+        //check_running!(args, halt);
         match line {
             Ok(line) => {
                 let line_trimmed = line.trim_start();
@@ -207,7 +222,7 @@ pub fn verify_files(files: Iter<'_, PathBuf>, output: &mut impl Write, args: &Ar
     let (mut errors, mut faults) = (0usize, 0usize);
 
     for file_name in files {
-        check_running!(args, halt);
+        //check_running!(args, halt);
         if !read_checksum_file(file_name, output, args, halt, &mut errors, &mut faults) {
             return false;
         }

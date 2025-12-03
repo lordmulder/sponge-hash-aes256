@@ -11,8 +11,6 @@ use std::{
     path::Path,
 };
 
-use crate::common::Error;
-
 // ---------------------------------------------------------------------------
 // Standard streams
 // ---------------------------------------------------------------------------
@@ -36,14 +34,14 @@ pub enum DataSource<'a> {
 }
 
 impl DataSource<'_> {
-    pub fn from_stdin() -> Result<Self, Error> {
+    pub fn from_stdin() -> Result<Self, IoError> {
         match STDIN_MUTEX.try_lock() {
             Ok(guard) => Ok(DataSource::Stream((guard, stdin().lock()))),
-            Err(_) => Err(Error::Io(IoError::other("Failed to lock 'stdin' handle, already in use!"))),
+            Err(_) => Err(IoError::other("Failed to lock 'stdin' handle, already in use!")),
         }
     }
 
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, IoError> {
         if !STDIN_NAME.eq(path.as_ref()) {
             Ok(DataSource::File(File::open(path)?))
         } else {
