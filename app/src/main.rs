@@ -168,11 +168,10 @@ mod verify;
 
 use num::Integer;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
-use std::process;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::{io::stdout, process::ExitCode, sync::Arc};
 
-use crate::verify::{verify_files, verify_from_stdin};
+use crate::common::Aborted;
 use crate::{
     arguments::Args,
     common::{MAX_DIGEST_SIZE, MAX_SNAIL_LEVEL},
@@ -184,21 +183,18 @@ use crate::{
 // Main
 // ---------------------------------------------------------------------------
 
-/// Applicationm entry point (“main” function)
-fn main() -> ExitCode {
-    // Initialize the Args from the given command-line arguments
-    let args = Arc::new(Args::parse_command_line());
-
+/// The actual "main" functiom
+fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
     // Check for incompatible arguments
     if args.text && args.binary {
         print_error!(args, "Error: Options '--binary' and '--text' are mutually exclusive!");
-        return ExitCode::FAILURE;
+        return Ok(false);
     }
 
     // Check for options that cannot be used in `--check` mode
     if args.check && args.length.is_some() {
         print_error!(args, "Error: Option '--length' must not be used in '--check' mode!");
-        return ExitCode::FAILURE;
+        return Ok(false);
     }
 
     // Compute the digest size, in bytes (falling back to the default, it unspecified)
@@ -210,25 +206,25 @@ fn main() -> ExitCode {
     // Make sure that the digest size is divisble by eight
     if digest_rem != 0usize {
         print_error!(args, "Error: Digest output size must be divisble by eight! (given value: {})", args.length.unwrap().get());
-        return ExitCode::FAILURE;
+        return Ok(false);
     }
 
     // Make sure that the digest size doesn't exceed the allowable maximum
     if digest_size > MAX_DIGEST_SIZE {
         print_error!(args, "Error: Digest output size exceeds the allowable maximum! (given value: {})", digest_size * 8usize);
-        return ExitCode::FAILURE;
+        return Ok(false);
     }
 
     // Check for snail level being out of bounds
     if args.snail > MAX_SNAIL_LEVEL {
         print_error!(args, "\n{}", include_str!("../../.assets/text/goat.txt"));
-        return ExitCode::FAILURE;
+        return Ok(false);
     }
 
     // Check the maximum allowable info length
     if args.info.as_ref().is_some_and(|str| str.len() > u8::MAX as usize) {
         print_error!(args, "Error: Length of \"info\" must not exceed 255 characters! (given length: {})", args.info.as_ref().unwrap().len());
-        return ExitCode::FAILURE;
+        return Ok(false);
     }
 
     // Install the interrupt (CTRL+C) handling routine
@@ -240,13 +236,15 @@ fn main() -> ExitCode {
     let mut output = stdout().lock();
 
     // Run built-in self-test, if it was requested by the user
-    let success = if args.self_test {
+    if args.self_test {
         self_test(&mut output, &args, &halt)
     } else if args.check {
         if args.files.is_empty() {
-            verify_from_stdin(&mut output, &args, &halt)
+            //verify_from_stdin(&mut output, &args, &halt)
+            unimplemented!("Not yet implemented!")
         } else {
-            verify_files(args.files.iter(), &mut output, &args, &halt)
+            //verify_files(args.files.iter(), &mut output, &args, &halt)
+            unimplemented!("Not yet implemented!")
         }
     } else {
         // Process all files and directories that were given on the command-line
@@ -254,19 +252,27 @@ fn main() -> ExitCode {
             //process_from_stdin(&mut output, digest_size, &args, &halt)
             unimplemented!("Not yet implemented!")
         } else {
-            process_files(&mut output, digest_size, &args, &halt)
+            process_files(&mut output, digest_size, args, halt)
         }
-    };
-
-    // Check if the process has been aborted (CTRL+C)
-    if halt.load(Ordering::SeqCst) {
-        print_error!(args, "Aborted: The process has been interrupted by the user!");
-        process::exit(130i32);
     }
+}
 
-    if success {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::FAILURE
+// ---------------------------------------------------------------------------
+// Entry point
+// ---------------------------------------------------------------------------
+
+/// Applicationm entry point (“main” function)
+fn main() -> ExitCode {
+    // Initialize the Args from the given command-line arguments
+    let args = Arc::new(Args::parse_command_line());
+
+    // Call the actual "main" function
+    match sponge256sum_main(Arc::clone(&args)) {
+        Ok(true) => ExitCode::SUCCESS,
+        Ok(false) => ExitCode::FAILURE,
+        Err(Aborted) => {
+            print_error!(args, "Aborted: The process has been interrupted by the user!");
+            ExitCode::from(130u8)
+        }
     }
 }

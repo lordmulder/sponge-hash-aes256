@@ -20,7 +20,7 @@ use std::{
 
 use crate::{
     arguments::{Args, HEADER_LINE},
-    common::Flag,
+    common::{Aborted, Flag},
     digest::digest_equal,
     environment::get_selftest_passes,
     print_error,
@@ -31,12 +31,12 @@ use crate::{
 // ---------------------------------------------------------------------------
 
 #[derive(Debug)]
-enum SelfTestError {
+enum Error {
     Aborted,
     IoError,
 }
 
-impl From<IoError> for SelfTestError {
+impl From<IoError> for Error {
     fn from(_io_error: IoError) -> Self {
         Self::IoError
     }
@@ -73,7 +73,7 @@ fn print_digest<T: AsRef<[u8]>>(output: &mut impl Write, prefix: &str, digest: T
 macro_rules! check_cancelled {
     ($halt:ident) => {
         if $halt.load(Ordering::Relaxed) {
-            return Err(SelfTestError::Aborted);
+            return Err(Error::Aborted);
         }
     };
 }
@@ -91,7 +91,7 @@ const MAX_ITERATION: u32 = 249989u32;
 
 const TOTAL_BYTES: u64 = (BUFFER_SIZE as u64) * (MAX_ITERATION as u64) * (PCG64_SEEDVALUE.len() as u64);
 
-fn do_test(seed: u64, digest_expected: &[u8; DEFAULT_DIGEST_SIZE], output: &mut impl Write, counter: &mut u64, halt: &Flag) -> Result<bool, SelfTestError> {
+fn do_test(seed: u64, digest_expected: &[u8; DEFAULT_DIGEST_SIZE], output: &mut impl Write, counter: &mut u64, halt: &Flag) -> Result<bool, Error> {
     let mut source = Pcg64Mcg::seed_from_u64(seed);
     let mut buffer = [0u8; BUFFER_SIZE];
     let mut hasher = SpongeHash256::default();
@@ -115,7 +115,7 @@ fn do_test(seed: u64, digest_expected: &[u8; DEFAULT_DIGEST_SIZE], output: &mut 
     Ok(success)
 }
 
-fn test_runner(output: &mut impl Write, passes: NonZeroU16, halt: &Flag) -> Result<bool, SelfTestError> {
+fn test_runner(output: &mut impl Write, passes: NonZeroU16, halt: &Flag) -> Result<bool, Error> {
     writeln!(output, "{}\n", HEADER_LINE)?;
     let mut elapsed_median = Median::new();
 
@@ -151,21 +151,21 @@ fn test_runner(output: &mut impl Write, passes: NonZeroU16, halt: &Flag) -> Resu
 // Self-test
 // ---------------------------------------------------------------------------
 
-pub fn self_test(output: &mut impl Write, args: &Args, halt: &Flag) -> bool {
+pub fn self_test(output: &mut impl Write, args: &Args, halt: &Flag) -> Result<bool, Aborted> {
     let passes = match get_selftest_passes() {
         Ok(value) => value,
         Err(error) => {
             print_error!(args, "Error: Invalid number of self-test passes \"{}\" specified!", error);
-            return false;
+            return Ok(false);
         }
     };
 
     match test_runner(output, passes, halt) {
-        Ok(result) => result,
-        Err(SelfTestError::Aborted) => false,
+        Ok(result) => Ok(result),
+        Err(Error::Aborted) => Err(Aborted),
         Err(error) => {
             print_error!(args, "Self-test encountered an error: {:?}", error);
-            false
+            Ok(false)
         }
     }
 }

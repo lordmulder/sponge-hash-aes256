@@ -20,6 +20,9 @@ pub const MAX_THREADS: usize = 32usize;
 /// Atomic flag
 pub type Flag = AtomicBool;
 
+/// Error type to indicate that a process was aborted
+pub struct Aborted;
+
 // ---------------------------------------------------------------------------
 // Helper macros
 // ---------------------------------------------------------------------------

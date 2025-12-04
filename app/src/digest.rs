@@ -28,12 +28,12 @@ const IO_BUFFER_SIZE: usize = 2048usize;
 // Error type
 // ---------------------------------------------------------------------------
 
-pub enum DigestError {
+pub enum Error {
     IoError,
     Aborted,
 }
 
-impl From<IoError> for DigestError {
+impl From<IoError> for Error {
     fn from(_io_error: IoError) -> Self {
         Self::IoError
     }
@@ -111,13 +111,13 @@ impl Hasher {
 macro_rules! check_cancelled {
     ($halt:ident) => {
         if $halt.load(Ordering::Relaxed) {
-            return Err(DigestError::Aborted);
+            return Err(Error::Aborted);
         }
     };
 }
 
 /// Process a single input file
-pub fn compute_digest(input: &mut dyn Read, digest_out: &mut [u8], args: &Args, halt: &Flag) -> Result<(), DigestError> {
+pub fn compute_digest(input: &mut dyn Read, digest_out: &mut [u8], args: &Args, halt: &Flag) -> Result<(), Error> {
     static LINE_BREAK: &str = "\n";
     let mut hasher = Hasher::new(&args.info, args.snail);
 

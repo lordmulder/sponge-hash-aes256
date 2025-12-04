@@ -7,9 +7,19 @@ use std::ffi::OsString;
 use std::sync::{Mutex, MutexGuard};
 use std::{
     fs::File,
-    io::{stdin, Error as IoError, Read, Result as IoResult, StdinLock},
+    io::{stdin, Read, Result as IoResult, StdinLock},
     path::Path,
 };
+
+// ---------------------------------------------------------------------------
+// Error type
+// ---------------------------------------------------------------------------
+
+#[derive(Debug)]
+pub enum Error {
+    Lock,
+    Open,
+}
 
 // ---------------------------------------------------------------------------
 // Standard streams
@@ -34,25 +44,28 @@ pub enum DataSource<'a> {
 }
 
 impl DataSource<'_> {
-    pub fn from_stdin() -> Result<Self, IoError> {
+    pub fn from_stdin() -> Result<Self, Error> {
         match STDIN_MUTEX.try_lock() {
-            Ok(guard) => Ok(DataSource::Stream((guard, stdin().lock()))),
-            Err(_) => Err(IoError::other("Failed to lock 'stdin' handle, already in use!")),
+            Ok(guard) => Ok(Self::Stream((guard, stdin().lock()))),
+            Err(_) => Err(Error::Lock),
         }
     }
 
-    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, IoError> {
+    pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         if !STDIN_NAME.eq(path.as_ref()) {
-            Ok(DataSource::File(File::open(path)?))
+            match File::open(path) {
+                Ok(file) => Ok(Self::File(file)),
+                Err(_) => Err(Error::Open),
+            }
         } else {
-            DataSource::from_stdin()
+            Self::from_stdin()
         }
     }
 
     pub fn is_directory(&self) -> bool {
         match self {
-            DataSource::File(file) => file.metadata().is_ok_and(|meta| meta.is_dir()),
-            DataSource::Stream(_) => false,
+            Self::File(file) => file.metadata().is_ok_and(|meta| meta.is_dir()),
+            Self::Stream(_) => false,
         }
     }
 }
@@ -60,10 +73,10 @@ impl DataSource<'_> {
 impl Read for DataSource<'_> {
     #[inline(always)]
     fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
-        let reader: &mut dyn Read = match self {
-            DataSource::File(file) => file,
+        match self {
+            DataSource::File(file) => file as &mut dyn Read,
             DataSource::Stream(stream) => &mut stream.1,
-        };
-        reader.read(buf)
+        }
+        .read(buf)
     }
 }

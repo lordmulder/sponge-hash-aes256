@@ -16,7 +16,7 @@ use std::{
 use crate::{
     arguments::Args,
     common::{Flag, MAX_DIGEST_SIZE},
-    digest::{compute_digest, digest_equal, DigestError},
+    digest::{compute_digest, digest_equal, Error as DigestError},
     io::{DataSource, STDIN_NAME},
     print_error,
 };
@@ -114,7 +114,7 @@ fn verify_file(path: &OsStr, digest_expected: &[u8], output: &mut impl Write, ar
                 }
             }
         }
-        Err(error) => handle_error!(args, errors, "Failed to open input file: {:?} ({})", path, error),
+        Err(error) => handle_error!(args, errors, "Failed to open input file: {:?} ({:?})", path, error),
     }
 
     true
@@ -180,6 +180,7 @@ fn verify_checksums(
 // ---------------------------------------------------------------------------
 
 /// Read checksums from a file
+#[allow(dead_code)]
 fn read_checksum_file(path: &PathBuf, output: &mut impl Write, args: &Args, halt: &Arc<Flag>, errors: &mut usize, faults: &mut usize) -> bool {
     match File::open(path) {
         Ok(mut file) => {
@@ -195,11 +196,12 @@ fn read_checksum_file(path: &PathBuf, output: &mut impl Write, args: &Args, halt
     true
 }
 
+#[allow(dead_code)]
 pub fn verify_from_stdin(output: &mut impl Write, args: &Args, halt: &Arc<Flag>) -> bool {
     let mut input = match DataSource::from_stdin() {
         Ok(stream) => stream,
         Err(error) => {
-            print_error!(args, "Failed to acquire the standard input stream: {}", error);
+            print_error!(args, "Failed to acquire the standard input stream: {:?}", error);
             return false;
         }
     };
@@ -218,6 +220,7 @@ pub fn verify_from_stdin(output: &mut impl Write, args: &Args, halt: &Arc<Flag>)
 // ---------------------------------------------------------------------------
 
 /// Iterate a list of checksum files
+#[allow(dead_code)]
 pub fn verify_files(files: Iter<'_, PathBuf>, output: &mut impl Write, args: &Args, halt: &Arc<Flag>) -> bool {
     let (mut errors, mut faults) = (0usize, 0usize);
 
