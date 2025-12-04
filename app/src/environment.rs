@@ -5,7 +5,7 @@
 use std::{
     env,
     fmt::{Display, Formatter, Result as FmtResult},
-    num::{NonZeroU16, NonZeroUsize},
+    num::NonZeroU16,
 };
 
 use crate::common::MAX_THREADS;
@@ -53,17 +53,11 @@ pub fn get_search_strategy() -> Result<bool, InvalidValue> {
 
 /// The number of threads for multi-threaded processing
 #[inline]
-pub fn get_thread_count(multi_threading: bool) -> Result<NonZeroUsize, InvalidValue> {
-    if multi_threading {
-        match get_env("SPONGE256SUM_THREAD_COUNT") {
-            Some(str) => str.parse::<usize>().map(NonZeroUsize::new).map_err(|_| InvalidValue(str)),
-            None => Ok(None),
-        }
-    } else {
-        Ok(NonZeroUsize::new(1usize))
+pub fn get_thread_count() -> Result<usize, InvalidValue> {
+    match get_env("SPONGE256SUM_THREAD_COUNT") {
+        Some(str) => str.parse::<usize>().map(|value| value.min(MAX_THREADS)).map_err(|_| InvalidValue(str)),
+        None => Ok(usize::MIN),
     }
-    .map(|value| value.unwrap_or_else(|| NonZeroUsize::new(num_cpus::get()).unwrap()))
-    .map(|value| value.min(NonZeroUsize::new(MAX_THREADS).unwrap()))
 }
 
 /// The number of threads for multi-threaded processing

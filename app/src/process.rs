@@ -11,6 +11,7 @@ use std::{
     fs::{self, DirEntry, Metadata},
     io::{Result as IoResult, Write},
     iter,
+    num::NonZeroUsize,
     path::PathBuf,
     str::from_utf8,
     sync::{atomic::Ordering, Arc},
@@ -19,7 +20,7 @@ use std::{
 
 use crate::{
     arguments::Args,
-    common::{Aborted, Flag, MAX_DIGEST_SIZE},
+    common::{hardware_concurrency, Aborted, Flag, MAX_DIGEST_SIZE},
     digest::{compute_digest, Error as DigestError},
     environment::{get_search_strategy, get_thread_count},
     io::{DataSource, STDIN_NAME},
@@ -410,12 +411,17 @@ pub fn process_files(output: &mut impl Write, digest_size: usize, args: Arc<Args
     assert!(!args.files.is_empty(), "The list of input files must not be empty!");
 
     // Determine number of threads
-    let thread_count = match get_thread_count(args.multi_threading) {
-        Ok(value) => value.get(),
-        Err(error) => {
-            print_error!(args, "Error: Invalid thread count \"{}\" specified!", error);
-            return Ok(false);
+    let thread_count = if args.multi_threading {
+        match get_thread_count() {
+            Ok(value) if value == usize::MIN => hardware_concurrency(),
+            Ok(value) => NonZeroUsize::new(value).unwrap(),
+            Err(error) => {
+                print_error!(args, "Error: Invalid thread count \"{}\" specified!", error);
+                return Ok(false);
+            }
         }
+    } else {
+        NonZeroUsize::MIN
     };
 
     // Determine directory walking strategy
@@ -427,8 +433,8 @@ pub fn process_files(output: &mut impl Write, digest_size: usize, args: Arc<Args
         }
     };
 
-    if thread_count > 1usize {
-        process_mt(output, thread_count, digest_size, breadth_first, &args, &halt)
+    if thread_count > NonZeroUsize::MIN {
+        process_mt(output, thread_count.get(), digest_size, breadth_first, &args, &halt)
     } else {
         process_st(output, digest_size, breadth_first, &args, &halt)
     }

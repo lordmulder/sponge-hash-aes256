@@ -2,7 +2,7 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use std::sync::atomic::AtomicBool;
+use std::{num::NonZeroUsize, sync::atomic::AtomicBool};
 
 // ---------------------------------------------------------------------------
 // Common definitions
@@ -15,13 +15,25 @@ pub const MAX_SNAIL_LEVEL: u8 = 4u8;
 pub const MAX_DIGEST_SIZE: usize = 64usize;
 
 /// Maximum number of threads
-pub const MAX_THREADS: usize = 32usize;
+pub const MAX_THREADS: usize = 64usize;
 
 /// Atomic flag
 pub type Flag = AtomicBool;
 
 /// Error type to indicate that a process was aborted
 pub struct Aborted;
+
+// ---------------------------------------------------------------------------
+// Detect number of CPU cores
+// ---------------------------------------------------------------------------
+
+fn cores_to_threads(cores: usize) -> NonZeroUsize {
+    NonZeroUsize::new(((2.0 * (cores as f64).log2()).floor() as usize).max(1usize)).unwrap()
+}
+
+pub fn hardware_concurrency() -> NonZeroUsize {
+    cores_to_threads(num_cpus::get())
+}
 
 // ---------------------------------------------------------------------------
 // Helper macros
