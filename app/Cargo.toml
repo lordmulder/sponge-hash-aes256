@@ -27,6 +27,9 @@ rustc-version-const = { version = "1.1.0", default-features = false }
 sponge-hash-aes256 = { path = "../lib", default-features = false }
 wild = { version = "2.2.1", default-features = false }
 
+[target.'cfg(all(any(all(target_os = "linux", target_env = "musl"), target_os = "windows"), any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64")))'.dependencies]
+mimalloc = { version = "0.1.48", default-features = false }
+
 [dev-dependencies]
 regex = { version = "1.12.2", default-features = false, features = ["unicode"] }
 
