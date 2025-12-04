@@ -20,6 +20,10 @@ pub const MAX_THREADS: usize = 64usize;
 /// Atomic flag
 pub type Flag = AtomicBool;
 
+/// Type for holding a digest
+pub type Digest = [u8; MAX_DIGEST_SIZE];
+pub const EMPTY_DIGEST: Digest = [0u8; MAX_DIGEST_SIZE];
+
 /// Error type to indicate that a process was aborted
 pub struct Aborted;
 
@@ -27,10 +31,14 @@ pub struct Aborted;
 // Detect number of CPU cores
 // ---------------------------------------------------------------------------
 
+/// Map the number of available CPU cores to the number of threads
+///
+/// **Note:** This avoids running too many parallel threads on systems with a large number of CPU cores!
 fn cores_to_threads(cores: usize) -> NonZeroUsize {
     NonZeroUsize::new(((2.0 * (cores as f64).log2()).floor() as usize).max(1usize)).unwrap()
 }
 
+/// Get the "optimal" number of parallel threads for the current system
 pub fn hardware_concurrency() -> NonZeroUsize {
     cores_to_threads(num_cpus::get())
 }

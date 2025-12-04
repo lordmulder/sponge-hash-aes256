@@ -173,6 +173,7 @@ use std::{io::stdout, process::ExitCode, sync::Arc};
 
 use crate::common::Aborted;
 use crate::process::process_stdin;
+use crate::verify::{verify_files, verify_stdin};
 use crate::{
     arguments::Args,
     common::{MAX_DIGEST_SIZE, MAX_SNAIL_LEVEL},
@@ -245,20 +246,19 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
     // Run built-in self-test, if it was requested by the user
     if args.self_test {
         self_test(&mut output, &args, &halt)
-    } else if args.check {
-        if args.files.is_empty() {
-            //verify_from_stdin(&mut output, &args, &halt)
-            unimplemented!("Not yet implemented!")
-        } else {
-            //verify_files(args.files.iter(), &mut output, &args, &halt)
-            unimplemented!("Not yet implemented!")
-        }
-    } else {
+    } else if !args.check {
         // Process all files and directories that were given on the command-line
         if args.files.is_empty() {
             process_stdin(&mut output, digest_size, args, halt)
         } else {
             process_files(&mut output, digest_size, args, halt)
+        }
+    } else {
+        // Verify all checksum files that were given on the command-line
+        if args.files.is_empty() {
+            verify_stdin(&mut output, args, halt)
+        } else {
+            verify_files(&mut output, args, halt)
         }
     }
 }

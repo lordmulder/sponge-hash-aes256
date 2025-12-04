@@ -20,7 +20,7 @@ use std::{
 
 use crate::{
     arguments::Args,
-    common::{hardware_concurrency, Aborted, Flag, MAX_DIGEST_SIZE},
+    common::{hardware_concurrency, Aborted, Digest, Flag, EMPTY_DIGEST, MAX_DIGEST_SIZE},
     digest::{compute_digest, Error as DigestError},
     environment::{get_search_strategy, get_thread_count},
     io::{DataSource, STDIN_NAME},
@@ -150,7 +150,7 @@ fn print_result(output: &mut impl Write, digest_result: &DigestResult, digest_si
     }
 }
 
-fn print_digest(output: &mut impl Write, file_name: &OsStr, digest: &[u8; MAX_DIGEST_SIZE], digest_size: usize, args: &Args) -> IoResult<()> {
+fn print_digest(output: &mut impl Write, file_name: &OsStr, digest: &Digest, digest_size: usize, args: &Args) -> IoResult<()> {
     let mut hex_buffer = [0u8; MAX_DIGEST_SIZE * 2usize];
     let hex_slice = &mut hex_buffer[..digest_size.checked_mul(2usize).unwrap()];
 
@@ -179,7 +179,7 @@ fn print_digest(output: &mut impl Write, file_name: &OsStr, digest: &[u8; MAX_DI
 // Compute file digest
 // ---------------------------------------------------------------------------
 
-type DigestResult = Result<([u8; MAX_DIGEST_SIZE], PathBuf), TaskError>;
+type DigestResult = Result<(Digest, PathBuf), TaskError>;
 
 fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt: &Flag) -> Result<DigestResult, Aborted> {
     match DataSource::from_path(&file_name) {
@@ -187,7 +187,7 @@ fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt
             if source.is_directory() {
                 Ok(Err(TaskError::SrcIsDir(file_name)))
             } else {
-                let mut digest = [0u8; MAX_DIGEST_SIZE];
+                let mut digest = EMPTY_DIGEST;
                 match compute_digest(&mut source, &mut digest[..digest_size], args, halt) {
                     Ok(_) => Ok(Ok((digest, file_name))),
                     Err(DigestError::IoError) => Ok(Err(TaskError::FileRead(file_name))),
@@ -454,7 +454,7 @@ pub fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args
         }
     };
 
-    let mut digest = [0u8; MAX_DIGEST_SIZE];
+    let mut digest = EMPTY_DIGEST;
 
     match compute_digest(&mut source, &mut digest[..digest_size], &args, &halt) {
         Ok(_) => Ok(print_digest(output, &STDIN_NAME, &digest, digest_size, &args).is_ok()),
