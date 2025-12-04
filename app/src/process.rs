@@ -22,7 +22,7 @@ use crate::{
     common::{Aborted, Flag, MAX_DIGEST_SIZE},
     digest::{compute_digest, Error as DigestError},
     environment::{get_search_strategy, get_thread_count},
-    io::DataSource,
+    io::{DataSource, STDIN_NAME},
     print_error,
 };
 
@@ -121,6 +121,12 @@ macro_rules! check_cancelled {
             return Err(ThreadError::Aborted);
         }
     };
+    ($halt:ident, $aborted:ident) => {
+        if $halt.load(Ordering::Relaxed) {
+            $aborted = true;
+            break;
+        }
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +180,7 @@ fn print_digest(output: &mut impl Write, file_name: &OsStr, digest: &[u8; MAX_DI
 
 type DigestResult = Result<([u8; MAX_DIGEST_SIZE], PathBuf), TaskError>;
 
-fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt: &Flag) -> Result<DigestResult, ThreadError> {
+fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt: &Flag) -> Result<DigestResult, Aborted> {
     match DataSource::from_path(&file_name) {
         Ok(mut source) => {
             if source.is_directory() {
@@ -184,7 +190,7 @@ fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt
                 match compute_digest(&mut source, &mut digest[..digest_size], args, halt) {
                     Ok(_) => Ok(Ok((digest, file_name))),
                     Err(DigestError::IoError) => Ok(Err(TaskError::FileRead(file_name))),
-                    Err(DigestError::Aborted) => Err(ThreadError::Aborted),
+                    Err(DigestError::Aborted) => Err(Aborted),
                 }
             }
         }
@@ -197,7 +203,7 @@ fn compute_thread(path_rx: &Receiver<PathResult>, digest_tx: &Sender<DigestResul
         check_cancelled!(halt);
         match path_result {
             Ok(path) => {
-                let digest_result = compute_file_digest(path, digest_size, args, halt)?;
+                let digest_result = compute_file_digest(path, digest_size, args, halt).or(Err(ThreadError::Aborted))?;
                 let is_success = digest_result.is_ok();
                 digest_tx.send(digest_result)?;
                 if !(is_success || args.keep_going) {
@@ -266,7 +272,7 @@ fn iterate_directory(path_tx: &Sender<PathResult>, dir_name: PathBuf, visited: &
 }
 
 /// Iterate a list of input files
-fn iterate_thread(path_tx: &Sender<PathResult>, breadth_first: bool, args: &Args, halt: &Flag) -> Result<(), ThreadError> {
+fn iterate_thread(path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &Flag) -> Result<(), ThreadError> {
     let handle_directories = args.dirs || args.recursive;
 
     for file_name in args.files.iter().cloned() {
@@ -274,7 +280,7 @@ fn iterate_thread(path_tx: &Sender<PathResult>, breadth_first: bool, args: &Args
         let directory_info = if handle_directories { fs::metadata(&file_name).ok().filter(|meta| meta.is_dir()) } else { None };
         if let Some(meta_data) = directory_info {
             let visited = file_id::get(&meta_data).map_or_else(FileIdSet::new, |dir_id| iter::once(dir_id).collect());
-            if !(iterate_directory(path_tx, file_name, &visited, breadth_first, args, halt)? || args.keep_going) {
+            if !(iterate_directory(path_tx, file_name, &visited, bfs, args, halt)? || args.keep_going) {
                 break;
             }
         } else {
@@ -286,12 +292,123 @@ fn iterate_thread(path_tx: &Sender<PathResult>, breadth_first: bool, args: &Args
 }
 
 // ---------------------------------------------------------------------------
-// Main
+// Process implementation
+// ---------------------------------------------------------------------------
+
+fn process_mt(output: &mut impl Write, thread_count: usize, digest_size: usize, bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
+    // Initialize thread pool
+    let mut thread_pool = Vec::with_capacity(thread_count.saturating_add(1usize));
+    let (path_tx, path_rx) = bounded::<PathResult>(thread_count.saturating_mul(16usize));
+    let (digest_tx, digest_rx) = bounded::<DigestResult>(thread_count);
+
+    // Start the file iteration thread
+    let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
+    thread_pool.push(thread::spawn(move || iterate_thread(&path_tx, bfs, &args_cloned, &halt_cloned)));
+
+    // Start the worker threads
+    for (path_rx, digest_tx) in iter::repeat_n(path_rx, thread_count).zip(iter::repeat_n(digest_tx, thread_count)) {
+        let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
+        thread_pool.push(thread::spawn(move || compute_thread(&path_rx, &digest_tx, digest_size, &args_cloned, &halt_cloned)));
+    }
+
+    // Process all digest results
+    let (mut file_errors, mut write_errors, mut is_aborted) = (u64::MIN, false, false);
+    while let Ok(digest_result) = digest_rx.recv() {
+        check_cancelled!(halt, is_aborted);
+        if digest_result.is_err() {
+            file_errors = file_errors.saturating_add(1u64);
+        }
+        if !print_result(output, &digest_result, digest_size, args) {
+            write_errors = true;
+            break;
+        } else if !(digest_result.is_ok() || args.keep_going) {
+            break;
+        }
+    }
+
+    // Wait until all threads have completed
+    drop(digest_rx);
+    for thread in thread_pool.drain(..) {
+        if matches!(thread.join().expect("Failed to join worker thread!"), Err(ThreadError::Aborted)) {
+            is_aborted = true;
+        }
+    }
+
+    // Has the process been aborted?
+    if is_aborted {
+        return Err(Aborted);
+    }
+
+    // Print warning if any file(s) have been skipped
+    if args.keep_going && (file_errors > 0u64) {
+        print_error!(args, "WARNING: {} file(s) were skipped due to errors.", file_errors);
+    }
+
+    // Check for errors
+    Ok((file_errors == u64::MIN) && (!write_errors))
+}
+
+fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
+    // Initialize thread pool
+    let (path_tx, path_rx) = bounded::<PathResult>(32usize);
+
+    // Start the file iteration thread
+    let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
+    let thread_handle = thread::spawn(move || iterate_thread(&path_tx, bfs, &args_cloned, &halt_cloned));
+
+    // Process all files in the queue
+    let (mut file_errors, mut write_errors, mut is_aborted) = (u64::MIN, false, false);
+    while let Ok(path_result) = path_rx.recv() {
+        check_cancelled!(halt, is_aborted);
+        let digest_result = match path_result {
+            Ok(path) => match compute_file_digest(path, digest_size, args, halt) {
+                Ok(digest_result) => digest_result,
+                Err(Aborted) => {
+                    is_aborted |= true;
+                    break;
+                }
+            },
+            Err(error) => Err(error),
+        };
+        if digest_result.is_err() {
+            file_errors = file_errors.saturating_add(1u64);
+        }
+        if !print_result(output, &digest_result, digest_size, args) {
+            write_errors = true;
+            break;
+        } else if !(digest_result.is_ok() || args.keep_going) {
+            break;
+        }
+    }
+
+    // Wait until iterating thread has completed
+    drop(path_rx);
+    if matches!(thread_handle.join().expect("Failed to join worker thread!"), Err(ThreadError::Aborted)) {
+        is_aborted = true;
+    }
+
+    // Has the process been aborted?
+    if is_aborted {
+        return Err(Aborted);
+    }
+
+    // Print warning if any file(s) have been skipped
+    if args.keep_going && (file_errors > 0u64) {
+        print_error!(args, "WARNING: {} file(s) were skipped due to errors.", file_errors);
+    }
+
+    // Check for errors
+    Ok((file_errors == u64::MIN) && (!write_errors))
+}
+
+// ---------------------------------------------------------------------------
+// Process files
 // ---------------------------------------------------------------------------
 
 /// Process all input files
-#[allow(dead_code)]
 pub fn process_files(output: &mut impl Write, digest_size: usize, args: Arc<Args>, halt: Arc<Flag>) -> Result<bool, Aborted> {
+    assert!(!args.files.is_empty(), "The list of input files must not be empty!");
+
     // Determine number of threads
     let thread_count = match get_thread_count(args.multi_threading) {
         Ok(value) => value.get(),
@@ -310,48 +427,35 @@ pub fn process_files(output: &mut impl Write, digest_size: usize, args: Arc<Args
         }
     };
 
-    // Initialize thread pool
-    let mut thread_pool = Vec::with_capacity(thread_count.saturating_add(1usize));
-    let (path_tx, path_rx) = bounded::<PathResult>(thread_count.saturating_mul(16usize));
-    let (digest_tx, digest_rx) = bounded::<DigestResult>(thread_count);
-
-    // Start the file iteration thread
-    let (args_cloned, halt_cloned) = (Arc::clone(&args), Arc::clone(&halt));
-    thread_pool.push(thread::spawn(move || iterate_thread(&path_tx, breadth_first, &args_cloned, &halt_cloned)));
-
-    // Start the worker threads
-    for (path_rx, digest_tx) in iter::repeat_n(path_rx, thread_count).zip(iter::repeat_n(digest_tx, thread_count)) {
-        let (args_cloned, halt_cloned) = (Arc::clone(&args), Arc::clone(&halt));
-        thread_pool.push(thread::spawn(move || compute_thread(&path_rx, &digest_tx, digest_size, &args_cloned, &halt_cloned)));
+    if thread_count > 1usize {
+        process_mt(output, thread_count, digest_size, breadth_first, &args, &halt)
+    } else {
+        process_st(output, digest_size, breadth_first, &args, &halt)
     }
+}
 
-    // Process all digest results
-    let (mut file_errors, mut write_errors) = (u64::MIN, false);
-    while let Ok(digest_result) = digest_rx.recv() {
-        if !print_result(output, &digest_result, digest_size, &args) {
-            write_errors = true;
-            break;
-        } else if digest_result.is_err() {
-            file_errors = file_errors.saturating_add(1u64);
-            if !args.keep_going {
-                break;
-            }
+// ---------------------------------------------------------------------------
+// Process STDIN
+// ---------------------------------------------------------------------------
+
+/// Process data from 'stdin' stream
+pub fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args>, halt: Arc<Flag>) -> Result<bool, Aborted> {
+    let mut source = match DataSource::from_stdin() {
+        Ok(stream) => stream,
+        Err(_) => {
+            print_error!(args, "Failed to acquire the standard input stream!");
+            return Ok(false);
         }
-    }
+    };
 
-    // Wait until all threads have completed
-    drop(digest_rx);
-    for thread in thread_pool.drain(..) {
-        if matches!(thread.join().expect("Failed to join worker thread!"), Err(ThreadError::Aborted)) {
-            return Err(Aborted);
+    let mut digest = [0u8; MAX_DIGEST_SIZE];
+
+    match compute_digest(&mut source, &mut digest[..digest_size], &args, &halt) {
+        Ok(_) => Ok(print_digest(output, &STDIN_NAME, &digest, digest_size, &args).is_ok()),
+        Err(DigestError::IoError) => {
+            print_error!(args, "Failed to read data from standard input stream!");
+            Ok(false)
         }
+        Err(DigestError::Aborted) => Err(Aborted),
     }
-
-    // Print warning if any file(s) have been skipped
-    if args.keep_going && (file_errors > 0u64) {
-        print_error!(args, "WARNING: {} file(s) were skipped due to errors.", file_errors);
-    }
-
-    // Check for errors
-    Ok((file_errors == u64::MIN) && (!write_errors))
 }

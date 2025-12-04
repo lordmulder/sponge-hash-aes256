@@ -162,7 +162,7 @@ mod common;
 mod digest;
 mod environment;
 mod io;
-mod process_files;
+mod process;
 mod self_test;
 mod verify;
 
@@ -172,10 +172,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::{io::stdout, process::ExitCode, sync::Arc};
 
 use crate::common::Aborted;
+use crate::process::process_stdin;
 use crate::{
     arguments::Args,
     common::{MAX_DIGEST_SIZE, MAX_SNAIL_LEVEL},
-    process_files::process_files,
+    process::process_files,
     self_test::self_test,
 };
 
@@ -249,8 +250,7 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
     } else {
         // Process all files and directories that were given on the command-line
         if args.files.is_empty() {
-            //process_from_stdin(&mut output, digest_size, &args, &halt)
-            unimplemented!("Not yet implemented!")
+            process_stdin(&mut output, digest_size, args, halt)
         } else {
             process_files(&mut output, digest_size, args, halt)
         }
