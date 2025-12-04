@@ -17,7 +17,7 @@ use std::{
 
 use crate::{
     arguments::Args,
-    common::{hardware_concurrency, Aborted, Digest, Flag, EMPTY_DIGEST},
+    common::{calloc_vec, hardware_concurrency, Aborted, Digest, Flag},
     environment::get_thread_count,
     print_error,
 };
@@ -80,17 +80,20 @@ macro_rules! check_cancelled {
 // Read checksums from checksum file
 // ---------------------------------------------------------------------------
 
-type ReadResult = Result<(Digest, usize, PathBuf), TaskError>;
+type ReadResult = Result<(Digest, PathBuf), TaskError>;
 struct Malformed;
 
 /// Parse a single line from checksum file
 #[allow(clippy::collapsible_if)]
-fn parse_checksum_line<'a>(line: &'a str, digest: &mut Digest) -> Result<(&'a OsStr, usize), Malformed> {
+fn parse_checksum_line(line: &str) -> Result<(&OsStr, Digest), Malformed> {
     if let Some((digest_hex, input_name)) = line.split_once(|c: char| char::is_ascii_whitespace(&c)) {
         if (!digest_hex.is_empty()) && (!input_name.is_empty()) {
             let (length, remainder) = digest_hex.len().div_rem(&2usize);
-            if (length > 0usize) && (remainder == 0usize) && decode_to_slice(digest_hex, &mut digest[..length]).is_ok() {
-                return Ok((OsStr::new(input_name), length));
+            if (length > usize::MIN) && (remainder == usize::MIN) {
+                let mut digest = calloc_vec(length);
+                if decode_to_slice(digest_hex, digest.as_mut_slice()).is_ok() {
+                    return Ok((OsStr::new(input_name), digest));
+                }
             }
         }
     }
@@ -100,16 +103,14 @@ fn parse_checksum_line<'a>(line: &'a str, digest: &mut Digest) -> Result<(&'a Os
 
 /// Read all checksums from source
 fn read_checksum_data(checksum_tx: &Sender<ReadResult>, input: &mut dyn Read, input_name: PathBuf, args: &Args, halt: &Flag) -> Result<bool, ThreadError> {
-    let mut digest_buffer = EMPTY_DIGEST;
-
     for (line_no, line) in BufReader::new(input).lines().enumerate() {
         check_cancelled!(halt);
         match line {
             Ok(line) => {
                 let line_trimmed = line.trim_start();
                 if !line_trimmed.is_empty() {
-                    if let Ok((file_name, digest_len)) = parse_checksum_line(line_trimmed, &mut digest_buffer) {
-                        checksum_tx.send(Ok((digest_buffer, digest_len, PathBuf::from(file_name))))?;
+                    if let Ok((file_name, digest)) = parse_checksum_line(line_trimmed) {
+                        checksum_tx.send(Ok((digest, PathBuf::from(file_name))))?;
                     } else {
                         checksum_tx.send(Err(TaskError::CheckParseErr(input_name.clone(), line_no + 1usize)))?;
                         if !args.keep_going {

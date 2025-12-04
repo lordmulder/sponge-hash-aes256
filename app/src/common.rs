@@ -2,7 +2,9 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
+use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
 use std::{num::NonZeroUsize, sync::atomic::AtomicBool};
+use tinyvec::TinyVec;
 
 // ---------------------------------------------------------------------------
 // Common definitions
@@ -12,17 +14,16 @@ use std::{num::NonZeroUsize, sync::atomic::AtomicBool};
 pub const MAX_SNAIL_LEVEL: u8 = 4u8;
 
 /// Maximum allowable digest size, specified in bytes
-pub const MAX_DIGEST_SIZE: usize = 64usize;
+pub const MAX_DIGEST_SIZE: usize = 8usize * DEFAULT_DIGEST_SIZE;
 
 /// Maximum number of threads
 pub const MAX_THREADS: usize = 64usize;
 
+/// Type for holding a digest
+pub type Digest = TinyVec<[u8; DEFAULT_DIGEST_SIZE]>;
+
 /// Atomic flag
 pub type Flag = AtomicBool;
-
-/// Type for holding a digest
-pub type Digest = [u8; MAX_DIGEST_SIZE];
-pub const EMPTY_DIGEST: Digest = [0u8; MAX_DIGEST_SIZE];
 
 /// Error type to indicate that a process was aborted
 pub struct Aborted;
@@ -41,6 +42,17 @@ fn cores_to_threads(cores: usize) -> NonZeroUsize {
 /// Get the "optimal" number of parallel threads for the current system
 pub fn hardware_concurrency() -> NonZeroUsize {
     cores_to_threads(num_cpus::get())
+}
+
+// ---------------------------------------------------------------------------
+// TinyVec helper
+// ---------------------------------------------------------------------------
+
+#[inline(always)]
+pub fn calloc_vec<const N: usize>(length: usize) -> TinyVec<[u8; N]> {
+    let mut digest = TinyVec::with_capacity(length);
+    digest.resize(length, 0u8);
+    digest
 }
 
 // ---------------------------------------------------------------------------

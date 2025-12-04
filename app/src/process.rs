@@ -4,6 +4,7 @@
 
 use crossbeam_channel::{bounded, Receiver, SendError, Sender};
 use hex::encode_to_slice;
+use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
 use std::{
     borrow::Cow,
     collections::BTreeSet,
@@ -20,7 +21,7 @@ use std::{
 
 use crate::{
     arguments::Args,
-    common::{hardware_concurrency, Aborted, Digest, Flag, EMPTY_DIGEST, MAX_DIGEST_SIZE},
+    common::{calloc_vec, hardware_concurrency, Aborted, Digest, Flag},
     digest::{compute_digest, Error as DigestError},
     environment::{get_search_strategy, get_thread_count},
     io::{DataSource, STDIN_NAME},
@@ -134,9 +135,9 @@ macro_rules! check_cancelled {
 // Print results
 // ---------------------------------------------------------------------------
 
-fn print_result(output: &mut impl Write, digest_result: &DigestResult, digest_size: usize, args: &Args) -> bool {
+fn print_result(output: &mut impl Write, digest_result: &DigestResult, args: &Args) -> bool {
     match digest_result {
-        Ok(digest) => print_digest(output, digest.1.as_os_str(), &digest.0, digest_size, args).is_ok(),
+        Ok(digest) => print_digest(output, digest.1.as_os_str(), &digest.0, args).is_ok(),
         Err(error) => {
             match error {
                 TaskError::DirOpen(path) => print_error!(args, "Failed to open directory: {:?}", path),
@@ -150,22 +151,20 @@ fn print_result(output: &mut impl Write, digest_result: &DigestResult, digest_si
     }
 }
 
-fn print_digest(output: &mut impl Write, file_name: &OsStr, digest: &Digest, digest_size: usize, args: &Args) -> IoResult<()> {
-    let mut hex_buffer = [0u8; MAX_DIGEST_SIZE * 2usize];
-    let hex_slice = &mut hex_buffer[..digest_size.checked_mul(2usize).unwrap()];
-
-    encode_to_slice(&digest[..digest_size], hex_slice).unwrap();
+fn print_digest(output: &mut impl Write, file_name: &OsStr, digest: &Digest, args: &Args) -> IoResult<()> {
+    let mut hex_buffer = calloc_vec::<{ 2usize * DEFAULT_DIGEST_SIZE }>(digest.len().checked_mul(2usize).unwrap());
+    encode_to_slice(digest.as_slice(), hex_buffer.as_mut_slice()).unwrap();
 
     if args.null {
         if args.plain {
-            write!(output, "{}\0", from_utf8(hex_slice).unwrap())?;
+            write!(output, "{}\0", from_utf8(hex_buffer.as_mut_slice()).unwrap())?;
         } else {
-            write!(output, "{} {}\0", from_utf8(hex_slice).unwrap(), file_name.to_string_lossy())?;
+            write!(output, "{} {}\0", from_utf8(hex_buffer.as_mut_slice()).unwrap(), file_name.to_string_lossy())?;
         }
     } else if args.plain {
-        writeln!(output, "{}", from_utf8(hex_slice).unwrap())?;
+        writeln!(output, "{}", from_utf8(hex_buffer.as_mut_slice()).unwrap())?;
     } else {
-        writeln!(output, "{} {}", from_utf8(hex_slice).unwrap(), file_name.to_string_lossy())?;
+        writeln!(output, "{} {}", from_utf8(hex_buffer.as_mut_slice()).unwrap(), file_name.to_string_lossy())?;
     }
 
     if args.flush {
@@ -187,8 +186,8 @@ fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt
             if source.is_directory() {
                 Ok(Err(TaskError::SrcIsDir(file_name)))
             } else {
-                let mut digest = EMPTY_DIGEST;
-                match compute_digest(&mut source, &mut digest[..digest_size], args, halt) {
+                let mut digest = calloc_vec(digest_size);
+                match compute_digest(&mut source, digest.as_mut_slice(), args, halt) {
                     Ok(_) => Ok(Ok((digest, file_name))),
                     Err(DigestError::IoError) => Ok(Err(TaskError::FileRead(file_name))),
                     Err(DigestError::Aborted) => Err(Aborted),
@@ -319,7 +318,7 @@ fn process_mt(output: &mut impl Write, thread_count: usize, digest_size: usize, 
         if digest_result.is_err() {
             file_errors = file_errors.saturating_add(1u64);
         }
-        if !print_result(output, &digest_result, digest_size, args) {
+        if !print_result(output, &digest_result, args) {
             write_errors = true;
             break;
         } else if !(digest_result.is_ok() || args.keep_going) {
@@ -374,7 +373,7 @@ fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc
         if digest_result.is_err() {
             file_errors = file_errors.saturating_add(1u64);
         }
-        if !print_result(output, &digest_result, digest_size, args) {
+        if !print_result(output, &digest_result, args) {
             write_errors = true;
             break;
         } else if !(digest_result.is_ok() || args.keep_going) {
@@ -446,7 +445,7 @@ pub fn process_files(output: &mut impl Write, digest_size: usize, args: Arc<Args
 
 /// Process data from 'stdin' stream
 pub fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args>, halt: Arc<Flag>) -> Result<bool, Aborted> {
-    let mut source = match DataSource::from_stdin() {
+    let mut stdin = match DataSource::from_stdin() {
         Ok(stream) => stream,
         Err(_) => {
             print_error!(args, "Failed to acquire the standard input stream!");
@@ -454,10 +453,10 @@ pub fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args
         }
     };
 
-    let mut digest = EMPTY_DIGEST;
+    let mut digest = calloc_vec(digest_size);
 
-    match compute_digest(&mut source, &mut digest[..digest_size], &args, &halt) {
-        Ok(_) => Ok(print_digest(output, &STDIN_NAME, &digest, digest_size, &args).is_ok()),
+    match compute_digest(&mut stdin, digest.as_mut_slice(), &args, &halt) {
+        Ok(_) => Ok(print_digest(output, &STDIN_NAME, &digest, &args).is_ok()),
         Err(DigestError::IoError) => {
             print_error!(args, "Failed to read data from standard input stream!");
             Ok(false)
