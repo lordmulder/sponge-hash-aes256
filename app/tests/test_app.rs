@@ -3,7 +3,6 @@
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use hex_literal::hex;
-use lazy_static::lazy_static;
 use rand_pcg::{
     rand_core::{RngCore, SeedableRng},
     Pcg64,
@@ -17,7 +16,7 @@ use std::{
     iter,
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::Mutex,
+    sync::{LazyLock, Mutex},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -25,14 +24,12 @@ use std::{
 // Regular expressions
 // ---------------------------------------------------------------------------
 
-lazy_static! {
-    static ref REGEX_LINE: Regex = Regex::new(r"(?m)^([0-9a-fA-F]+)\s([\x20-\x7E]+)$").unwrap();
-    static ref REGEX_ZERO: Regex = Regex::new(r"([0-9a-fA-F]+)\s([\x20-\x7E]+)\x00").unwrap();
-    static ref REGEX_CHECK: Regex = Regex::new(r"(?m)^([\x20-\x7E]+):\s(\w+)$").unwrap();
-    static ref REGEX_VERSION: Regex = Regex::new(r"(?m)^sponge256sum\s+v(\d+\.\d+\.\d+)[\s$]").unwrap();
-    static ref REGEX_HELP: Regex = Regex::new(r"(?m)^Usage:\s+sponge256sum(\.exe)?[\s$]").unwrap();
-    static ref REGEX_SELFTEST: Regex = Regex::new(r"(?m)^Successful.").unwrap();
-}
+static REGEX_LINE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([0-9a-fA-F]+)\s([\x20-\x7E]+)$").unwrap());
+static REGEX_ZERO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([0-9a-fA-F]+)\s([\x20-\x7E]+)\x00").unwrap());
+static REGEX_CHECK: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([\x20-\x7E]+):\s(\w+)$").unwrap());
+static REGEX_VERSION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^sponge256sum\s+v(\d+\.\d+\.\d+)[\s$]").unwrap());
+static REGEX_HELP: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Usage:\s+sponge256sum(\.exe)?[\s$]").unwrap());
+static REGEX_SELFTEST: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Successful.").unwrap());
 
 // ---------------------------------------------------------------------------
 // Randomness
@@ -53,9 +50,7 @@ impl RandContext {
     }
 }
 
-lazy_static! {
-    static ref RANDOM: Mutex<RandContext> = Mutex::new(RandContext::new());
-}
+static RANDOM: LazyLock<Mutex<RandContext>> = LazyLock::new(|| Mutex::new(RandContext::new()));
 
 fn random_u64() -> u64 {
     let mut context = RANDOM.lock().unwrap();

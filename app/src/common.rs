@@ -45,14 +45,20 @@ pub fn hardware_concurrency() -> NonZeroUsize {
 }
 
 // ---------------------------------------------------------------------------
-// TinyVec helper
+// TinyVec extension
 // ---------------------------------------------------------------------------
 
-#[inline(always)]
-pub fn calloc_vec<const N: usize>(length: usize) -> TinyVec<[u8; N]> {
-    let mut digest = TinyVec::with_capacity(length);
-    digest.resize(length, 0u8);
-    digest
+pub trait TinyVecEx {
+    fn with_size(length: usize) -> Self;
+}
+
+impl<const N: usize> TinyVecEx for TinyVec<[u8; N]> {
+    #[inline(always)]
+    fn with_size(length: usize) -> Self {
+        let mut digest = Self::with_capacity(length);
+        digest.resize(length, 0u8);
+        digest
+    }
 }
 
 // ---------------------------------------------------------------------------

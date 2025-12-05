@@ -14,10 +14,11 @@ use std::{
     sync::{atomic::Ordering, Arc},
     thread,
 };
+use tinyvec::TinyVec;
 
 use crate::{
     arguments::Args,
-    common::{calloc_vec, hardware_concurrency, Aborted, Digest, Flag},
+    common::{hardware_concurrency, Aborted, Digest, Flag, TinyVecEx},
     environment::get_thread_count,
     print_error,
 };
@@ -90,7 +91,7 @@ fn parse_checksum_line(line: &str) -> Result<(&OsStr, Digest), Malformed> {
         if (!digest_hex.is_empty()) && (!input_name.is_empty()) {
             let (length, remainder) = digest_hex.len().div_rem(&2usize);
             if (length > usize::MIN) && (remainder == usize::MIN) {
-                let mut digest = calloc_vec(length);
+                let mut digest = TinyVec::with_size(length);
                 if decode_to_slice(digest_hex, digest.as_mut_slice()).is_ok() {
                     return Ok((OsStr::new(input_name), digest));
                 }

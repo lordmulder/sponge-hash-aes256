@@ -14,14 +14,15 @@ use std::{
     iter,
     num::NonZeroUsize,
     path::PathBuf,
-    str::from_utf8,
+    str::from_utf8_unchecked,
     sync::{atomic::Ordering, Arc},
     thread,
 };
+use tinyvec::TinyVec;
 
 use crate::{
     arguments::Args,
-    common::{calloc_vec, hardware_concurrency, Aborted, Digest, Flag},
+    common::{hardware_concurrency, Aborted, Digest, Flag, TinyVecEx},
     digest::{compute_digest, Error as DigestError},
     environment::{get_search_strategy, get_thread_count},
     io::{DataSource, STDIN_NAME},
@@ -152,19 +153,22 @@ fn print_result(output: &mut impl Write, digest_result: &DigestResult, args: &Ar
 }
 
 fn print_digest(output: &mut impl Write, file_name: &OsStr, digest: &Digest, args: &Args) -> IoResult<()> {
-    let mut hex_buffer = calloc_vec::<{ 2usize * DEFAULT_DIGEST_SIZE }>(digest.len().checked_mul(2usize).unwrap());
+    let hex_length = digest.len().checked_mul(2usize).unwrap();
+    let mut hex_buffer: TinyVec<[u8; 2usize * DEFAULT_DIGEST_SIZE]> = TinyVec::with_size(hex_length);
+
     encode_to_slice(digest.as_slice(), hex_buffer.as_mut_slice()).unwrap();
+    let hex_string = unsafe { from_utf8_unchecked(hex_buffer.as_slice()) };
 
     if args.null {
         if args.plain {
-            write!(output, "{}\0", from_utf8(hex_buffer.as_mut_slice()).unwrap())?;
+            write!(output, "{}\0", hex_string)?;
         } else {
-            write!(output, "{} {}\0", from_utf8(hex_buffer.as_mut_slice()).unwrap(), file_name.to_string_lossy())?;
+            write!(output, "{} {}\0", hex_string, file_name.to_string_lossy())?;
         }
     } else if args.plain {
-        writeln!(output, "{}", from_utf8(hex_buffer.as_mut_slice()).unwrap())?;
+        writeln!(output, "{}", hex_string)?;
     } else {
-        writeln!(output, "{} {}", from_utf8(hex_buffer.as_mut_slice()).unwrap(), file_name.to_string_lossy())?;
+        writeln!(output, "{} {}", hex_string, file_name.to_string_lossy())?;
     }
 
     if args.flush {
@@ -186,7 +190,7 @@ fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt
             if source.is_directory() {
                 Ok(Err(TaskError::SrcIsDir(file_name)))
             } else {
-                let mut digest = calloc_vec(digest_size);
+                let mut digest = TinyVec::with_size(digest_size);
                 match compute_digest(&mut source, digest.as_mut_slice(), args, halt) {
                     Ok(_) => Ok(Ok((digest, file_name))),
                     Err(DigestError::IoError) => Ok(Err(TaskError::FileRead(file_name))),
@@ -453,7 +457,7 @@ pub fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args
         }
     };
 
-    let mut digest = calloc_vec(digest_size);
+    let mut digest = TinyVec::with_size(digest_size);
 
     match compute_digest(&mut stdin, digest.as_mut_slice(), &args, &halt) {
         Ok(_) => Ok(print_digest(output, &STDIN_NAME, &digest, &args).is_ok()),

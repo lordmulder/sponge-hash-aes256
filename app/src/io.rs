@@ -2,9 +2,8 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use lazy_static::lazy_static;
 use std::ffi::OsString;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{LazyLock, Mutex, MutexGuard};
 use std::{
     fs::File,
     io::{stdin, Read, Result as IoResult, StdinLock},
@@ -25,12 +24,11 @@ pub enum Error {
 // Standard streams
 // ---------------------------------------------------------------------------
 
-const STD_STRING: &str = if cfg!(target_family = "windows") { "CON" } else { "/dev/stdin" };
+#[cfg(target_family = "windows")]
+pub static STDIN_NAME: LazyLock<OsString> = LazyLock::new(|| OsString::from("CON"));
 
-lazy_static! {
-    /// Standard input sentinal value for various OS
-    pub static ref STDIN_NAME: OsString = OsString::from(STD_STRING);
-}
+#[cfg(target_family = "unix")]
+pub static STDIN_NAME: LazyLock<OsString> = LazyLock::new(|| OsString::from("/dev/stdin"));
 
 // ---------------------------------------------------------------------------
 // I/O wrapper
