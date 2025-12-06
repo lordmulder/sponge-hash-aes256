@@ -83,6 +83,7 @@ macro_rules! check_cancelled {
 static VERIFICATION_STATUS: [&str; 2usize] = ["FAILED", "OK"];
 
 /// Print a single verification result
+#[inline]
 fn print_match(output: &mut impl Write, is_match: bool, file_name: &Path, args: &Args) -> IoResult<()> {
     if args.null {
         if args.plain {
@@ -104,6 +105,7 @@ fn print_match(output: &mut impl Write, is_match: bool, file_name: &Path, args: 
 }
 
 /// Print result to output
+#[inline]
 fn print_result(output: &mut impl Write, verify_result: &VerifyResult, args: &Args) -> bool {
     match verify_result {
         Ok((is_match, path)) => print_match(output, *is_match, path, args).is_ok(),
@@ -119,6 +121,22 @@ fn print_result(output: &mut impl Write, verify_result: &VerifyResult, args: &Ar
                 TaskError::TargetSrcIsDir(path) => print_error!(args, "Target file is a directory: {:?}", path),
             }
             true
+        }
+    }
+}
+
+/// Print the summary
+fn print_summary(chck_errors: u64, file_errors: u64, args: &Args) {
+    if (chck_errors > u64::MIN) || (file_errors > u64::MIN) {
+        if args.keep_going {
+            if chck_errors > u64::MIN {
+                print_error!(args, "WARNING: {} computed checksum(s) did *not* match!", chck_errors);
+            }
+            if file_errors > u64::MIN {
+                print_error!(args, "WARNING: {} file(s) could not be verified due to errors!", file_errors);
+            }
+        } else {
+            print_error!(args, "WARNING: The verification failed with an error!");
         }
     }
 }
@@ -319,18 +337,7 @@ fn verify_mt(output: &mut impl Write, thread_count: usize, args: &Arc<Args>, hal
     }
 
     // Print warning if any file(s) did not match the expected checksum
-    if (chck_errors > u64::MIN) || (file_errors > u64::MIN) {
-        if args.keep_going {
-            if chck_errors > u64::MIN {
-                print_error!(args, "WARNING: {} computed checksum(s) did *not* match!", chck_errors);
-            }
-            if file_errors > u64::MIN {
-                print_error!(args, "WARNING: {} file(s) could not be verified due to errors!", file_errors);
-            }
-        } else {
-            print_error!(args, "WARNING: The verification failed with an error!");
-        }
-    }
+    print_summary(chck_errors, file_errors, args);
 
     // Check for errors
     Ok((chck_errors == u64::MIN) && (file_errors == u64::MIN) && (!write_errors))
@@ -386,18 +393,7 @@ fn verify_st(output: &mut impl Write, args: &Arc<Args>, halt: &Arc<Flag>) -> Res
     }
 
     // Print warning if any file(s) did not match the expected checksum
-    if (chck_errors > u64::MIN) || (file_errors > u64::MIN) {
-        if args.keep_going {
-            if chck_errors > u64::MIN {
-                print_error!(args, "WARNING: {} computed checksum(s) did *not* match!", chck_errors);
-            }
-            if file_errors > u64::MIN {
-                print_error!(args, "WARNING: {} file(s) could not be verified due to errors!", file_errors);
-            }
-        } else {
-            print_error!(args, "WARNING: The verification failed with an error!");
-        }
-    }
+    print_summary(chck_errors, file_errors, args);
 
     // Check for errors
     Ok((chck_errors == u64::MIN) && (file_errors == u64::MIN) && (!write_errors))

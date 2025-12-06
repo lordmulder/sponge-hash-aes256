@@ -149,23 +149,27 @@ fn do_test_file(expected: &str, file_name: &str, snail_mode: bool) {
     assert_eq!(caps.get(1).unwrap().as_str(), expected);
 }
 
-fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: bool, force_null: bool) {
+fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: bool, multi_threading: bool, force_null: bool) {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data");
+    let mut parameters = Vec::with_capacity(4usize);
     let mut digest_set = HashSet::with_capacity(expected_map.len());
 
-    let output = if recursive {
-        if force_null {
-            run_binary([OsStr::new("--recursive"), OsStr::new("--null"), path.as_os_str()], true)
-        } else {
-            run_binary([OsStr::new("--recursive"), path.as_os_str()], true)
-        }
+    if recursive {
+        parameters.push(OsStr::new("--recursive"));
     } else {
-        if force_null {
-            run_binary([OsStr::new("--dirs"), OsStr::new("--null"), path.as_os_str()], true)
-        } else {
-            run_binary([OsStr::new("--dirs"), path.as_os_str()], true)
-        }
-    };
+        parameters.push(OsStr::new("--dirs"));
+    }
+
+    if multi_threading {
+        parameters.push(OsStr::new("--multi-threading"));
+    }
+
+    if force_null {
+        parameters.push(OsStr::new("--null"));
+    }
+
+    parameters.push(path.as_os_str());
+    let output = run_binary(parameters.as_slice(), true);
 
     for caps in if force_null { REGEX_ZERO.captures_iter(&output) } else { REGEX_LINE.captures_iter(&output) } {
         let digest = caps.get(1).unwrap().as_str();
@@ -207,7 +211,7 @@ fn do_test_data(expected: &str, data: &[u8], snail_mode: bool) {
     assert_eq!(caps.get(1).unwrap().as_str(), expected);
 }
 
-fn do_verify_files(modify: bool, file_count: usize) {
+fn do_verify_files(modify: bool, file_count: usize, multi_threading: bool) {
     let source_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data");
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
 
@@ -220,7 +224,12 @@ fn do_verify_files(modify: bool, file_count: usize) {
         check_file.clone()
     };
 
-    let output = run_binary([OsStr::new("--check"), OsStr::new("--keep-going"), input_file.as_os_str()], !modify);
+    let output = if multi_threading {
+        run_binary([OsStr::new("--check"), OsStr::new("--keep-going"), OsStr::new("--multi-threading"), input_file.as_os_str()], !modify)
+    } else {
+        run_binary([OsStr::new("--check"), OsStr::new("--keep-going"), input_file.as_os_str()], !modify)
+    };
+
     let mut result_set = HashSet::with_capacity(file_count);
 
     for caps in REGEX_CHECK.captures_iter(&output) {
@@ -319,7 +328,7 @@ fn test_dir_1a() {
     let mut expected = HashMap::with_capacity(2);
     expected.insert(EXPECTED_1, "frank.pdf");
     expected.insert(EXPECTED_2, "dracula.pdf");
-    do_test_dir(&expected, false, false);
+    do_test_dir(&expected, false, false, false);
 }
 
 #[test]
@@ -327,7 +336,23 @@ fn test_dir_1b() {
     let mut expected = HashMap::with_capacity(2);
     expected.insert(EXPECTED_1, "frank.pdf");
     expected.insert(EXPECTED_2, "dracula.pdf");
-    do_test_dir(&expected, false, true);
+    do_test_dir(&expected, false, false, true);
+}
+
+#[test]
+fn test_dir_1c() {
+    let mut expected = HashMap::with_capacity(2);
+    expected.insert(EXPECTED_1, "frank.pdf");
+    expected.insert(EXPECTED_2, "dracula.pdf");
+    do_test_dir(&expected, false, true, false);
+}
+
+#[test]
+fn test_dir_1d() {
+    let mut expected = HashMap::with_capacity(2);
+    expected.insert(EXPECTED_1, "frank.pdf");
+    expected.insert(EXPECTED_2, "dracula.pdf");
+    do_test_dir(&expected, false, true, true);
 }
 
 #[test]
@@ -336,7 +361,7 @@ fn test_dir_2a() {
     expected.insert(EXPECTED_1, "frank.pdf");
     expected.insert(EXPECTED_2, "dracula.pdf");
     expected.insert(EXPECTED_3, "dorian.pdf");
-    do_test_dir(&expected, true, false);
+    do_test_dir(&expected, true, false, false);
 }
 
 #[test]
@@ -345,7 +370,25 @@ fn test_dir_2b() {
     expected.insert(EXPECTED_1, "frank.pdf");
     expected.insert(EXPECTED_2, "dracula.pdf");
     expected.insert(EXPECTED_3, "dorian.pdf");
-    do_test_dir(&expected, true, true);
+    do_test_dir(&expected, true, false, true);
+}
+
+#[test]
+fn test_dir_2c() {
+    let mut expected = HashMap::with_capacity(2);
+    expected.insert(EXPECTED_1, "frank.pdf");
+    expected.insert(EXPECTED_2, "dracula.pdf");
+    expected.insert(EXPECTED_3, "dorian.pdf");
+    do_test_dir(&expected, true, true, false);
+}
+
+#[test]
+fn test_dir_2d() {
+    let mut expected = HashMap::with_capacity(2);
+    expected.insert(EXPECTED_1, "frank.pdf");
+    expected.insert(EXPECTED_2, "dracula.pdf");
+    expected.insert(EXPECTED_3, "dorian.pdf");
+    do_test_dir(&expected, true, true, true);
 }
 
 #[test]
@@ -373,13 +416,23 @@ fn test_data_2b() {
 }
 
 #[test]
-fn test_verify_1() {
-    do_verify_files(false, 3usize);
+fn test_verify_1a() {
+    do_verify_files(false, 3usize, false);
 }
 
 #[test]
-fn test_verify_2() {
-    do_verify_files(true, 3usize);
+fn test_verify_1b() {
+    do_verify_files(false, 3usize, true);
+}
+
+#[test]
+fn test_verify_2a() {
+    do_verify_files(true, 3usize, false);
+}
+
+#[test]
+fn test_verify_2b() {
+    do_verify_files(true, 3usize, true);
 }
 
 #[test]

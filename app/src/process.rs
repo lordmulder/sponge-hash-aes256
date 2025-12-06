@@ -146,6 +146,7 @@ macro_rules! check_cancelled {
 // ---------------------------------------------------------------------------
 
 /// Print a single digest
+#[inline]
 fn print_digest(output: &mut impl Write, file_name: &OsStr, digest: &Digest, args: &Args) -> IoResult<()> {
     let hex_length = digest.len().checked_mul(2usize).unwrap();
     let mut hex_buffer: TinyVec<[u8; 2usize * DEFAULT_DIGEST_SIZE]> = TinyVec::with_size(hex_length);
@@ -173,6 +174,7 @@ fn print_digest(output: &mut impl Write, file_name: &OsStr, digest: &Digest, arg
 }
 
 /// Print result to output
+#[inline]
 fn print_result(output: &mut impl Write, digest_result: &DigestResult, args: &Args) -> bool {
     match digest_result {
         Ok(digest) => print_digest(output, digest.1.as_os_str(), &digest.0, args).is_ok(),
@@ -185,6 +187,17 @@ fn print_result(output: &mut impl Write, digest_result: &DigestResult, args: &Ar
                 TaskError::WalkRead(path) => print_error!(args, "Failed to read directory: {:?}", path),
             }
             true
+        }
+    }
+}
+
+/// Print the summary
+fn print_summary(file_errors: u64, args: &Args) {
+    if file_errors > u64::MIN {
+        if args.keep_going {
+            print_error!(args, "WARNING: {} file(s) were skipped due to errors!", file_errors);
+        } else {
+            print_error!(args, "WARNING: The process failed with an error!");
         }
     }
 }
@@ -360,13 +373,7 @@ fn process_mt(output: &mut impl Write, thread_count: usize, digest_size: usize, 
     }
 
     // Print warning if any file(s) have been skipped
-    if file_errors > u64::MIN {
-        if args.keep_going {
-            print_error!(args, "WARNING: {} file(s) were skipped due to errors!", file_errors);
-        } else {
-            print_error!(args, "WARNING: The process failed with an error!");
-        }
-    }
+    print_summary(file_errors, args);
 
     // Check for errors
     Ok((file_errors == u64::MIN) && (!write_errors))
@@ -426,13 +433,7 @@ fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc
     }
 
     // Print warning if any file(s) have been skipped
-    if file_errors > u64::MIN {
-        if args.keep_going {
-            print_error!(args, "WARNING: {} file(s) were skipped due to errors!", file_errors);
-        } else {
-            print_error!(args, "WARNING: The process failed with an error!");
-        }
-    }
+    print_summary(file_errors, args);
 
     // Check for errors
     Ok((file_errors == u64::MIN) && (!write_errors))
