@@ -2,7 +2,7 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use crossbeam_channel::{bounded, Receiver, SendError, Sender};
+use crossbeam_channel::{bounded, Receiver, SendError, Sender, TrySendError};
 use hex::encode_to_slice;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
 use std::{
@@ -115,6 +115,15 @@ fn append(visited: &'_ FileIdSet, file_id: Option<FileId>) -> Cow<'_, FileIdSet>
         cloned.insert(id);
         Cow::Owned(cloned)
     })
+}
+
+/// Send all items from an iterator to the given channel
+#[inline]
+fn iter_to_channel<T>(sender: Sender<T>, iter: impl Iterator<Item = T>) -> Result<(), TrySendError<T>> {
+    for value in iter {
+        sender.try_send(value)?;
+    }
+    Ok(())
 }
 
 /// Check if the computation has been aborted
@@ -304,12 +313,16 @@ fn iterate_thread(path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &F
 fn process_mt(output: &mut impl Write, thread_count: usize, digest_size: usize, bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
     // Initialize thread pool
     let mut thread_pool = Vec::with_capacity(thread_count.saturating_add(1usize));
-    let (path_tx, path_rx) = bounded::<PathResult>(thread_count.saturating_mul(16usize));
-    let (digest_tx, digest_rx) = bounded::<DigestResult>(thread_count);
+    let (path_tx, path_rx) = bounded::<PathResult>(thread_count.saturating_mul(32usize));
+    let (digest_tx, digest_rx) = bounded::<DigestResult>(thread_count.saturating_mul(2usize));
 
     // Start the file iteration thread
-    let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
-    thread_pool.push(thread::spawn(move || iterate_thread(&path_tx, bfs, &args_cloned, &halt_cloned)));
+    if args.dirs || args.recursive || (args.files.len() > path_tx.capacity().unwrap_or(usize::MAX)) {
+        let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
+        thread_pool.push(thread::spawn(move || iterate_thread(&path_tx, bfs, &args_cloned, &halt_cloned)))
+    } else {
+        iter_to_channel(path_tx, args.files.iter().cloned().map(Ok)).expect("Failed to send iterator!");
+    };
 
     // Start the worker threads
     for (path_rx, digest_tx) in iter::repeat_n(path_rx, thread_count).zip(iter::repeat_n(digest_tx, thread_count)) {
@@ -356,12 +369,17 @@ fn process_mt(output: &mut impl Write, thread_count: usize, digest_size: usize, 
 }
 
 fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
-    // Initialize channel
+    // Initialize thread pool
+    let mut thread_pool = Vec::new();
     let (path_tx, path_rx) = bounded::<PathResult>(32usize);
 
     // Start the file iteration thread
-    let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
-    let thread_handle = thread::spawn(move || iterate_thread(&path_tx, bfs, &args_cloned, &halt_cloned));
+    if args.dirs || args.recursive || (args.files.len() > path_tx.capacity().unwrap_or(usize::MAX)) {
+        let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
+        thread_pool.push(thread::spawn(move || iterate_thread(&path_tx, bfs, &args_cloned, &halt_cloned)))
+    } else {
+        iter_to_channel(path_tx, args.files.iter().cloned().map(Ok)).expect("Failed to send iterator!");
+    };
 
     // Process all files in the queue
     let (mut file_errors, mut write_errors, mut is_aborted) = (u64::MIN, false, false);
@@ -390,10 +408,12 @@ fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc
         }
     }
 
-    // Wait until iterating thread has completed
+    // Wait until all threads have completed
     drop(path_rx);
-    if matches!(thread_handle.join().expect("Failed to join worker thread!"), Err(ThreadError::Aborted)) {
-        is_aborted = true;
+    for thread in thread_pool.drain(..) {
+        if matches!(thread.join().expect("Failed to join worker thread!"), Err(ThreadError::Aborted)) {
+            is_aborted = true;
+        }
     }
 
     // Has the process been aborted?
