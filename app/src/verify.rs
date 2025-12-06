@@ -2,15 +2,16 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use crossbeam_channel::{bounded, SendError, Sender};
+use crossbeam_channel::{bounded, Receiver, SendError, Sender};
 use hex::decode_to_slice;
 use num::Integer;
 use std::{
     ffi::OsStr,
     fs::File,
-    io::{BufRead, BufReader, Read, Write},
+    io::{BufRead, BufReader, Read, Result as IoResult, Write},
+    iter,
     num::NonZeroUsize,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{atomic::Ordering, Arc},
     thread,
 };
@@ -18,8 +19,10 @@ use tinyvec::TinyVec;
 
 use crate::{
     arguments::Args,
-    common::{hardware_concurrency, Aborted, Digest, Flag, TinyVecEx},
+    common::{hardware_concurrency, increment, Aborted, Digest, Flag, TinyVecEx},
+    digest::{compute_digest, digest_equal, Error as DigestError},
     environment::get_thread_count,
+    io::{DataSource, STDIN_NAME},
     print_error,
 };
 
@@ -31,11 +34,14 @@ use crate::{
 #[derive(Debug)]
 #[allow(dead_code)]
 enum TaskError {
-    CheckSrcIsDir(PathBuf),
-    CheckFileOpen(PathBuf),
-    CheckFileRead(PathBuf),
-    CheckParseErr(PathBuf, usize),
-    Undefined,
+    ChksumSrcIsDir(PathBuf),
+    ChksumFileOpen(PathBuf),
+    ChksumFileRead(PathBuf),
+    ChksumStdnOpen,
+    ChksumParseErr(PathBuf, usize),
+    TargetSrcIsDir(PathBuf),
+    TargetFileOpen(PathBuf),
+    TargetFileRead(PathBuf),
 }
 
 /// Error type to signal that a thread was aborted
@@ -73,9 +79,100 @@ macro_rules! check_cancelled {
 // Print results
 // ---------------------------------------------------------------------------
 
+// Verification result
+static VERIFICATION_STATUS: [&str; 2usize] = ["FAILED", "OK"];
+
+/// Print a single verification result
+fn print_match(output: &mut impl Write, is_match: bool, file_name: &Path, args: &Args) -> IoResult<()> {
+    if args.null {
+        if args.plain {
+            write!(output, "{}\0", VERIFICATION_STATUS[is_match as usize])?;
+        } else {
+            write!(output, "{}: {}\0", file_name.to_string_lossy(), VERIFICATION_STATUS[is_match as usize])?;
+        }
+    } else if args.plain {
+        writeln!(output, "{}", VERIFICATION_STATUS[is_match as usize])?;
+    } else {
+        writeln!(output, "{}: {}", file_name.to_string_lossy(), VERIFICATION_STATUS[is_match as usize])?;
+    }
+
+    if args.flush {
+        output.flush()?;
+    }
+
+    Ok(())
+}
+
+/// Print result to output
+fn print_result(output: &mut impl Write, verify_result: &VerifyResult, args: &Args) -> bool {
+    match verify_result {
+        Ok((is_match, path)) => print_match(output, *is_match, path, args).is_ok(),
+        Err(error) => {
+            match error {
+                TaskError::ChksumFileOpen(path) => print_error!(args, "Failed to open checksum file {:?}", path),
+                TaskError::ChksumFileRead(path) => print_error!(args, "Failed to read checksum file {:?}", path),
+                TaskError::ChksumParseErr(path, line) => print_error!(args, "Malformed checksum file {:?} [line #{}]", path, line),
+                TaskError::ChksumSrcIsDir(path) => print_error!(args, "Checksum file is a directory: {:?}", path),
+                TaskError::ChksumStdnOpen => print_error!(args, "Failed to acquire the standard input stream for reading!"),
+                TaskError::TargetFileOpen(path) => print_error!(args, "Failed to open target file {:?}", path),
+                TaskError::TargetFileRead(path) => print_error!(args, "Failed to read target file {:?}", path),
+                TaskError::TargetSrcIsDir(path) => print_error!(args, "Target file is a directory: {:?}", path),
+            }
+            true
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
-// Compute file digest
+// Verify file digest
 // ---------------------------------------------------------------------------
+
+type VerifyResult = Result<(bool, PathBuf), TaskError>;
+
+/// Compute checksum and compare to expected value
+fn verify_checksum(source: &mut dyn Read, digest_expected: &[u8], args: &Args, halt: &Flag) -> Result<bool, DigestError> {
+    let mut digest_computed: Digest = TinyVec::with_size(digest_expected.len());
+    compute_digest(source, digest_computed.as_mut_slice(), args, halt)?;
+    Ok(digest_equal(digest_computed.as_slice(), digest_expected))
+}
+
+/// Verify checksum of a single file
+fn verify_file(file_name: PathBuf, digest_expected: &Digest, args: &Args, halt: &Flag) -> Result<VerifyResult, Aborted> {
+    match DataSource::from_path(&file_name) {
+        Ok(mut file) => {
+            if file.is_directory() {
+                Ok(Err(TaskError::TargetSrcIsDir(file_name)))
+            } else {
+                match verify_checksum(&mut file, digest_expected.as_slice(), args, halt) {
+                    Ok(is_match) => Ok(Ok((is_match, file_name))),
+                    Err(DigestError::IoError) => Ok(Err(TaskError::TargetFileRead(file_name))),
+                    Err(DigestError::Aborted) => Err(Aborted),
+                }
+            }
+        }
+        Err(_) => Ok(Err(TaskError::TargetFileOpen(file_name))),
+    }
+}
+
+/// Verify all provided checksums
+fn verify_thread(checksum_rx: &Receiver<ReadResult>, result_tx: &Sender<VerifyResult>, args: &Args, halt: &Flag) -> Result<(), ThreadError> {
+    while let Ok(read_result) = checksum_rx.recv() {
+        check_cancelled!(halt);
+        match read_result {
+            Ok((digest_expected, file_name)) => {
+                let digest_result = verify_file(file_name, &digest_expected, args, halt).or(Err(ThreadError::Aborted))?;
+                let is_success = matches!(digest_result, Ok((true, _)));
+                result_tx.send(digest_result)?;
+                if !(is_success || args.keep_going) {
+                    break;
+                }
+            }
+            Err(error) => result_tx.send(Err(error))?,
+        }
+    }
+
+    Ok(())
+}
 
 // ---------------------------------------------------------------------------
 // Read checksums from checksum file
@@ -113,7 +210,7 @@ fn read_checksum_data(checksum_tx: &Sender<ReadResult>, input: &mut dyn Read, in
                     if let Ok((file_name, digest)) = parse_checksum_line(line_trimmed) {
                         checksum_tx.send(Ok((digest, PathBuf::from(file_name))))?;
                     } else {
-                        checksum_tx.send(Err(TaskError::CheckParseErr(input_name.clone(), line_no + 1usize)))?;
+                        checksum_tx.send(Err(TaskError::ChksumParseErr(input_name.clone(), line_no + 1usize)))?;
                         if !args.keep_going {
                             return Ok(false);
                         }
@@ -121,7 +218,7 @@ fn read_checksum_data(checksum_tx: &Sender<ReadResult>, input: &mut dyn Read, in
                 };
             }
             Err(_) => {
-                checksum_tx.send(Err(TaskError::CheckFileRead(input_name)))?;
+                checksum_tx.send(Err(TaskError::ChksumFileRead(input_name)))?;
                 return Ok(false);
             }
         }
@@ -135,14 +232,14 @@ fn read_checksum_file(checksum_tx: &Sender<ReadResult>, file_name: PathBuf, args
     match File::open(&file_name) {
         Ok(mut file) => {
             if file.metadata().is_ok_and(|meta| meta.is_dir()) {
-                checksum_tx.send(Err(TaskError::CheckSrcIsDir(file_name)))?;
+                checksum_tx.send(Err(TaskError::ChksumSrcIsDir(file_name)))?;
                 Ok(false)
             } else {
                 read_checksum_data(checksum_tx, &mut file, file_name, args, halt)
             }
         }
         Err(_) => {
-            checksum_tx.send(Err(TaskError::CheckFileOpen(file_name)))?;
+            checksum_tx.send(Err(TaskError::ChksumFileOpen(file_name)))?;
             Ok(false)
         }
     }
@@ -150,10 +247,19 @@ fn read_checksum_file(checksum_tx: &Sender<ReadResult>, file_name: PathBuf, args
 
 /// Iterate a list of checksum files
 fn reader_thread(checksum_tx: &Sender<ReadResult>, args: &Args, halt: &Flag) -> Result<(), ThreadError> {
-    for file_name in args.files.iter().cloned() {
-        check_cancelled!(halt);
-        if !(read_checksum_file(checksum_tx, file_name, args, halt)? || args.keep_going) {
-            break;
+    if !args.files.is_empty() {
+        for file_name in args.files.iter().cloned() {
+            check_cancelled!(halt);
+            if !(read_checksum_file(checksum_tx, file_name, args, halt)? || args.keep_going) {
+                break;
+            }
+        }
+    } else {
+        match DataSource::from_stdin() {
+            Ok(mut stdin_stream) => {
+                read_checksum_data(checksum_tx, &mut stdin_stream, PathBuf::from(&*STDIN_NAME), args, halt)?;
+            }
+            Err(_) => checksum_tx.send(Err(TaskError::ChksumStdnOpen))?,
         }
     }
 
@@ -168,43 +274,39 @@ fn verify_mt(output: &mut impl Write, thread_count: usize, args: &Arc<Args>, hal
     // Initialize thread pool
     let mut thread_pool = Vec::with_capacity(thread_count.saturating_add(1usize));
     let (checksum_tx, checksum_rx) = bounded::<ReadResult>(thread_count.saturating_mul(16usize));
-    //let (_digest_tx, digest_rx) = bounded::<()>(thread_count);
+    let (result_tx, result_rx) = bounded::<VerifyResult>(thread_count);
 
     // Start the file iteration thread
     let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
     thread_pool.push(thread::spawn(move || reader_thread(&checksum_tx, &args_cloned, &halt_cloned)));
 
     // Start the worker threads
-    /*for (path_rx, digest_tx) in iter::repeat_n(path_rx, thread_count).zip(iter::repeat_n(digest_tx, thread_count)) {
+    for (checksum_rx, result_tx) in iter::repeat_n(checksum_rx, thread_count).zip(iter::repeat_n(result_tx, thread_count)) {
         let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
-        //thread_pool.push(thread::spawn(move || compute_thread(&path_rx, &digest_tx, &args_cloned, &halt_cloned)));
-    }*/
+        thread_pool.push(thread::spawn(move || verify_thread(&checksum_rx, &result_tx, &args_cloned, &halt_cloned)));
+    }
 
-    // Process all digest results
-    let (file_errors, mut write_errors, mut is_aborted) = (u64::MIN, false, false);
-    /*while let Ok(digest_result) = digest_rx.recv() {
+    // Process all verification results
+    let (mut chck_errors, mut file_errors, mut write_errors, mut is_aborted) = (u64::MIN, u64::MIN, false, false);
+    while let Ok(verify_result) = result_rx.recv() {
         check_cancelled!(halt, is_aborted);
-        if digest_result.is_err() {
-            file_errors = file_errors.saturating_add(1u64);
+        let is_success = matches!(verify_result, Ok((true, _)));
+        if verify_result.is_err() {
+            increment(&mut file_errors)
+        } else if !is_success {
+            increment(&mut chck_errors)
         }
-        if !print_result(output, &digest_result, args) {
-            write_errors = true;
-            break;
-        } else if !(digest_result.is_ok() || args.keep_going) {
-            break;
-        }
-    }*/
 
-    // TEST
-    while let Ok(checksum) = checksum_rx.recv() {
-        if writeln!(output, "Checksum: {:?}", checksum).is_err() {
+        if !print_result(output, &verify_result, args) {
             write_errors = true;
+            break;
+        } else if !(is_success || args.keep_going) {
             break;
         }
     }
 
     // Wait until all threads have completed
-    drop(checksum_rx);
+    drop(result_rx);
     for thread in thread_pool.drain(..) {
         if matches!(thread.join().expect("Failed to join worker thread!"), Err(ThreadError::Aborted)) {
             is_aborted = true;
@@ -216,31 +318,36 @@ fn verify_mt(output: &mut impl Write, thread_count: usize, args: &Arc<Args>, hal
         return Err(Aborted);
     }
 
-    // Print warning if any file(s) have been skipped
-    if args.keep_going && (file_errors > 0u64) {
-        print_error!(args, "WARNING: {} file(s) were skipped due to errors.", file_errors);
+    // Print warning if any file(s) did not match or have been skipped
+    if args.keep_going {
+        if chck_errors > u64::MIN {
+            print_error!(args, "WARNING: {} computed checksum(s) did *not* match!", chck_errors);
+            if file_errors > u64::MIN {
+                print_error!(args, "WARNING: {} additional error(s) were encountered!", file_errors);
+            }
+        } else if file_errors > u64::MIN {
+            print_error!(args, "WARNING: {} error(s) were encountered!", file_errors);
+        }
     }
 
     // Check for errors
-    Ok((file_errors == u64::MIN) && (!write_errors))
+    Ok((chck_errors == u64::MIN) && (file_errors == u64::MIN) && (!write_errors))
 }
 
-fn verify_st(_output: &mut impl Write, _args: &Arc<Args>, _halt: &Arc<Flag>) -> Result<bool, Aborted> {
-    todo!("verify_st()");
-    /*
-    // Initialize thread pool
-    let (path_tx, path_rx) = bounded::<PathResult>(32usize);
+fn verify_st(output: &mut impl Write, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
+    // Initialize channel
+    let (checksum_tx, checksum_rx) = bounded::<ReadResult>(32usize);
 
     // Start the file iteration thread
     let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
-    let thread_handle = thread::spawn(move || iterate_thread(&path_tx, bfs, &args_cloned, &halt_cloned));
+    let thread_handle = thread::spawn(move || reader_thread(&checksum_tx, &args_cloned, &halt_cloned));
 
-    // Process all files in the queue
-    let (mut file_errors, mut write_errors, mut is_aborted) = (u64::MIN, false, false);
-    while let Ok(path_result) = path_rx.recv() {
+    // Process all verification results
+    let (mut chck_errors, mut file_errors, mut write_errors, mut is_aborted) = (u64::MIN, u64::MIN, false, false);
+    while let Ok(checksum_result) = checksum_rx.recv() {
         check_cancelled!(halt, is_aborted);
-        let digest_result = match path_result {
-            Ok(path) => match compute_file_digest(path, digest_size, args, halt) {
+        let verify_result = match checksum_result {
+            Ok((digest_expected, file_name)) => match verify_file(file_name, &digest_expected, args, halt) {
                 Ok(digest_result) => digest_result,
                 Err(Aborted) => {
                     is_aborted |= true;
@@ -249,19 +356,24 @@ fn verify_st(_output: &mut impl Write, _args: &Arc<Args>, _halt: &Arc<Flag>) -> 
             },
             Err(error) => Err(error),
         };
-        if digest_result.is_err() {
-            file_errors = file_errors.saturating_add(1u64);
+
+        let is_success = matches!(verify_result, Ok((true, _)));
+        if verify_result.is_err() {
+            increment(&mut file_errors)
+        } else if !is_success {
+            increment(&mut chck_errors)
         }
-        if !print_result(output, &digest_result, digest_size, args) {
+
+        if !print_result(output, &verify_result, args) {
             write_errors = true;
             break;
-        } else if !(digest_result.is_ok() || args.keep_going) {
+        } else if !(is_success || args.keep_going) {
             break;
         }
     }
 
-    // Wait until iterating thread has completed
-    drop(path_rx);
+    // Wait until all threads have completed
+    drop(checksum_rx);
     if matches!(thread_handle.join().expect("Failed to join worker thread!"), Err(ThreadError::Aborted)) {
         is_aborted = true;
     }
@@ -271,23 +383,28 @@ fn verify_st(_output: &mut impl Write, _args: &Arc<Args>, _halt: &Arc<Flag>) -> 
         return Err(Aborted);
     }
 
-    // Print warning if any file(s) have been skipped
-    if args.keep_going && (file_errors > 0u64) {
-        print_error!(args, "WARNING: {} file(s) were skipped due to errors.", file_errors);
+    // Print warning if any file(s) did not match or have been skipped
+    if args.keep_going {
+        if chck_errors > u64::MIN {
+            print_error!(args, "WARNING: {} computed checksum(s) did *not* match!", chck_errors);
+            if file_errors > u64::MIN {
+                print_error!(args, "WARNING: {} additional error(s) were encountered!", file_errors);
+            }
+        } else if file_errors > u64::MIN {
+            print_error!(args, "WARNING: {} error(s) were encountered!", file_errors);
+        }
     }
 
     // Check for errors
-    Ok((file_errors == u64::MIN) && (!write_errors))  */
+    Ok((chck_errors == u64::MIN) && (file_errors == u64::MIN) && (!write_errors))
 }
 
 // ---------------------------------------------------------------------------
-// Process files
+// Verify files
 // ---------------------------------------------------------------------------
 
-/// Process all input files
+/// Verify all input files
 pub fn verify_files(output: &mut impl Write, args: Arc<Args>, halt: Arc<Flag>) -> Result<bool, Aborted> {
-    assert!(!args.files.is_empty(), "The list of input files must not be empty!");
-
     // Determine number of threads
     let thread_count = if args.multi_threading {
         match get_thread_count() {
@@ -307,31 +424,4 @@ pub fn verify_files(output: &mut impl Write, args: Arc<Args>, halt: Arc<Flag>) -
     } else {
         verify_st(output, &args, &halt)
     }
-}
-
-// ---------------------------------------------------------------------------
-// Verify from STDIN
-// ---------------------------------------------------------------------------
-
-/// Process data from 'stdin' stream
-pub fn verify_stdin(_output: &mut impl Write, _args: Arc<Args>, _halt: Arc<Flag>) -> Result<bool, Aborted> {
-    todo!("verify_stdin()");
-    /*let mut source = match DataSource::from_stdin() {
-        Ok(stream) => stream,
-        Err(_) => {
-            print_error!(args, "Failed to acquire the standard input stream!");
-            return Ok(false);
-        }
-    };
-
-    let mut digest = EMPTY_DIGEST;
-
-    match compute_digest(&mut source, &mut digest[..digest_size], &args, &halt) {
-        Ok(_) => Ok(print_digest(output, &STDIN_NAME, &digest, digest_size, &args).is_ok()),
-        Err(DigestError::IoError) => {
-            print_error!(args, "Failed to read data from standard input stream!");
-            Ok(false)
-        }
-        Err(DigestError::Aborted) => Err(Aborted),
-    }*/
 }

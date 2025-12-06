@@ -55,10 +55,23 @@ pub trait TinyVecEx {
 impl<const N: usize> TinyVecEx for TinyVec<[u8; N]> {
     #[inline(always)]
     fn with_size(length: usize) -> Self {
-        let mut digest = Self::with_capacity(length);
-        digest.resize(length, 0u8);
-        digest
+        if length > N {
+            let mut digest = Self::with_capacity(length);
+            digest.resize(length, 0u8);
+            digest
+        } else {
+            Self::from_array_len([0u8; N], length)
+        }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Utility functions
+// ---------------------------------------------------------------------------
+
+#[inline(always)]
+pub fn increment(counter: &mut u64) {
+    *counter = counter.saturating_add(1u64);
 }
 
 // ---------------------------------------------------------------------------

@@ -22,7 +22,7 @@ use tinyvec::TinyVec;
 
 use crate::{
     arguments::Args,
-    common::{hardware_concurrency, Aborted, Digest, Flag, TinyVecEx},
+    common::{hardware_concurrency, increment, Aborted, Digest, Flag, TinyVecEx},
     digest::{compute_digest, Error as DigestError},
     environment::{get_search_strategy, get_thread_count},
     io::{DataSource, STDIN_NAME},
@@ -37,8 +37,8 @@ use crate::{
 #[derive(Debug)]
 #[allow(dead_code)]
 enum TaskError {
-    DirOpen(PathBuf),
-    DirRead(PathBuf),
+    WalkOpen(PathBuf),
+    WalkRead(PathBuf),
     SrcIsDir(PathBuf),
     FileOpen(PathBuf),
     FileRead(PathBuf),
@@ -136,22 +136,7 @@ macro_rules! check_cancelled {
 // Print results
 // ---------------------------------------------------------------------------
 
-fn print_result(output: &mut impl Write, digest_result: &DigestResult, args: &Args) -> bool {
-    match digest_result {
-        Ok(digest) => print_digest(output, digest.1.as_os_str(), &digest.0, args).is_ok(),
-        Err(error) => {
-            match error {
-                TaskError::DirOpen(path) => print_error!(args, "Failed to open directory: {:?}", path),
-                TaskError::DirRead(path) => print_error!(args, "Failed to read directory: {:?}", path),
-                TaskError::SrcIsDir(path) => print_error!(args, "Input file is a directory: {:?}", path),
-                TaskError::FileOpen(path) => print_error!(args, "Failed to open input file: {:?}", path),
-                TaskError::FileRead(path) => print_error!(args, "Failed to read input file: {:?}", path),
-            }
-            true
-        }
-    }
-}
-
+/// Print a single digest
 fn print_digest(output: &mut impl Write, file_name: &OsStr, digest: &Digest, args: &Args) -> IoResult<()> {
     let hex_length = digest.len().checked_mul(2usize).unwrap();
     let mut hex_buffer: TinyVec<[u8; 2usize * DEFAULT_DIGEST_SIZE]> = TinyVec::with_size(hex_length);
@@ -176,6 +161,23 @@ fn print_digest(output: &mut impl Write, file_name: &OsStr, digest: &Digest, arg
     }
 
     Ok(())
+}
+
+/// Print result to output
+fn print_result(output: &mut impl Write, digest_result: &DigestResult, args: &Args) -> bool {
+    match digest_result {
+        Ok(digest) => print_digest(output, digest.1.as_os_str(), &digest.0, args).is_ok(),
+        Err(error) => {
+            match error {
+                TaskError::FileOpen(path) => print_error!(args, "Failed to open input file: {:?}", path),
+                TaskError::FileRead(path) => print_error!(args, "Failed to read input file: {:?}", path),
+                TaskError::SrcIsDir(path) => print_error!(args, "Input file is a directory: {:?}", path),
+                TaskError::WalkOpen(path) => print_error!(args, "Failed to open directory: {:?}", path),
+                TaskError::WalkRead(path) => print_error!(args, "Failed to read directory: {:?}", path),
+            }
+            true
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -232,7 +234,7 @@ fn iterate_directory(path_tx: &Sender<PathResult>, dir_name: PathBuf, visited: &
     let dir_iter = match fs::read_dir(&dir_name) {
         Ok(dir_iter) => dir_iter,
         Err(_) => {
-            path_tx.send(Err(TaskError::DirOpen(dir_name.to_path_buf())))?;
+            path_tx.send(Err(TaskError::WalkOpen(dir_name.to_path_buf())))?;
             return Ok(false);
         }
     };
@@ -259,7 +261,7 @@ fn iterate_directory(path_tx: &Sender<PathResult>, dir_name: PathBuf, visited: &
                 }
             }
             Err(_) => {
-                path_tx.send(Err(TaskError::DirRead(dir_name)))?;
+                path_tx.send(Err(TaskError::WalkRead(dir_name)))?;
                 return Ok(false);
             }
         }
@@ -320,8 +322,9 @@ fn process_mt(output: &mut impl Write, thread_count: usize, digest_size: usize, 
     while let Ok(digest_result) = digest_rx.recv() {
         check_cancelled!(halt, is_aborted);
         if digest_result.is_err() {
-            file_errors = file_errors.saturating_add(1u64);
+            increment(&mut file_errors);
         }
+
         if !print_result(output, &digest_result, args) {
             write_errors = true;
             break;
@@ -345,7 +348,7 @@ fn process_mt(output: &mut impl Write, thread_count: usize, digest_size: usize, 
 
     // Print warning if any file(s) have been skipped
     if args.keep_going && (file_errors > 0u64) {
-        print_error!(args, "WARNING: {} file(s) were skipped due to errors.", file_errors);
+        print_error!(args, "WARNING: {} file(s) were skipped due to errors!", file_errors);
     }
 
     // Check for errors
@@ -353,7 +356,7 @@ fn process_mt(output: &mut impl Write, thread_count: usize, digest_size: usize, 
 }
 
 fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
-    // Initialize thread pool
+    // Initialize channel
     let (path_tx, path_rx) = bounded::<PathResult>(32usize);
 
     // Start the file iteration thread
@@ -374,9 +377,11 @@ fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc
             },
             Err(error) => Err(error),
         };
+
         if digest_result.is_err() {
-            file_errors = file_errors.saturating_add(1u64);
+            increment(&mut file_errors);
         }
+
         if !print_result(output, &digest_result, args) {
             write_errors = true;
             break;
@@ -398,7 +403,7 @@ fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc
 
     // Print warning if any file(s) have been skipped
     if args.keep_going && (file_errors > 0u64) {
-        print_error!(args, "WARNING: {} file(s) were skipped due to errors.", file_errors);
+        print_error!(args, "WARNING: {} file(s) were skipped due to errors!", file_errors);
     }
 
     // Check for errors
@@ -409,9 +414,34 @@ fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc
 // Process files
 // ---------------------------------------------------------------------------
 
+/// Process data from 'stdin' stream
+fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args>, halt: Arc<Flag>) -> Result<bool, Aborted> {
+    let mut stdin = match DataSource::from_stdin() {
+        Ok(stream) => stream,
+        Err(_) => {
+            print_error!(args, "Failed to acquire the standard input stream for reading!");
+            return Ok(false);
+        }
+    };
+
+    let mut digest = TinyVec::with_size(digest_size);
+
+    match compute_digest(&mut stdin, digest.as_mut_slice(), &args, &halt) {
+        Ok(_) => Ok(print_digest(output, &STDIN_NAME, &digest, &args).is_ok()),
+        Err(DigestError::IoError) => {
+            print_error!(args, "Failed to read data from the standard input stream!");
+            Ok(false)
+        }
+        Err(DigestError::Aborted) => Err(Aborted),
+    }
+}
+
 /// Process all input files
 pub fn process_files(output: &mut impl Write, digest_size: usize, args: Arc<Args>, halt: Arc<Flag>) -> Result<bool, Aborted> {
-    assert!(!args.files.is_empty(), "The list of input files must not be empty!");
+    // Read input datat from 'stdin' stream?
+    if args.files.is_empty() {
+        return process_stdin(output, digest_size, args, halt);
+    }
 
     // Determine number of threads
     let thread_count = if args.multi_threading {
@@ -440,31 +470,5 @@ pub fn process_files(output: &mut impl Write, digest_size: usize, args: Arc<Args
         process_mt(output, thread_count.get(), digest_size, breadth_first, &args, &halt)
     } else {
         process_st(output, digest_size, breadth_first, &args, &halt)
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Process STDIN
-// ---------------------------------------------------------------------------
-
-/// Process data from 'stdin' stream
-pub fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args>, halt: Arc<Flag>) -> Result<bool, Aborted> {
-    let mut stdin = match DataSource::from_stdin() {
-        Ok(stream) => stream,
-        Err(_) => {
-            print_error!(args, "Failed to acquire the standard input stream!");
-            return Ok(false);
-        }
-    };
-
-    let mut digest = TinyVec::with_size(digest_size);
-
-    match compute_digest(&mut stdin, digest.as_mut_slice(), &args, &halt) {
-        Ok(_) => Ok(print_digest(output, &STDIN_NAME, &digest, &args).is_ok()),
-        Err(DigestError::IoError) => {
-            print_error!(args, "Failed to read data from standard input stream!");
-            Ok(false)
-        }
-        Err(DigestError::Aborted) => Err(Aborted),
     }
 }

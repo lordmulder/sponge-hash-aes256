@@ -172,8 +172,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::{io::stdout, process::ExitCode, sync::Arc};
 
 use crate::common::Aborted;
-use crate::process::process_stdin;
-use crate::verify::{verify_files, verify_stdin};
+use crate::verify::verify_files;
 use crate::{
     arguments::Args,
     common::{MAX_DIGEST_SIZE, MAX_SNAIL_LEVEL},
@@ -247,19 +246,11 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
     if args.self_test {
         self_test(&mut output, &args, &halt)
     } else if !args.check {
-        // Process all files and directories that were given on the command-line
-        if args.files.is_empty() {
-            process_stdin(&mut output, digest_size, args, halt)
-        } else {
-            process_files(&mut output, digest_size, args, halt)
-        }
+        // Process all input files/directories that were given on the command-line
+        process_files(&mut output, digest_size, args, halt)
     } else {
         // Verify all checksum files that were given on the command-line
-        if args.files.is_empty() {
-            verify_stdin(&mut output, args, halt)
-        } else {
-            verify_files(&mut output, args, halt)
-        }
+        verify_files(&mut output, args, halt)
     }
 }
 
