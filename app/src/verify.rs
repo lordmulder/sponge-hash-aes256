@@ -318,15 +318,17 @@ fn verify_mt(output: &mut impl Write, thread_count: usize, args: &Arc<Args>, hal
         return Err(Aborted);
     }
 
-    // Print warning if any file(s) did not match or have been skipped
-    if args.keep_going {
-        if chck_errors > u64::MIN {
-            print_error!(args, "WARNING: {} computed checksum(s) did *not* match!", chck_errors);
-            if file_errors > u64::MIN {
-                print_error!(args, "WARNING: {} additional error(s) were encountered!", file_errors);
+    // Print warning if any file(s) did not match the expected checksum
+    if (chck_errors > u64::MIN) || (file_errors > u64::MIN) {
+        if args.keep_going {
+            if chck_errors > u64::MIN {
+                print_error!(args, "WARNING: {} computed checksum(s) did *not* match!", chck_errors);
             }
-        } else if file_errors > u64::MIN {
-            print_error!(args, "WARNING: {} error(s) were encountered!", file_errors);
+            if file_errors > u64::MIN {
+                print_error!(args, "WARNING: {} file(s) could not be verified due to errors!", file_errors);
+            }
+        } else {
+            print_error!(args, "WARNING: The verification failed with an error!");
         }
     }
 
@@ -383,15 +385,17 @@ fn verify_st(output: &mut impl Write, args: &Arc<Args>, halt: &Arc<Flag>) -> Res
         return Err(Aborted);
     }
 
-    // Print warning if any file(s) did not match or have been skipped
-    if args.keep_going {
-        if chck_errors > u64::MIN {
-            print_error!(args, "WARNING: {} computed checksum(s) did *not* match!", chck_errors);
-            if file_errors > u64::MIN {
-                print_error!(args, "WARNING: {} additional error(s) were encountered!", file_errors);
+    // Print warning if any file(s) did not match the expected checksum
+    if (chck_errors > u64::MIN) || (file_errors > u64::MIN) {
+        if args.keep_going {
+            if chck_errors > u64::MIN {
+                print_error!(args, "WARNING: {} computed checksum(s) did *not* match!", chck_errors);
             }
-        } else if file_errors > u64::MIN {
-            print_error!(args, "WARNING: {} error(s) were encountered!", file_errors);
+            if file_errors > u64::MIN {
+                print_error!(args, "WARNING: {} file(s) could not be verified due to errors!", file_errors);
+            }
+        } else {
+            print_error!(args, "WARNING: The verification failed with an error!");
         }
     }
 

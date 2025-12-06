@@ -360,8 +360,12 @@ fn process_mt(output: &mut impl Write, thread_count: usize, digest_size: usize, 
     }
 
     // Print warning if any file(s) have been skipped
-    if args.keep_going && (file_errors > 0u64) {
-        print_error!(args, "WARNING: {} file(s) were skipped due to errors!", file_errors);
+    if file_errors > u64::MIN {
+        if args.keep_going {
+            print_error!(args, "WARNING: {} file(s) were skipped due to errors!", file_errors);
+        } else {
+            print_error!(args, "WARNING: The process failed with an error!");
+        }
     }
 
     // Check for errors
@@ -422,8 +426,12 @@ fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc
     }
 
     // Print warning if any file(s) have been skipped
-    if args.keep_going && (file_errors > 0u64) {
-        print_error!(args, "WARNING: {} file(s) were skipped due to errors!", file_errors);
+    if file_errors > u64::MIN {
+        if args.keep_going {
+            print_error!(args, "WARNING: {} file(s) were skipped due to errors!", file_errors);
+        } else {
+            print_error!(args, "WARNING: The process failed with an error!");
+        }
     }
 
     // Check for errors
