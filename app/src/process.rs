@@ -44,15 +44,12 @@ enum TaskError {
     FileRead(PathBuf),
 }
 
-/// Error type to signal that a thread was aborted
-enum ThreadError {
-    Aborted,
-    SendErr,
-}
+/// Error type to signal that a thread was cancelled
+struct Cancelled;
 
-impl<T> From<SendError<T>> for ThreadError {
+impl<T> From<SendError<T>> for Cancelled {
     fn from(_: SendError<T>) -> Self {
-        Self::SendErr
+        Self
     }
 }
 
@@ -126,16 +123,19 @@ fn iter_to_channel<T>(sender: Sender<T>, iter: impl Iterator<Item = T>) -> Resul
     Ok(())
 }
 
-/// Check if the computation has been aborted
+/// Check if the computation has been cancelled
 macro_rules! check_cancelled {
     ($halt:ident) => {
-        if $halt.load(Ordering::Relaxed) {
-            return Err(ThreadError::Aborted);
+        if $halt.load(Ordering::Relaxed) != 0isize {
+            return Err(Cancelled);
         }
     };
-    ($halt:ident, $aborted:ident) => {
-        if $halt.load(Ordering::Relaxed) {
-            $aborted = true;
+}
+
+/// Check if the computation has been cancelled
+macro_rules! break_cancelled {
+    ($halt:ident) => {
+        if $halt.load(Ordering::Relaxed) != 0isize {
             break;
         }
     };
@@ -208,7 +208,7 @@ fn print_summary(file_errors: u64, args: &Args) {
 
 type DigestResult = Result<(Digest, PathBuf), TaskError>;
 
-fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt: &Flag) -> Result<DigestResult, Aborted> {
+fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt: &Flag) -> Result<DigestResult, Cancelled> {
     match DataSource::from_path(&file_name) {
         Ok(mut source) => {
             if source.is_directory() {
@@ -218,7 +218,7 @@ fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt
                 match compute_digest(&mut source, digest.as_mut_slice(), args, halt) {
                     Ok(_) => Ok(Ok((digest, file_name))),
                     Err(DigestError::IoError) => Ok(Err(TaskError::FileRead(file_name))),
-                    Err(DigestError::Aborted) => Err(Aborted),
+                    Err(DigestError::Cancelled) => Err(Cancelled),
                 }
             }
         }
@@ -226,12 +226,12 @@ fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt
     }
 }
 
-fn compute_thread(path_rx: &Receiver<PathResult>, digest_tx: &Sender<DigestResult>, digest_size: usize, args: &Args, halt: &Flag) -> Result<(), ThreadError> {
+fn compute_thread(path_rx: &Receiver<PathResult>, digest_tx: &Sender<DigestResult>, digest_size: usize, args: &Args, halt: &Flag) -> Result<(), Cancelled> {
     while let Ok(path_result) = path_rx.recv() {
         check_cancelled!(halt);
         match path_result {
             Ok(path) => {
-                let digest_result = compute_file_digest(path, digest_size, args, halt).or(Err(ThreadError::Aborted))?;
+                let digest_result = compute_file_digest(path, digest_size, args, halt).or(Err(Cancelled))?;
                 let is_success = digest_result.is_ok();
                 digest_tx.send(digest_result)?;
                 if !(is_success || args.keep_going) {
@@ -252,7 +252,7 @@ fn compute_thread(path_rx: &Receiver<PathResult>, digest_tx: &Sender<DigestResul
 type PathResult = Result<PathBuf, TaskError>;
 
 /// Iterate all files and sub-directories in a directory
-fn iterate_directory(path_tx: &Sender<PathResult>, dir_name: PathBuf, visited: &FileIdSet, bfs: bool, args: &Args, halt: &Flag) -> Result<bool, ThreadError> {
+fn iterate_directory(path_tx: &Sender<PathResult>, dir_name: PathBuf, visited: &FileIdSet, bfs: bool, args: &Args, halt: &Flag) -> Result<bool, Cancelled> {
     let dir_iter = match fs::read_dir(&dir_name) {
         Ok(dir_iter) => dir_iter,
         Err(_) => {
@@ -300,7 +300,7 @@ fn iterate_directory(path_tx: &Sender<PathResult>, dir_name: PathBuf, visited: &
 }
 
 /// Iterate a list of input files
-fn iterate_thread(path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &Flag) -> Result<(), ThreadError> {
+fn iterate_thread(path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &Flag) -> Result<(), Cancelled> {
     let handle_directories = args.dirs || args.recursive;
 
     for file_name in args.files.iter().cloned() {
@@ -332,7 +332,7 @@ fn process_mt(output: &mut impl Write, thread_count: usize, digest_size: usize, 
     // Start the file iteration thread
     if args.dirs || args.recursive || (args.files.len() > path_tx.capacity().unwrap_or(usize::MAX)) {
         let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
-        thread_pool.push(thread::spawn(move || iterate_thread(&path_tx, bfs, &args_cloned, &halt_cloned)))
+        thread_pool.push(thread::spawn(move || iterate_thread(&path_tx, bfs, &args_cloned, &halt_cloned)));
     } else {
         iter_to_channel(path_tx, args.files.iter().cloned().map(Ok)).expect("Failed to send iterator!");
     };
@@ -344,9 +344,9 @@ fn process_mt(output: &mut impl Write, thread_count: usize, digest_size: usize, 
     }
 
     // Process all digest results
-    let (mut file_errors, mut write_errors, mut is_aborted) = (u64::MIN, false, false);
+    let (mut file_errors, mut write_errors) = (u64::MIN, false);
     while let Ok(digest_result) = digest_rx.recv() {
-        check_cancelled!(halt, is_aborted);
+        break_cancelled!(halt);
         if digest_result.is_err() {
             increment(&mut file_errors);
         }
@@ -359,12 +359,13 @@ fn process_mt(output: &mut impl Write, thread_count: usize, digest_size: usize, 
         }
     }
 
-    // Wait until all threads have completed
+    // Send shutdown signal to still running threads
     drop(digest_rx);
+    let is_aborted = halt.compare_exchange(0isize, 1isize, Ordering::SeqCst, Ordering::SeqCst).is_err();
+
+    // Wait until all threads have completed
     for thread in thread_pool.drain(..) {
-        if matches!(thread.join().expect("Failed to join worker thread!"), Err(ThreadError::Aborted)) {
-            is_aborted = true;
-        }
+        let _ = thread.join().expect("Failed to join worker thread!");
     }
 
     // Has the process been aborted?
@@ -380,29 +381,26 @@ fn process_mt(output: &mut impl Write, thread_count: usize, digest_size: usize, 
 }
 
 fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
-    // Initialize thread pool
-    let mut thread_pool = Vec::new();
+    // Initialize channel
     let (path_tx, path_rx) = bounded::<PathResult>(32usize);
+    let mut thread_handle = None;
 
     // Start the file iteration thread
     if args.dirs || args.recursive || (args.files.len() > path_tx.capacity().unwrap_or(usize::MAX)) {
         let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
-        thread_pool.push(thread::spawn(move || iterate_thread(&path_tx, bfs, &args_cloned, &halt_cloned)))
+        thread_handle = Some(thread::spawn(move || iterate_thread(&path_tx, bfs, &args_cloned, &halt_cloned)));
     } else {
         iter_to_channel(path_tx, args.files.iter().cloned().map(Ok)).expect("Failed to send iterator!");
     };
 
     // Process all files in the queue
-    let (mut file_errors, mut write_errors, mut is_aborted) = (u64::MIN, false, false);
+    let (mut file_errors, mut write_errors) = (u64::MIN, false);
     while let Ok(path_result) = path_rx.recv() {
-        check_cancelled!(halt, is_aborted);
+        break_cancelled!(halt);
         let digest_result = match path_result {
             Ok(path) => match compute_file_digest(path, digest_size, args, halt) {
                 Ok(digest_result) => digest_result,
-                Err(Aborted) => {
-                    is_aborted |= true;
-                    break;
-                }
+                Err(Cancelled) => break,
             },
             Err(error) => Err(error),
         };
@@ -419,12 +417,13 @@ fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc
         }
     }
 
-    // Wait until all threads have completed
+    // Send shutdown signal to still running threads
     drop(path_rx);
-    for thread in thread_pool.drain(..) {
-        if matches!(thread.join().expect("Failed to join worker thread!"), Err(ThreadError::Aborted)) {
-            is_aborted = true;
-        }
+    let is_aborted = halt.compare_exchange(0isize, 1isize, Ordering::SeqCst, Ordering::SeqCst).is_err();
+
+    // Wait until the background thread has completed
+    if let Some(thread) = thread_handle {
+        let _ = thread.join().expect("Failed to join worker thread!");
     }
 
     // Has the process been aborted?
@@ -444,7 +443,7 @@ fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc
 // ---------------------------------------------------------------------------
 
 /// Process data from 'stdin' stream
-fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args>, halt: Arc<Flag>) -> Result<bool, Aborted> {
+fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args>, halt: Arc<Flag>) -> Result<bool, Cancelled> {
     let mut stdin = match DataSource::from_stdin() {
         Ok(stream) => stream,
         Err(_) => {
@@ -461,7 +460,7 @@ fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args>, h
             print_error!(args, "Failed to read data from the standard input stream!");
             Ok(false)
         }
-        Err(DigestError::Aborted) => Err(Aborted),
+        Err(DigestError::Cancelled) => Err(Cancelled),
     }
 }
 
@@ -469,7 +468,7 @@ fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args>, h
 pub fn process_files(output: &mut impl Write, digest_size: usize, args: Arc<Args>, halt: Arc<Flag>) -> Result<bool, Aborted> {
     // Read input datat from 'stdin' stream?
     if args.files.is_empty() {
-        return process_stdin(output, digest_size, args, halt);
+        return process_stdin(output, digest_size, args, halt).map_err(|_| Aborted);
     }
 
     // Determine number of threads

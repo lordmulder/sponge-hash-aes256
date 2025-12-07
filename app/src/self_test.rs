@@ -32,7 +32,7 @@ use crate::{
 
 #[derive(Debug)]
 enum Error {
-    Aborted,
+    Cancelled,
     IoError,
 }
 
@@ -72,8 +72,8 @@ fn print_digest<T: AsRef<[u8]>>(output: &mut impl Write, prefix: &str, digest: T
 /// Check if the computation has been aborted
 macro_rules! check_cancelled {
     ($halt:ident) => {
-        if $halt.load(Ordering::Relaxed) {
-            return Err(Error::Aborted);
+        if $halt.load(Ordering::Relaxed) != 0isize {
+            return Err(Error::Cancelled);
         }
     };
 }
@@ -162,7 +162,7 @@ pub fn self_test(output: &mut impl Write, args: &Args, halt: &Flag) -> Result<bo
 
     match test_runner(output, passes, halt) {
         Ok(result) => Ok(result),
-        Err(Error::Aborted) => Err(Aborted),
+        Err(Error::Cancelled) => Err(Aborted),
         Err(error) => {
             print_error!(args, "Self-test encountered an error: {:?}", error);
             Ok(false)

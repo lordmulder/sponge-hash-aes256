@@ -3,7 +3,7 @@
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
-use std::{num::NonZeroUsize, sync::atomic::AtomicBool};
+use std::{num::NonZeroUsize, sync::atomic::AtomicIsize};
 use tinyvec::TinyVec;
 
 // ---------------------------------------------------------------------------
@@ -23,7 +23,7 @@ pub const MAX_THREADS: usize = 64usize;
 pub type Digest = TinyVec<[u8; DEFAULT_DIGEST_SIZE]>;
 
 /// Atomic flag
-pub type Flag = AtomicBool;
+pub type Flag = AtomicIsize;
 
 /// Error type to indicate that a process was aborted
 pub struct Aborted;

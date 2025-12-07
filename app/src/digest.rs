@@ -30,7 +30,7 @@ const IO_BUFFER_SIZE: usize = 2048usize;
 
 pub enum Error {
     IoError,
-    Aborted,
+    Cancelled,
 }
 
 impl From<IoError> for Error {
@@ -110,8 +110,8 @@ impl Hasher {
 /// Check if the computation has been aborted
 macro_rules! check_cancelled {
     ($halt:ident) => {
-        if $halt.load(Ordering::Relaxed) {
-            return Err(Error::Aborted);
+        if $halt.load(Ordering::Relaxed) != 0isize {
+            return Err(Error::Cancelled);
         }
     };
 }

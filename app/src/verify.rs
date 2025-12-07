@@ -44,15 +44,12 @@ enum TaskError {
     TargetFileRead(PathBuf),
 }
 
-/// Error type to signal that a thread was aborted
-enum ThreadError {
-    Aborted,
-    SendErr,
-}
+/// Error type to signal that a thread was cancelled
+struct Cancelled;
 
-impl<T> From<SendError<T>> for ThreadError {
+impl<T> From<SendError<T>> for Cancelled {
     fn from(_: SendError<T>) -> Self {
-        Self::SendErr
+        Self
     }
 }
 
@@ -60,16 +57,19 @@ impl<T> From<SendError<T>> for ThreadError {
 // Utility functions
 // ---------------------------------------------------------------------------
 
-/// Check if the computation has been aborted
+/// Check if the computation has been cancelled
 macro_rules! check_cancelled {
     ($halt:ident) => {
-        if $halt.load(Ordering::Relaxed) {
-            return Err(ThreadError::Aborted);
+        if $halt.load(Ordering::Relaxed) != 0isize {
+            return Err(Cancelled);
         }
     };
-    ($halt:ident, $aborted:ident) => {
-        if $halt.load(Ordering::Relaxed) {
-            $aborted = true;
+}
+
+/// Check if the computation has been cancelled
+macro_rules! break_cancelled {
+    ($halt:ident) => {
+        if $halt.load(Ordering::Relaxed) != 0isize {
             break;
         }
     };
@@ -155,7 +155,7 @@ fn verify_checksum(source: &mut dyn Read, digest_expected: &[u8], args: &Args, h
 }
 
 /// Verify checksum of a single file
-fn verify_file(file_name: PathBuf, digest_expected: &Digest, args: &Args, halt: &Flag) -> Result<VerifyResult, Aborted> {
+fn verify_file(file_name: PathBuf, digest_expected: &Digest, args: &Args, halt: &Flag) -> Result<VerifyResult, Cancelled> {
     match DataSource::from_path(&file_name) {
         Ok(mut file) => {
             if file.is_directory() {
@@ -164,7 +164,7 @@ fn verify_file(file_name: PathBuf, digest_expected: &Digest, args: &Args, halt: 
                 match verify_checksum(&mut file, digest_expected.as_slice(), args, halt) {
                     Ok(is_match) => Ok(Ok((is_match, file_name))),
                     Err(DigestError::IoError) => Ok(Err(TaskError::TargetFileRead(file_name))),
-                    Err(DigestError::Aborted) => Err(Aborted),
+                    Err(DigestError::Cancelled) => Err(Cancelled),
                 }
             }
         }
@@ -173,12 +173,12 @@ fn verify_file(file_name: PathBuf, digest_expected: &Digest, args: &Args, halt: 
 }
 
 /// Verify all provided checksums
-fn verify_thread(checksum_rx: &Receiver<ReadResult>, result_tx: &Sender<VerifyResult>, args: &Args, halt: &Flag) -> Result<(), ThreadError> {
+fn verify_thread(checksum_rx: &Receiver<ReadResult>, result_tx: &Sender<VerifyResult>, args: &Args, halt: &Flag) -> Result<(), Cancelled> {
     while let Ok(read_result) = checksum_rx.recv() {
         check_cancelled!(halt);
         match read_result {
             Ok((digest_expected, file_name)) => {
-                let digest_result = verify_file(file_name, &digest_expected, args, halt).or(Err(ThreadError::Aborted))?;
+                let digest_result = verify_file(file_name, &digest_expected, args, halt)?;
                 let is_success = matches!(digest_result, Ok((true, _)));
                 result_tx.send(digest_result)?;
                 if !(is_success || args.keep_going) {
@@ -218,7 +218,7 @@ fn parse_checksum_line(line: &str) -> Result<(&OsStr, Digest), Malformed> {
 }
 
 /// Read all checksums from source
-fn read_checksum_data(checksum_tx: &Sender<ReadResult>, input: &mut dyn Read, input_name: PathBuf, args: &Args, halt: &Flag) -> Result<bool, ThreadError> {
+fn read_checksum_data(checksum_tx: &Sender<ReadResult>, input: &mut dyn Read, input_name: PathBuf, args: &Args, halt: &Flag) -> Result<bool, Cancelled> {
     for (line_no, line) in BufReader::new(input).lines().enumerate() {
         check_cancelled!(halt);
         match line {
@@ -246,7 +246,7 @@ fn read_checksum_data(checksum_tx: &Sender<ReadResult>, input: &mut dyn Read, in
 }
 
 /// Read checksums from a file
-fn read_checksum_file(checksum_tx: &Sender<ReadResult>, file_name: PathBuf, args: &Args, halt: &Flag) -> Result<bool, ThreadError> {
+fn read_checksum_file(checksum_tx: &Sender<ReadResult>, file_name: PathBuf, args: &Args, halt: &Flag) -> Result<bool, Cancelled> {
     match File::open(&file_name) {
         Ok(mut file) => {
             if file.metadata().is_ok_and(|meta| meta.is_dir()) {
@@ -264,7 +264,7 @@ fn read_checksum_file(checksum_tx: &Sender<ReadResult>, file_name: PathBuf, args
 }
 
 /// Iterate a list of checksum files
-fn reader_thread(checksum_tx: &Sender<ReadResult>, args: &Args, halt: &Flag) -> Result<(), ThreadError> {
+fn reader_thread(checksum_tx: &Sender<ReadResult>, args: &Args, halt: &Flag) -> Result<(), Cancelled> {
     if !args.files.is_empty() {
         for file_name in args.files.iter().cloned() {
             check_cancelled!(halt);
@@ -305,9 +305,9 @@ fn verify_mt(output: &mut impl Write, thread_count: usize, args: &Arc<Args>, hal
     }
 
     // Process all verification results
-    let (mut chck_errors, mut file_errors, mut write_errors, mut is_aborted) = (u64::MIN, u64::MIN, false, false);
+    let (mut chck_errors, mut file_errors, mut write_errors) = (u64::MIN, u64::MIN, false);
     while let Ok(verify_result) = result_rx.recv() {
-        check_cancelled!(halt, is_aborted);
+        break_cancelled!(halt);
         let is_success = matches!(verify_result, Ok((true, _)));
         if verify_result.is_err() {
             increment(&mut file_errors)
@@ -323,12 +323,13 @@ fn verify_mt(output: &mut impl Write, thread_count: usize, args: &Arc<Args>, hal
         }
     }
 
-    // Wait until all threads have completed
+    // Send shutdown signal to still running threads
     drop(result_rx);
+    let is_aborted = halt.compare_exchange(0isize, 1isize, Ordering::SeqCst, Ordering::SeqCst).is_err();
+
+    // Wait until all threads have completed
     for thread in thread_pool.drain(..) {
-        if matches!(thread.join().expect("Failed to join worker thread!"), Err(ThreadError::Aborted)) {
-            is_aborted = true;
-        }
+        let _ = thread.join().expect("Failed to join worker thread!");
     }
 
     // Has the process been aborted?
@@ -352,16 +353,13 @@ fn verify_st(output: &mut impl Write, args: &Arc<Args>, halt: &Arc<Flag>) -> Res
     let thread_handle = thread::spawn(move || reader_thread(&checksum_tx, &args_cloned, &halt_cloned));
 
     // Process all verification results
-    let (mut chck_errors, mut file_errors, mut write_errors, mut is_aborted) = (u64::MIN, u64::MIN, false, false);
+    let (mut chck_errors, mut file_errors, mut write_errors) = (u64::MIN, u64::MIN, false);
     while let Ok(checksum_result) = checksum_rx.recv() {
-        check_cancelled!(halt, is_aborted);
+        break_cancelled!(halt);
         let verify_result = match checksum_result {
             Ok((digest_expected, file_name)) => match verify_file(file_name, &digest_expected, args, halt) {
                 Ok(digest_result) => digest_result,
-                Err(Aborted) => {
-                    is_aborted |= true;
-                    break;
-                }
+                Err(_) => break,
             },
             Err(error) => Err(error),
         };
@@ -381,11 +379,12 @@ fn verify_st(output: &mut impl Write, args: &Arc<Args>, halt: &Arc<Flag>) -> Res
         }
     }
 
-    // Wait until all threads have completed
+    // Send shutdown signal to still running threads
     drop(checksum_rx);
-    if matches!(thread_handle.join().expect("Failed to join worker thread!"), Err(ThreadError::Aborted)) {
-        is_aborted = true;
-    }
+    let is_aborted = halt.compare_exchange(0isize, 1isize, Ordering::SeqCst, Ordering::SeqCst).is_err();
+
+    // Wait until the background thread has completed
+    let _ = thread_handle.join().expect("Failed to join worker thread!");
 
     // Has the process been aborted?
     if is_aborted {

@@ -168,10 +168,10 @@ mod verify;
 
 use num::Integer;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::Ordering;
 use std::{io::stdout, process::ExitCode, sync::Arc};
 
-use crate::common::Aborted;
+use crate::common::{Aborted, Flag};
 use crate::verify::verify_files;
 use crate::{
     arguments::Args,
@@ -235,9 +235,9 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
     }
 
     // Install the interrupt (CTRL+C) handling routine
-    let halt = Arc::new(AtomicBool::new(false));
+    let halt = Arc::new(Flag::new(0isize));
     let halt_cloned = halt.clone();
-    let _ = ctrlc::set_handler(move || halt_cloned.store(true, Ordering::SeqCst));
+    let _ = ctrlc::set_handler(move || halt_cloned.store(-1isize, Ordering::SeqCst));
 
     // Acquire stdout handle
     let mut output = stdout().lock();
