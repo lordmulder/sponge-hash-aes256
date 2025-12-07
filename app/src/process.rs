@@ -323,11 +323,11 @@ fn iterate_thread(path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &F
 // Process implementation
 // ---------------------------------------------------------------------------
 
-fn process_mt(output: &mut impl Write, thread_count: usize, digest_size: usize, bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
+fn process_mt(output: &mut impl Write, thread_count: NonZeroUsize, digest_size: usize, bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
     // Initialize thread pool
-    let mut thread_pool = Vec::with_capacity(thread_count.saturating_add(1usize));
-    let (path_tx, path_rx) = bounded::<PathResult>(thread_count.saturating_mul(32usize));
-    let (digest_tx, digest_rx) = bounded::<DigestResult>(thread_count.saturating_mul(2usize));
+    let mut thread_pool = Vec::with_capacity(thread_count.get().saturating_add(1usize));
+    let (path_tx, path_rx) = bounded::<PathResult>(thread_count.get().saturating_mul(32usize));
+    let (digest_tx, digest_rx) = bounded::<DigestResult>(thread_count.get().saturating_mul(2usize));
 
     // Start the file iteration thread
     if args.dirs || args.recursive || (args.files.len() > path_tx.capacity().unwrap_or(usize::MAX)) {
@@ -338,7 +338,7 @@ fn process_mt(output: &mut impl Write, thread_count: usize, digest_size: usize, 
     };
 
     // Start the worker threads
-    for (path_rx, digest_tx) in iter::repeat_n(path_rx, thread_count).zip(iter::repeat_n(digest_tx, thread_count)) {
+    for (path_rx, digest_tx) in iter::repeat_n(path_rx, thread_count.get()).zip(iter::repeat_n(digest_tx, thread_count.get())) {
         let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
         thread_pool.push(thread::spawn(move || compute_thread(&path_rx, &digest_tx, digest_size, &args_cloned, &halt_cloned)));
     }
@@ -495,7 +495,7 @@ pub fn process_files(output: &mut impl Write, digest_size: usize, args: Arc<Args
     };
 
     if thread_count > NonZeroUsize::MIN {
-        process_mt(output, thread_count.get(), digest_size, breadth_first, &args, &halt)
+        process_mt(output, thread_count, digest_size, breadth_first, &args, &halt)
     } else {
         process_st(output, digest_size, breadth_first, &args, &halt)
     }

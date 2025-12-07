@@ -288,18 +288,18 @@ fn reader_thread(checksum_tx: &Sender<ReadResult>, args: &Args, halt: &Flag) -> 
 // Verify implementation
 // ---------------------------------------------------------------------------
 
-fn verify_mt(output: &mut impl Write, thread_count: usize, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
+fn verify_mt(output: &mut impl Write, thread_count: NonZeroUsize, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
     // Initialize thread pool
-    let mut thread_pool = Vec::with_capacity(thread_count.saturating_add(1usize));
-    let (checksum_tx, checksum_rx) = bounded::<ReadResult>(thread_count.saturating_mul(16usize));
-    let (result_tx, result_rx) = bounded::<VerifyResult>(thread_count);
+    let mut thread_pool = Vec::with_capacity(thread_count.get().saturating_add(1usize));
+    let (checksum_tx, checksum_rx) = bounded::<ReadResult>(thread_count.get().saturating_mul(16usize));
+    let (result_tx, result_rx) = bounded::<VerifyResult>(thread_count.get());
 
     // Start the file iteration thread
     let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
     thread_pool.push(thread::spawn(move || reader_thread(&checksum_tx, &args_cloned, &halt_cloned)));
 
     // Start the worker threads
-    for (checksum_rx, result_tx) in iter::repeat_n(checksum_rx, thread_count).zip(iter::repeat_n(result_tx, thread_count)) {
+    for (checksum_rx, result_tx) in iter::repeat_n(checksum_rx, thread_count.get()).zip(iter::repeat_n(result_tx, thread_count.get())) {
         let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
         thread_pool.push(thread::spawn(move || verify_thread(&checksum_rx, &result_tx, &args_cloned, &halt_cloned)));
     }
@@ -419,7 +419,7 @@ pub fn verify_files(output: &mut impl Write, args: Arc<Args>, halt: Arc<Flag>) -
     };
 
     if thread_count > NonZeroUsize::MIN {
-        verify_mt(output, thread_count.get(), &args, &halt)
+        verify_mt(output, thread_count, &args, &halt)
     } else {
         verify_st(output, &args, &halt)
     }

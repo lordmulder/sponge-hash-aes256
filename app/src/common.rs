@@ -44,10 +44,6 @@ const STATUS_STOPPED: usize = 1usize;
 const STATUS_ABORTED: usize = 2usize;
 
 impl Flag {
-    pub const fn new() -> Self {
-        Self(AtomicUsize::new(STATUS_RUNNING))
-    }
-
     #[inline(always)]
     pub fn cancelled(&self) -> bool {
         self.0.load(Ordering::Relaxed) != STATUS_RUNNING
@@ -65,6 +61,13 @@ impl Flag {
     #[inline(always)]
     pub fn abort_process(&self) {
         self.0.store(STATUS_ABORTED, Ordering::SeqCst);
+    }
+}
+
+impl Default for Flag {
+    #[inline]
+    fn default() -> Self {
+        Self(AtomicUsize::new(STATUS_RUNNING))
     }
 }
 

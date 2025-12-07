@@ -168,7 +168,13 @@ mod verify;
 
 use num::Integer;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
-use std::{io::stdout, process::ExitCode, sync::Arc};
+use std::thread;
+use std::time::Duration;
+use std::{
+    io::stdout,
+    process::{exit as exit_process, ExitCode},
+    sync::Arc,
+};
 
 use crate::common::{Aborted, Flag};
 use crate::verify::verify_files;
@@ -234,9 +240,9 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
     }
 
     // Install the interrupt (CTRL+C) handling routine
-    let halt = Arc::new(Flag::new());
+    let halt = Arc::new(Flag::default());
     let halt_cloned = halt.clone();
-    let _ = ctrlc::set_handler(move || halt_cloned.abort_process());
+    let _ = ctrlc::set_handler(move || ctrlc_handler(&halt_cloned));
 
     // Acquire stdout handle
     let mut output = stdout().lock();
@@ -251,6 +257,15 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
         // Verify all checksum files that were given on the command-line
         verify_files(&mut output, args, halt)
     }
+}
+
+/// The SIGINT (CTRL+C) interrupt handler routine
+///
+/// If the process does not exit cleanly after 10 seconds, we just terminate it!
+fn ctrlc_handler(halt: &Arc<Flag>) {
+    halt.abort_process();
+    thread::sleep(Duration::from_secs(10u64));
+    exit_process(130i32);
 }
 
 // ---------------------------------------------------------------------------
