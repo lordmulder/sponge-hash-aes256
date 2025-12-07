@@ -14,7 +14,6 @@ use std::{
     io::{Error as IoError, Result as IoResult, Write},
     num::NonZeroU16,
     str::from_utf8,
-    sync::atomic::Ordering,
     time::Instant,
 };
 
@@ -72,7 +71,7 @@ fn print_digest<T: AsRef<[u8]>>(output: &mut impl Write, prefix: &str, digest: T
 /// Check if the computation has been aborted
 macro_rules! check_cancelled {
     ($halt:ident) => {
-        if $halt.load(Ordering::Relaxed) != 0isize {
+        if $halt.cancelled() {
             return Err(Error::Cancelled);
         }
     };

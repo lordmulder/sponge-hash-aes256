@@ -3,10 +3,7 @@
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use sponge_hash_aes256::SpongeHash256;
-use std::{
-    io::{BufRead, BufReader, Error as IoError, Read},
-    sync::atomic::Ordering,
-};
+use std::io::{BufRead, BufReader, Error as IoError, Read};
 
 use crate::{
     arguments::Args,
@@ -110,7 +107,7 @@ impl Hasher {
 /// Check if the computation has been aborted
 macro_rules! check_cancelled {
     ($halt:ident) => {
-        if $halt.load(Ordering::Relaxed) != 0isize {
+        if $halt.cancelled() {
             return Err(Error::Cancelled);
         }
     };

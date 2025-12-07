@@ -12,7 +12,7 @@ use std::{
     iter,
     num::NonZeroUsize,
     path::{Path, PathBuf},
-    sync::{atomic::Ordering, Arc},
+    sync::Arc,
     thread,
 };
 use tinyvec::TinyVec;
@@ -60,7 +60,7 @@ impl<T> From<SendError<T>> for Cancelled {
 /// Check if the computation has been cancelled
 macro_rules! check_cancelled {
     ($halt:ident) => {
-        if $halt.load(Ordering::Relaxed) != 0isize {
+        if $halt.cancelled() {
             return Err(Cancelled);
         }
     };
@@ -69,7 +69,7 @@ macro_rules! check_cancelled {
 /// Check if the computation has been cancelled
 macro_rules! break_cancelled {
     ($halt:ident) => {
-        if $halt.load(Ordering::Relaxed) != 0isize {
+        if $halt.cancelled() {
             break;
         }
     };
@@ -325,7 +325,7 @@ fn verify_mt(output: &mut impl Write, thread_count: usize, args: &Arc<Args>, hal
 
     // Send shutdown signal to still running threads
     drop(result_rx);
-    let is_aborted = halt.compare_exchange(0isize, 1isize, Ordering::SeqCst, Ordering::SeqCst).is_err();
+    let is_aborted = halt.stop_process().is_err();
 
     // Wait until all threads have completed
     for thread in thread_pool.drain(..) {
@@ -381,7 +381,7 @@ fn verify_st(output: &mut impl Write, args: &Arc<Args>, halt: &Arc<Flag>) -> Res
 
     // Send shutdown signal to still running threads
     drop(checksum_rx);
-    let is_aborted = halt.compare_exchange(0isize, 1isize, Ordering::SeqCst, Ordering::SeqCst).is_err();
+    let is_aborted = halt.stop_process().is_err();
 
     // Wait until the background thread has completed
     let _ = thread_handle.join().expect("Failed to join worker thread!");

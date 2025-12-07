@@ -15,7 +15,7 @@ use std::{
     num::NonZeroUsize,
     path::PathBuf,
     str::from_utf8_unchecked,
-    sync::{atomic::Ordering, Arc},
+    sync::Arc,
     thread,
 };
 use tinyvec::TinyVec;
@@ -126,7 +126,7 @@ fn iter_to_channel<T>(sender: Sender<T>, iter: impl Iterator<Item = T>) -> Resul
 /// Check if the computation has been cancelled
 macro_rules! check_cancelled {
     ($halt:ident) => {
-        if $halt.load(Ordering::Relaxed) != 0isize {
+        if $halt.cancelled() {
             return Err(Cancelled);
         }
     };
@@ -135,7 +135,7 @@ macro_rules! check_cancelled {
 /// Check if the computation has been cancelled
 macro_rules! break_cancelled {
     ($halt:ident) => {
-        if $halt.load(Ordering::Relaxed) != 0isize {
+        if $halt.cancelled() {
             break;
         }
     };
@@ -361,7 +361,7 @@ fn process_mt(output: &mut impl Write, thread_count: usize, digest_size: usize, 
 
     // Send shutdown signal to still running threads
     drop(digest_rx);
-    let is_aborted = halt.compare_exchange(0isize, 1isize, Ordering::SeqCst, Ordering::SeqCst).is_err();
+    let is_aborted = halt.stop_process().is_err();
 
     // Wait until all threads have completed
     for thread in thread_pool.drain(..) {
@@ -419,7 +419,7 @@ fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc
 
     // Send shutdown signal to still running threads
     drop(path_rx);
-    let is_aborted = halt.compare_exchange(0isize, 1isize, Ordering::SeqCst, Ordering::SeqCst).is_err();
+    let is_aborted = halt.stop_process().is_err();
 
     // Wait until the background thread has completed
     if let Some(thread) = thread_handle {

@@ -3,7 +3,10 @@
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
-use std::{num::NonZeroUsize, sync::atomic::AtomicIsize};
+use std::{
+    num::NonZeroUsize,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 use tinyvec::TinyVec;
 
 // ---------------------------------------------------------------------------
@@ -22,11 +25,48 @@ pub const MAX_THREADS: usize = 64usize;
 /// Type for holding a digest
 pub type Digest = TinyVec<[u8; DEFAULT_DIGEST_SIZE]>;
 
-/// Atomic flag
-pub type Flag = AtomicIsize;
-
 /// Error type to indicate that a process was aborted
 pub struct Aborted;
+
+// ---------------------------------------------------------------------------
+// Cancellation flag
+// ---------------------------------------------------------------------------
+
+/// A flag which can be used to signal a cancellation request
+pub struct Flag(AtomicUsize);
+
+/// An error type indicating that the process could not be stopped, because it was already aborted
+pub struct AlreadyAborted;
+
+// Status constants
+const STATUS_RUNNING: usize = 0usize;
+const STATUS_STOPPED: usize = 1usize;
+const STATUS_ABORTED: usize = 2usize;
+
+impl Flag {
+    pub const fn new() -> Self {
+        Self(AtomicUsize::new(STATUS_RUNNING))
+    }
+
+    #[inline(always)]
+    pub fn cancelled(&self) -> bool {
+        self.0.load(Ordering::Relaxed) != STATUS_RUNNING
+    }
+
+    #[inline(always)]
+    pub fn stop_process(&self) -> Result<(), AlreadyAborted> {
+        match self.0.compare_exchange(STATUS_RUNNING, STATUS_STOPPED, Ordering::SeqCst, Ordering::SeqCst) {
+            Ok(_) => Ok(()),
+            Err(STATUS_STOPPED) => Ok(()),
+            Err(_) => Err(AlreadyAborted),
+        }
+    }
+
+    #[inline(always)]
+    pub fn abort_process(&self) {
+        self.0.store(STATUS_ABORTED, Ordering::SeqCst);
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Detect number of CPU cores
