@@ -19,9 +19,6 @@ pub const MAX_SNAIL_LEVEL: u8 = 4u8;
 /// Maximum allowable digest size, specified in bytes
 pub const MAX_DIGEST_SIZE: usize = 8usize * DEFAULT_DIGEST_SIZE;
 
-/// Maximum number of threads
-pub const MAX_THREADS: usize = 64usize;
-
 /// Type for holding a digest
 pub type Digest = TinyVec<[u8; DEFAULT_DIGEST_SIZE]>;
 
@@ -35,8 +32,8 @@ pub struct Aborted;
 /// A flag which can be used to signal a cancellation request
 pub struct Flag(AtomicUsize);
 
-/// An error type indicating that the process could not be stopped, because it was already aborted
-pub struct AlreadyAborted;
+/// An error type indicating that the cancellation flag could not be updated
+pub struct UpdateError;
 
 // Status constants
 const STATUS_RUNNING: usize = 0usize;
@@ -44,23 +41,35 @@ const STATUS_STOPPED: usize = 1usize;
 const STATUS_ABORTED: usize = 2usize;
 
 impl Flag {
+    /// Check whether the process is still running
+    ///
+    /// This will return `true`, unless either `stop_process()` or `abort_process()` has been triggered.
     #[inline(always)]
-    pub fn cancelled(&self) -> bool {
-        self.0.load(Ordering::Relaxed) != STATUS_RUNNING
+    pub fn running(&self) -> bool {
+        self.0.load(Ordering::Relaxed) == STATUS_RUNNING
+    }
+
+    /// Request the process to be stopped normally
+    #[inline]
+    pub fn stop_process(&self) -> Result<(), UpdateError> {
+        self.try_update(STATUS_STOPPED)
+    }
+
+    /// Request the process to be aborted, e.g., after a `SIGINT` was received
+    #[inline]
+    pub fn abort_process(&self) -> Result<(), UpdateError> {
+        self.try_update(STATUS_ABORTED)
     }
 
     #[inline(always)]
-    pub fn stop_process(&self) -> Result<(), AlreadyAborted> {
-        match self.0.compare_exchange(STATUS_RUNNING, STATUS_STOPPED, Ordering::SeqCst, Ordering::SeqCst) {
+    fn try_update(&self, new_state: usize) -> Result<(), UpdateError> {
+        match self.0.compare_exchange(STATUS_RUNNING, new_state, Ordering::AcqRel, Ordering::Acquire) {
             Ok(_) => Ok(()),
-            Err(STATUS_STOPPED) => Ok(()),
-            Err(_) => Err(AlreadyAborted),
+            Err(previous_state) => match previous_state == new_state {
+                true => Ok(()),
+                false => Err(UpdateError),
+            },
         }
-    }
-
-    #[inline(always)]
-    pub fn abort_process(&self) {
-        self.0.store(STATUS_ABORTED, Ordering::SeqCst);
     }
 }
 
@@ -69,22 +78,6 @@ impl Default for Flag {
     fn default() -> Self {
         Self(AtomicUsize::new(STATUS_RUNNING))
     }
-}
-
-// ---------------------------------------------------------------------------
-// Detect number of CPU cores
-// ---------------------------------------------------------------------------
-
-/// Map the number of available CPU cores to the number of threads
-///
-/// **Note:** This avoids running too many parallel threads on systems with a large number of CPU cores!
-fn cores_to_threads(cores: usize) -> NonZeroUsize {
-    NonZeroUsize::new(((2.0 * (cores as f64).log2()).floor() as usize).max(1usize)).unwrap()
-}
-
-/// Get the "optimal" number of parallel threads for the current system
-pub fn hardware_concurrency() -> NonZeroUsize {
-    cores_to_threads(num_cpus::get())
 }
 
 // ---------------------------------------------------------------------------
@@ -112,9 +105,21 @@ impl<const N: usize> TinyVecEx for TinyVec<[u8; N]> {
 // Utility functions
 // ---------------------------------------------------------------------------
 
+/// Increments the referenced counter by one (saturating)
 #[inline(always)]
 pub fn increment(counter: &mut u64) {
     *counter = counter.saturating_add(1u64);
+}
+
+/// Compute the thread-count-specific capacity for a bounded channel
+#[inline]
+pub fn get_capacity(thread_count: &NonZeroUsize) -> usize {
+    let capacity = thread_count.get().saturating_mul(2usize).saturating_add(1usize);
+    if capacity > isize::MAX as usize {
+        capacity
+    } else {
+        capacity.next_power_of_two()
+    }
 }
 
 // ---------------------------------------------------------------------------

@@ -71,7 +71,7 @@ fn print_digest<T: AsRef<[u8]>>(output: &mut impl Write, prefix: &str, digest: T
 /// Check if the computation has been aborted
 macro_rules! check_cancelled {
     ($halt:ident) => {
-        if $halt.cancelled() {
+        if !$halt.running() {
             return Err(Error::Cancelled);
         }
     };
@@ -152,7 +152,7 @@ fn test_runner(output: &mut impl Write, passes: NonZeroU16, halt: &Flag) -> Resu
 
 pub fn self_test(output: &mut impl Write, args: &Args, halt: &Flag) -> Result<bool, Aborted> {
     let passes = match get_selftest_passes() {
-        Ok(value) => value,
+        Ok(value) => value.unwrap_or_else(|| NonZeroU16::new(3u16).unwrap()),
         Err(error) => {
             print_error!(args, "Error: Invalid number of self-test passes \"{}\" specified!", error);
             return Ok(false);

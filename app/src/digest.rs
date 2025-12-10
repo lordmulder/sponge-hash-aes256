@@ -107,7 +107,7 @@ impl Hasher {
 /// Check if the computation has been aborted
 macro_rules! check_cancelled {
     ($halt:ident) => {
-        if $halt.cancelled() {
+        if !$halt.running() {
             return Err(Error::Cancelled);
         }
     };

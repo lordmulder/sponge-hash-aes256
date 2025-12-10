@@ -164,10 +164,12 @@ mod environment;
 mod io;
 mod process;
 mod self_test;
+mod thread_pool;
 mod verify;
 
 use num::Integer;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
+use std::sync::Once;
 use std::thread;
 use std::time::Duration;
 use std::{
@@ -241,8 +243,8 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
 
     // Install the interrupt (CTRL+C) handling routine
     let halt = Arc::new(Flag::default());
-    let halt_cloned = halt.clone();
-    let _ = ctrlc::set_handler(move || ctrlc_handler(&halt_cloned));
+    let (halt_cloned, args_cloned) = (Arc::clone(&halt), Arc::clone(&args));
+    let _ = ctrlc::set_handler(move || ctrlc_handler(&args_cloned, &halt_cloned));
 
     // Acquire stdout handle
     let mut output = stdout().lock();
@@ -259,13 +261,27 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Interrupt handler
+// ---------------------------------------------------------------------------
+
+/// This function will be called when the process is aborting
+fn abort_process(args: &Args) -> ! {
+    static ABORT_ONLY_ONCE: Once = Once::new();
+    ABORT_ONLY_ONCE.call_once(|| {
+        print_error!(args, "Aborted: The process has been interrupted by the user!");
+        exit_process(130i32) /* 128 + 2 = 130 */
+    });
+    unreachable!()
+}
+
 /// The SIGINT (CTRL+C) interrupt handler routine
 ///
 /// If the process does not exit cleanly after 10 seconds, we just terminate it!
-fn ctrlc_handler(halt: &Arc<Flag>) {
-    halt.abort_process();
+fn ctrlc_handler(args: &Arc<Args>, halt: &Arc<Flag>) {
+    let _ = halt.abort_process();
     thread::sleep(Duration::from_secs(10u64));
-    exit_process(130i32);
+    abort_process(args);
 }
 
 // ---------------------------------------------------------------------------
@@ -281,9 +297,6 @@ fn main() -> ExitCode {
     match sponge256sum_main(Arc::clone(&args)) {
         Ok(true) => ExitCode::SUCCESS,
         Ok(false) => ExitCode::FAILURE,
-        Err(Aborted) => {
-            print_error!(args, "Aborted: The process has been interrupted by the user!");
-            ExitCode::from(130u8)
-        }
+        Err(Aborted) => abort_process(&args),
     }
 }

@@ -2,14 +2,13 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use crossbeam_channel::{bounded, Receiver, SendError, Sender};
+use crossbeam_channel::{bounded, Receiver, Sender};
 use hex::decode_to_slice;
 use num::Integer;
 use std::{
     ffi::OsStr,
     fs::File,
     io::{BufRead, BufReader, Read, Result as IoResult, Write},
-    iter,
     num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::Arc,
@@ -19,11 +18,11 @@ use tinyvec::TinyVec;
 
 use crate::{
     arguments::Args,
-    common::{hardware_concurrency, increment, Aborted, Digest, Flag, TinyVecEx},
+    common::{get_capacity, increment, Aborted, Digest, Flag, TinyVecEx},
     digest::{compute_digest, digest_equal, Error as DigestError},
-    environment::get_thread_count,
     io::{DataSource, STDIN_NAME},
     print_error,
+    thread_pool::{detect_thread_count, Cancelled, TaskResult, ThreadPool},
 };
 
 // ---------------------------------------------------------------------------
@@ -33,7 +32,7 @@ use crate::{
 /// Error type for processing file tasks
 #[derive(Debug)]
 #[allow(dead_code)]
-enum TaskError {
+enum Error {
     ChksumSrcIsDir(PathBuf),
     ChksumFileOpen(PathBuf),
     ChksumFileRead(PathBuf),
@@ -44,15 +43,6 @@ enum TaskError {
     TargetFileRead(PathBuf),
 }
 
-/// Error type to signal that a thread was cancelled
-struct Cancelled;
-
-impl<T> From<SendError<T>> for Cancelled {
-    fn from(_: SendError<T>) -> Self {
-        Self
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Utility functions
 // ---------------------------------------------------------------------------
@@ -60,7 +50,7 @@ impl<T> From<SendError<T>> for Cancelled {
 /// Check if the computation has been cancelled
 macro_rules! check_cancelled {
     ($halt:ident) => {
-        if $halt.cancelled() {
+        if !$halt.running() {
             return Err(Cancelled);
         }
     };
@@ -69,7 +59,7 @@ macro_rules! check_cancelled {
 /// Check if the computation has been cancelled
 macro_rules! break_cancelled {
     ($halt:ident) => {
-        if $halt.cancelled() {
+        if !$halt.running() {
             break;
         }
     };
@@ -111,14 +101,14 @@ fn print_result(output: &mut impl Write, verify_result: &VerifyResult, args: &Ar
         Ok((is_match, path)) => print_match(output, *is_match, path, args).is_ok(),
         Err(error) => {
             match error {
-                TaskError::ChksumFileOpen(path) => print_error!(args, "Failed to open checksum file {:?}", path),
-                TaskError::ChksumFileRead(path) => print_error!(args, "Failed to read checksum file {:?}", path),
-                TaskError::ChksumParseErr(path, line) => print_error!(args, "Malformed checksum file {:?} [line #{}]", path, line),
-                TaskError::ChksumSrcIsDir(path) => print_error!(args, "Checksum file is a directory: {:?}", path),
-                TaskError::ChksumStdnOpen => print_error!(args, "Failed to acquire the standard input stream for reading!"),
-                TaskError::TargetFileOpen(path) => print_error!(args, "Failed to open target file {:?}", path),
-                TaskError::TargetFileRead(path) => print_error!(args, "Failed to read target file {:?}", path),
-                TaskError::TargetSrcIsDir(path) => print_error!(args, "Target file is a directory: {:?}", path),
+                Error::ChksumFileOpen(path) => print_error!(args, "Failed to open checksum file {:?}", path),
+                Error::ChksumFileRead(path) => print_error!(args, "Failed to read checksum file {:?}", path),
+                Error::ChksumParseErr(path, line) => print_error!(args, "Malformed checksum file {:?} [line #{}]", path, line),
+                Error::ChksumSrcIsDir(path) => print_error!(args, "Checksum file is a directory: {:?}", path),
+                Error::ChksumStdnOpen => print_error!(args, "Failed to acquire the standard input stream for reading!"),
+                Error::TargetFileOpen(path) => print_error!(args, "Failed to open target file {:?}", path),
+                Error::TargetFileRead(path) => print_error!(args, "Failed to read target file {:?}", path),
+                Error::TargetSrcIsDir(path) => print_error!(args, "Target file is a directory: {:?}", path),
             }
             true
         }
@@ -145,7 +135,7 @@ fn print_summary(chck_errors: u64, file_errors: u64, args: &Args) {
 // Verify file digest
 // ---------------------------------------------------------------------------
 
-type VerifyResult = Result<(bool, PathBuf), TaskError>;
+type VerifyResult = Result<(bool, PathBuf), Error>;
 
 /// Compute checksum and compare to expected value
 fn verify_checksum(source: &mut dyn Read, digest_expected: &[u8], args: &Args, halt: &Flag) -> Result<bool, DigestError> {
@@ -159,21 +149,21 @@ fn verify_file(file_name: PathBuf, digest_expected: &Digest, args: &Args, halt: 
     match DataSource::from_path(&file_name) {
         Ok(mut file) => {
             if file.is_directory() {
-                Ok(Err(TaskError::TargetSrcIsDir(file_name)))
+                Ok(Err(Error::TargetSrcIsDir(file_name)))
             } else {
                 match verify_checksum(&mut file, digest_expected.as_slice(), args, halt) {
                     Ok(is_match) => Ok(Ok((is_match, file_name))),
-                    Err(DigestError::IoError) => Ok(Err(TaskError::TargetFileRead(file_name))),
+                    Err(DigestError::IoError) => Ok(Err(Error::TargetFileRead(file_name))),
                     Err(DigestError::Cancelled) => Err(Cancelled),
                 }
             }
         }
-        Err(_) => Ok(Err(TaskError::TargetFileOpen(file_name))),
+        Err(_) => Ok(Err(Error::TargetFileOpen(file_name))),
     }
 }
 
 /// Verify all provided checksums
-fn verify_thread(checksum_rx: &Receiver<ReadResult>, result_tx: &Sender<VerifyResult>, args: &Args, halt: &Flag) -> Result<(), Cancelled> {
+fn verify_thread(checksum_rx: &Receiver<ReadResult>, result_tx: &Sender<VerifyResult>, args: &Args, halt: &Flag) -> TaskResult {
     while let Ok(read_result) = checksum_rx.recv() {
         check_cancelled!(halt);
         match read_result {
@@ -196,7 +186,7 @@ fn verify_thread(checksum_rx: &Receiver<ReadResult>, result_tx: &Sender<VerifyRe
 // Read checksums from checksum file
 // ---------------------------------------------------------------------------
 
-type ReadResult = Result<(Digest, PathBuf), TaskError>;
+type ReadResult = Result<(Digest, PathBuf), Error>;
 struct Malformed;
 
 /// Parse a single line from checksum file
@@ -228,7 +218,7 @@ fn read_checksum_data(checksum_tx: &Sender<ReadResult>, input: &mut dyn Read, in
                     if let Ok((file_name, digest)) = parse_checksum_line(line_trimmed) {
                         checksum_tx.send(Ok((digest, PathBuf::from(file_name))))?;
                     } else {
-                        checksum_tx.send(Err(TaskError::ChksumParseErr(input_name.clone(), line_no + 1usize)))?;
+                        checksum_tx.send(Err(Error::ChksumParseErr(input_name.clone(), line_no + 1usize)))?;
                         if !args.keep_going {
                             return Ok(false);
                         }
@@ -236,7 +226,7 @@ fn read_checksum_data(checksum_tx: &Sender<ReadResult>, input: &mut dyn Read, in
                 };
             }
             Err(_) => {
-                checksum_tx.send(Err(TaskError::ChksumFileRead(input_name)))?;
+                checksum_tx.send(Err(Error::ChksumFileRead(input_name)))?;
                 return Ok(false);
             }
         }
@@ -250,21 +240,21 @@ fn read_checksum_file(checksum_tx: &Sender<ReadResult>, file_name: PathBuf, args
     match File::open(&file_name) {
         Ok(mut file) => {
             if file.metadata().is_ok_and(|meta| meta.is_dir()) {
-                checksum_tx.send(Err(TaskError::ChksumSrcIsDir(file_name)))?;
+                checksum_tx.send(Err(Error::ChksumSrcIsDir(file_name)))?;
                 Ok(false)
             } else {
                 read_checksum_data(checksum_tx, &mut file, file_name, args, halt)
             }
         }
         Err(_) => {
-            checksum_tx.send(Err(TaskError::ChksumFileOpen(file_name)))?;
+            checksum_tx.send(Err(Error::ChksumFileOpen(file_name)))?;
             Ok(false)
         }
     }
 }
 
 /// Iterate a list of checksum files
-fn reader_thread(checksum_tx: &Sender<ReadResult>, args: &Args, halt: &Flag) -> Result<(), Cancelled> {
+fn reader_thread(checksum_tx: &Sender<ReadResult>, args: &Args, halt: &Flag) -> TaskResult {
     if !args.files.is_empty() {
         for file_name in args.files.iter().cloned() {
             check_cancelled!(halt);
@@ -277,7 +267,7 @@ fn reader_thread(checksum_tx: &Sender<ReadResult>, args: &Args, halt: &Flag) -> 
             Ok(mut stdin_stream) => {
                 read_checksum_data(checksum_tx, &mut stdin_stream, PathBuf::from(&*STDIN_NAME), args, halt)?;
             }
-            Err(_) => checksum_tx.send(Err(TaskError::ChksumStdnOpen))?,
+            Err(_) => checksum_tx.send(Err(Error::ChksumStdnOpen))?,
         }
     }
 
@@ -289,23 +279,22 @@ fn reader_thread(checksum_tx: &Sender<ReadResult>, args: &Args, halt: &Flag) -> 
 // ---------------------------------------------------------------------------
 
 fn verify_mt(output: &mut impl Write, thread_count: NonZeroUsize, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
-    // Initialize thread pool
-    let mut thread_pool = Vec::with_capacity(thread_count.get().saturating_add(1usize));
-    let (checksum_tx, checksum_rx) = bounded::<ReadResult>(thread_count.get().saturating_mul(16usize));
-    let (result_tx, result_rx) = bounded::<VerifyResult>(thread_count.get());
+    // Initialize channels
+    let (checksum_tx, checksum_rx) = bounded::<ReadResult>(256usize);
+    let (result_tx, result_rx) = bounded::<VerifyResult>(get_capacity(&thread_count));
 
-    // Start the file iteration thread
+    // Start the checksum reader thread
     let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
-    thread_pool.push(thread::spawn(move || reader_thread(&checksum_tx, &args_cloned, &halt_cloned)));
+    let thread_handle = thread::spawn(move || reader_thread(&checksum_tx, &args_cloned, &halt_cloned));
 
     // Start the worker threads
-    for (checksum_rx, result_tx) in iter::repeat_n(checksum_rx, thread_count.get()).zip(iter::repeat_n(result_tx, thread_count.get())) {
-        let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
-        thread_pool.push(thread::spawn(move || verify_thread(&checksum_rx, &result_tx, &args_cloned, &halt_cloned)));
-    }
+    let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
+    let thread_pool = ThreadPool::new(thread_count, move || verify_thread(&checksum_rx, &result_tx, &args_cloned, &halt_cloned));
+
+    // Initialize counters
+    let (mut chck_errors, mut file_errors, mut write_errors) = (u64::MIN, u64::MIN, false);
 
     // Process all verification results
-    let (mut chck_errors, mut file_errors, mut write_errors) = (u64::MIN, u64::MIN, false);
     while let Ok(verify_result) = result_rx.recv() {
         break_cancelled!(halt);
         let is_success = matches!(verify_result, Ok((true, _)));
@@ -327,9 +316,14 @@ fn verify_mt(output: &mut impl Write, thread_count: NonZeroUsize, args: &Arc<Arg
     drop(result_rx);
     let is_aborted = halt.stop_process().is_err();
 
-    // Wait until all threads have completed
-    for thread in thread_pool.drain(..) {
-        let _ = thread.join().expect("Failed to join worker thread!");
+    // Wait until the thread has completed
+    if let Err(error) = thread_handle.join() {
+        panic!("Failed to join the worker thread: {error:?}")
+    }
+
+    // Wait until all thread-pool tasks have completed too
+    if let Err(error) = thread_pool.join() {
+        panic!("Failed to join the worker thread: {error:?}")
     }
 
     // Has the process been aborted?
@@ -346,20 +340,22 @@ fn verify_mt(output: &mut impl Write, thread_count: NonZeroUsize, args: &Arc<Arg
 
 fn verify_st(output: &mut impl Write, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
     // Initialize channel
-    let (checksum_tx, checksum_rx) = bounded::<ReadResult>(32usize);
+    let (checksum_tx, checksum_rx) = bounded::<ReadResult>(256usize);
 
-    // Start the file iteration thread
+    // Start the checksum reader thread
     let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
     let thread_handle = thread::spawn(move || reader_thread(&checksum_tx, &args_cloned, &halt_cloned));
 
-    // Process all verification results
+    // Initialize counters
     let (mut chck_errors, mut file_errors, mut write_errors) = (u64::MIN, u64::MIN, false);
+
+    // Process all verification results
     while let Ok(checksum_result) = checksum_rx.recv() {
         break_cancelled!(halt);
         let verify_result = match checksum_result {
             Ok((digest_expected, file_name)) => match verify_file(file_name, &digest_expected, args, halt) {
-                Ok(digest_result) => digest_result,
-                Err(_) => break,
+                Ok(result) => result,
+                Err(Cancelled) => break, /* cancelled */
             },
             Err(error) => Err(error),
         };
@@ -383,8 +379,10 @@ fn verify_st(output: &mut impl Write, args: &Arc<Args>, halt: &Arc<Flag>) -> Res
     drop(checksum_rx);
     let is_aborted = halt.stop_process().is_err();
 
-    // Wait until the background thread has completed
-    let _ = thread_handle.join().expect("Failed to join worker thread!");
+    // Wait until the thread has completed
+    if let Err(error) = thread_handle.join() {
+        panic!("Failed to join the worker thread: {error:?}")
+    }
 
     // Has the process been aborted?
     if is_aborted {
@@ -405,17 +403,12 @@ fn verify_st(output: &mut impl Write, args: &Arc<Args>, halt: &Arc<Flag>) -> Res
 /// Verify all input files
 pub fn verify_files(output: &mut impl Write, args: Arc<Args>, halt: Arc<Flag>) -> Result<bool, Aborted> {
     // Determine number of threads
-    let thread_count = if args.multi_threading {
-        match get_thread_count() {
-            Ok(value) if value == usize::MIN => hardware_concurrency(),
-            Ok(value) => NonZeroUsize::new(value).unwrap(),
-            Err(error) => {
-                print_error!(args, "Error: Invalid thread count \"{}\" specified!", error);
-                return Ok(false);
-            }
+    let thread_count = match detect_thread_count(&args) {
+        Ok(value) => value,
+        Err(error) => {
+            print_error!(args, "Error: Invalid thread count \"{}\" has been specified!", error);
+            return Ok(false);
         }
-    } else {
-        NonZeroUsize::MIN
     };
 
     if thread_count > NonZeroUsize::MIN {
