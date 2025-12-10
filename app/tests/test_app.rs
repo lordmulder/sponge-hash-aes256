@@ -20,10 +20,12 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{LazyLock, Mutex},
-    thread,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
 use tinyvec::TinyVec;
+
+#[cfg(unix)]
+use std::{thread, time::Duration};
 
 #[cfg(unix)]
 use nix::{
@@ -41,6 +43,8 @@ static REGEX_CHECK: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([\x20-
 static REGEX_VERSION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^sponge256sum\s+v(\d+\.\d+\.\d+)[\s$]").unwrap());
 static REGEX_HELP: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Usage:\s+sponge256sum(\.exe)?[\s$]").unwrap());
 static REGEX_SELFTEST: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Successful.").unwrap());
+
+#[cfg(unix)]
 static REGEX_ABORTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)\bAborted: The process has been interrupted").unwrap());
 
 // ---------------------------------------------------------------------------
@@ -150,6 +154,7 @@ where
     String::from_utf8(output.stdout).unwrap()
 }
 
+#[cfg(unix)]
 fn run_binary_with_signal<I, S>(args: I, delay: u64, signal: i32, expected_status: i32) -> String
 where
     I: IntoIterator<Item = S>,
