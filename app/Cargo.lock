@@ -568,6 +568,7 @@ dependencies = [
  "hex",
  "hex-literal",
  "mimalloc",
+ "nix",
  "num",
  "rand_pcg",
  "regex",

@@ -20,9 +20,16 @@ use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{LazyLock, Mutex},
-    time::{SystemTime, UNIX_EPOCH},
+    thread,
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tinyvec::TinyVec;
+
+#[cfg(unix)]
+use nix::{
+    sys::signal::{kill, Signal},
+    unistd::Pid,
+};
 
 // ---------------------------------------------------------------------------
 // Regular expressions
@@ -34,6 +41,7 @@ static REGEX_CHECK: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([\x20-
 static REGEX_VERSION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^sponge256sum\s+v(\d+\.\d+\.\d+)[\s$]").unwrap());
 static REGEX_HELP: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Usage:\s+sponge256sum(\.exe)?[\s$]").unwrap());
 static REGEX_SELFTEST: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Successful.").unwrap());
+static REGEX_ABORTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)\bAborted: The process has been interrupted").unwrap());
 
 // ---------------------------------------------------------------------------
 // Randomness
@@ -140,6 +148,27 @@ where
 
     assert!(output.status.success());
     String::from_utf8(output.stdout).unwrap()
+}
+
+fn run_binary_with_signal<I, S>(args: I, delay: u64, signal: i32, expected_status: i32) -> String
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let child = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
+        .args(args)
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .stdin(Stdio::null())
+        .spawn()
+        .expect("Failed to run binary!");
+
+    thread::sleep(Duration::from_secs(delay));
+    kill(Pid::from_raw(child.id() as i32), Signal::try_from(signal).unwrap()).expect("Failed to send signal!");
+
+    let output = child.wait_with_output().expect("Failed to wait for process!");
+    assert!(output.status.code().is_some_and(|exit_code| exit_code == expected_status));
+    String::from_utf8(output.stderr).unwrap()
 }
 
 fn modify_checksum_file(original_file: &Path, modified_file: PathBuf) -> PathBuf {
@@ -652,6 +681,13 @@ fn test_verify_2a() {
 #[test]
 fn test_verify_2b() {
     do_verify_files(true, 3usize, true);
+}
+
+#[cfg(unix)]
+#[test]
+fn test_interrupt() {
+    let output = run_binary_with_signal([OsStr::new("/dev/zero")], 1u64, 2i32, 130i32);
+    assert!(REGEX_ABORTED.is_match(&output))
 }
 
 #[test]

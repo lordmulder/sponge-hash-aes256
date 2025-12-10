@@ -30,6 +30,7 @@ wild = { version = "2.2.1", default-features = false }
 mimalloc = { version = "0.1.48", default-features = false }
 
 [dev-dependencies]
+nix = { version = "0.30.1", default-features = false }
 regex = { version = "1.12.2", default-features = false, features = ["unicode"] }
 
 [profile.release]
