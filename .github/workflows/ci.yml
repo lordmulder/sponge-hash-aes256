@@ -344,7 +344,7 @@ jobs:
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
       - uses: vmactions/omnios-vm@v1
         with:
-          release: r151054
+          release: r151056
           usesh: true
           prepare: |
             pkg install developer/build-essential developer/versioning/git
