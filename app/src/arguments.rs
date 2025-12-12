@@ -2,7 +2,6 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-use crate::{common::AsBool, print_error};
 use build_time::build_time_utc;
 use clap::{
     error::{ContextKind, ContextValue, Error, ErrorKind},
@@ -58,22 +57,24 @@ const HELP_TEXT: &str = "If no input files are specified, reads input data from 
 pub struct Args {
     /// Read the input file(s) in binary mode, i.e., default mode
     #[arg(short, long)]
+    #[arg(group = "input_mode")]
     pub binary: bool,
 
     /// Read the input file(s) in text mode
     #[arg(short, long)]
+    #[arg(group = "input_mode")]
     pub text: bool,
 
     /// Read and verify checksums from the provided input file(s)
-    #[arg(short, long)]
+    #[arg(short, long, group = "mtx_dirs", group = "mtx_recursive", group = "mtx_length", group = "mtx_plain", group = "mtx_selftest")]
     pub check: bool,
 
     /// Enable processing of directories as arguments
-    #[arg(short, long)]
+    #[arg(short, long, group = "mtx_dirs")]
     pub dirs: bool,
 
     /// Recursively process the provided directories (implies -d)
-    #[arg(short, long)]
+    #[arg(short, long, group = "mtx_recursive")]
     pub recursive: bool,
 
     /// Continue processing even if errors are encountered.
@@ -81,7 +82,7 @@ pub struct Args {
     pub keep_going: bool,
 
     /// Digest output size, in bits (default: 256, maximum: 2048)
-    #[arg(short, long)]
+    #[arg(short, long, group = "mtx_length")]
     pub length: Option<NonZeroUsize>,
 
     /// Include additional context information
@@ -97,7 +98,7 @@ pub struct Args {
     pub quiet: bool,
 
     /// Print digest(s) in plain format, i.e., without file names
-    #[arg(short, long)]
+    #[arg(short, long, group = "mtx_plain")]
     pub plain: bool,
 
     /// Separate digest(s) by NULL characters instead of newlines
@@ -105,7 +106,7 @@ pub struct Args {
     pub null: bool,
 
     /// Enable multi-threaded processing of input files
-    #[arg(short, long)]
+    #[arg(short, long, group = "mtx_threads")]
     pub multi_threading: bool,
 
     /// Explicitly flush 'stdout' stream after printing a digest
@@ -113,7 +114,7 @@ pub struct Args {
     pub flush: bool,
 
     /// Run the built-in self-test (BIST)
-    #[arg(short = 'T', long)]
+    #[arg(short = 'T', long, group = "mtx_selftest", group = "mtx_threads")]
     pub self_test: bool,
 
     /// Files to be processed
@@ -125,7 +126,7 @@ impl Args {
     /// Parse command-line arguments
     pub fn try_parse_command_line() -> Result<Self, ExitCode> {
         match Self::try_parse_from(args_os()) {
-            Ok(args) => validate(args),
+            Ok(args) => Ok(args),
             Err(error) => Err(print_arg_error(error)),
         }
     }
@@ -141,7 +142,8 @@ macro_rules! print_arg_error {
     };
 }
 
-fn get_str(error: &Error, kind: ContextKind) -> &str {
+#[inline]
+fn context_str(error: &Error, kind: ContextKind) -> &str {
     static EMPTY_STRING: String = String::new();
     if let Some(ContextValue::String(str_value)) = error.get(kind) {
         str_value
@@ -158,15 +160,24 @@ fn print_arg_error(error: Error) -> ExitCode {
             ExitCode::SUCCESS
         }
         ErrorKind::UnknownArgument => {
-            print_arg_error!("Unknown option \"{}\" encountered!", get_str(&error, ContextKind::InvalidArg));
+            print_arg_error!("Unknown option \"{}\" encountered!", context_str(&error, ContextKind::InvalidArg));
             ExitCode::FAILURE
         }
         ErrorKind::InvalidValue | ErrorKind::ValueValidation => {
-            let (invalid_arg, invalid_value) = (get_str(&error, ContextKind::InvalidArg), get_str(&error, ContextKind::InvalidValue));
+            let (invalid_arg, invalid_value) = (context_str(&error, ContextKind::InvalidArg), context_str(&error, ContextKind::InvalidValue));
             if invalid_value.is_empty() {
                 print_arg_error!("The required value for option \"{}\" is missing!", invalid_arg);
             } else {
                 print_arg_error!("The given value \"{}\" for option \"{}\" is invalid!", invalid_value, invalid_arg);
+            }
+            ExitCode::FAILURE
+        }
+        ErrorKind::ArgumentConflict => {
+            let (invalid_arg, prior_arg) = (context_str(&error, ContextKind::InvalidArg), context_str(&error, ContextKind::PriorArg));
+            if prior_arg.is_empty() || (prior_arg == invalid_arg) {
+                print_arg_error!("The option \"{}\" can not be used more than once!", invalid_arg);
+            } else {
+                print_arg_error!("The options \"{}\" and \"{}\" are mutually exclusive!", invalid_arg, prior_arg);
             }
             ExitCode::FAILURE
         }
@@ -175,28 +186,4 @@ fn print_arg_error(error: Error) -> ExitCode {
             ExitCode::FAILURE
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Argument validation
-// ---------------------------------------------------------------------------
-
-macro_rules! check_option {
-    ($args:ident, $option_1:ident, $option_2:ident) => {
-        if $args.$option_1.is_set() && $args.$option_2.is_set() {
-            print_error!($args, "Error: Option '--{}' must not be used in '--{}' mode!", stringify!($option_2), stringify!($option_1));
-            return Err(ExitCode::FAILURE);
-        }
-    };
-}
-
-/// Validate the given options
-fn validate(args: Args) -> Result<Args, ExitCode> {
-    check_option!(args, binary, text);
-    check_option!(args, check, length);
-    check_option!(args, check, dirs);
-    check_option!(args, check, recursive);
-    check_option!(args, check, plain);
-
-    Ok(args)
 }
