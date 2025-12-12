@@ -85,21 +85,21 @@ fn random_u64() -> u64 {
 // Utility functions
 // ---------------------------------------------------------------------------
 
-fn run_binary<I, S>(args: I, expected_success: bool) -> String
+fn run_binary<I, S>(args: I, expected_success: bool, force_stderr: bool) -> String
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
     let output = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
         .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stdout(if force_stderr { Stdio::null() } else { Stdio::piped() })
+        .stderr(if force_stderr { Stdio::piped() } else { Stdio::null() })
         .stdin(Stdio::null())
         .output()
         .expect("Failed to run binary!");
 
     assert_eq!(output.status.success(), expected_success);
-    String::from_utf8(output.stdout).unwrap()
+    String::from_utf8(if force_stderr { output.stderr } else { output.stdout }).unwrap()
 }
 
 fn run_binary_with_data<I, S>(args: I, data: &[u8]) -> String
@@ -157,15 +157,15 @@ where
 }
 
 #[cfg(unix)]
-fn run_binary_with_signal<I, S>(args: I, delay: u64, signal: i32, expected_status: i32) -> String
+fn run_binary_with_signal<I, S>(args: I, delay: u64, signal: i32, expected_status: i32, force_stderr: bool) -> String
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
     let child = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
         .args(args)
-        .stdout(Stdio::null())
-        .stderr(Stdio::piped())
+        .stdout(if force_stderr { Stdio::null() } else { Stdio::piped() })
+        .stderr(if force_stderr { Stdio::piped() } else { Stdio::null() })
         .stdin(Stdio::null())
         .spawn()
         .expect("Failed to run binary!");
@@ -174,8 +174,8 @@ where
     kill(Pid::from_raw(child.id() as i32), Signal::try_from(signal).unwrap()).expect("Failed to send signal!");
 
     let output = child.wait_with_output().expect("Failed to wait for process!");
-    assert!(output.status.code().is_some_and(|exit_code| exit_code == expected_status));
-    String::from_utf8(output.stderr).unwrap()
+    assert_eq!(output.status.code().unwrap_or(-1i32), expected_status);
+    String::from_utf8(if force_stderr { output.stderr } else { output.stdout }).unwrap()
 }
 
 fn modify_checksum_file(original_file: &Path, modified_file: PathBuf) -> PathBuf {
@@ -252,7 +252,7 @@ fn do_test_file(expected: &str, file_name: &str, text_mode: bool, snail_level: u
 
     parameters.push(path.as_os_str());
 
-    let output = run_binary(parameters, true);
+    let output = run_binary(parameters, true, false);
     let caps = REGEX_LINE.captures(&output).expect("Regex did not match!");
 
     assert!(digest_eq(caps.get(1).unwrap().as_str(), expected));
@@ -260,7 +260,7 @@ fn do_test_file(expected: &str, file_name: &str, text_mode: bool, snail_level: u
 
 fn do_test_file_with_length(expected: &str, file_name: &str, length: u32) {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("binary").join(file_name);
-    let output = run_binary([OsStr::new("--length"), OsStr::new(&format!("{}", length)), path.as_os_str()], true);
+    let output = run_binary([OsStr::new("--length"), OsStr::new(&format!("{}", length)), path.as_os_str()], true, false);
     let caps = REGEX_LINE.captures(&output).expect("Regex did not match!");
 
     assert!(digest_eq(caps.get(1).unwrap().as_str(), expected));
@@ -278,7 +278,7 @@ fn do_test_file_with_info(expected: &str, file_name: &str, info: &str, snail_lev
 
     parameters.push(path.as_os_str());
 
-    let output = run_binary(parameters.as_slice(), true);
+    let output = run_binary(parameters.as_slice(), true, false);
     let caps = REGEX_LINE.captures(&output).expect("Regex did not match!");
 
     assert!(digest_eq(caps.get(1).unwrap().as_str(), expected));
@@ -308,7 +308,7 @@ fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: bool, multi_thread
     }
 
     parameters.push(path.as_os_str());
-    let output = run_binary(parameters.as_slice(), true);
+    let output = run_binary(parameters.as_slice(), true, false);
 
     let matches = if force_null {
         if force_plain {
@@ -366,9 +366,9 @@ fn do_verify_files(modify: bool, file_count: usize, multi_threading: bool) {
     };
 
     let output = if multi_threading {
-        run_binary([OsStr::new("--check"), OsStr::new("--keep-going"), OsStr::new("--multi-threading"), input_file.as_os_str()], !modify)
+        run_binary([OsStr::new("--check"), OsStr::new("--keep-going"), OsStr::new("--multi-threading"), input_file.as_os_str()], !modify, false)
     } else {
-        run_binary([OsStr::new("--check"), OsStr::new("--keep-going"), input_file.as_os_str()], !modify)
+        run_binary([OsStr::new("--check"), OsStr::new("--keep-going"), input_file.as_os_str()], !modify, false)
     };
 
     let mut result_set = HashSet::with_capacity(file_count);
@@ -763,13 +763,13 @@ fn test_verify_2b() {
 #[cfg(unix)]
 #[test]
 fn test_interrupt() {
-    let output = run_binary_with_signal([OsStr::new("/dev/zero")], 1u64, 2i32, 130i32);
+    let output = run_binary_with_signal([OsStr::new("/dev/zero")], 1u64, 2i32, 130i32, true);
     assert!(REGEX_ABORTED.is_match(&output))
 }
 
 #[test]
 fn test_version() {
-    let output = run_binary([OsStr::new("--version")], true);
+    let output = run_binary([OsStr::new("--version")], true, true);
     let caps = REGEX_VERSION.captures(&output).expect("Regex did not match!");
 
     assert_eq!(caps.get(1).unwrap().as_str(), env!("CARGO_PKG_VERSION"));
@@ -777,7 +777,7 @@ fn test_version() {
 
 #[test]
 fn test_help() {
-    assert!(REGEX_HELP.is_match(&run_binary([OsStr::new("--help")], true)));
+    assert!(REGEX_HELP.is_match(&run_binary([OsStr::new("--help")], true, true)));
 }
 
 #[test]
