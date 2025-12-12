@@ -38,7 +38,9 @@ use nix::{
 // ---------------------------------------------------------------------------
 
 static REGEX_LINE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([0-9a-fA-F]+)\s([\x20-\x7E]+)$").unwrap());
+static REGEX_PLAIN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([0-9a-fA-F]+)$").unwrap());
 static REGEX_ZERO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([0-9a-fA-F]+)\s([\x20-\x7E]+)\x00").unwrap());
+static REGEX_PLAIN_ZERO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([0-9a-fA-F]+)\x00").unwrap());
 static REGEX_CHECK: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([\x20-\x7E]+):\s(\w+)$").unwrap());
 static REGEX_VERSION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^sponge256sum\s+v(\d+\.\d+\.\d+)[\s$]").unwrap());
 static REGEX_HELP: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Usage:\s+sponge256sum(\.exe)?[\s$]").unwrap());
@@ -282,7 +284,7 @@ fn do_test_file_with_info(expected: &str, file_name: &str, info: &str, snail_lev
     assert!(digest_eq(caps.get(1).unwrap().as_str(), expected));
 }
 
-fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: bool, multi_threading: bool, force_null: bool) {
+fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: bool, multi_threading: bool, force_null: bool, force_plain: bool) {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("binary");
     let mut parameters = Vec::with_capacity(4usize);
     let mut digest_set = HashSet::with_capacity(expected_map.len());
@@ -301,16 +303,38 @@ fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: bool, multi_thread
         parameters.push(OsStr::new("--null"));
     }
 
+    if force_plain {
+        parameters.push(OsStr::new("--plain"));
+    }
+
     parameters.push(path.as_os_str());
     let output = run_binary(parameters.as_slice(), true);
 
-    for caps in if force_null { REGEX_ZERO.captures_iter(&output) } else { REGEX_LINE.captures_iter(&output) } {
+    let matches = if force_null {
+        if force_plain {
+            REGEX_PLAIN_ZERO.captures_iter(&output)
+        } else {
+            REGEX_ZERO.captures_iter(&output)
+        }
+    } else {
+        if force_plain {
+            REGEX_PLAIN.captures_iter(&output)
+        } else {
+            REGEX_LINE.captures_iter(&output)
+        }
+    };
+
+    for caps in matches {
         let digest = caps.get(1).unwrap().as_str();
-        let file_name = caps.get(2).unwrap().as_str().split(|c| c == '/' || c == '\\').last().expect("No file name!");
-        if !["LICENSE", "SHA512SUMS", "next"].iter().any(|str| file_name.eq_ignore_ascii_case(*str)) {
-            let expected_name = expected_map.get(digest).expect("Unknown digest!");
-            assert!(digest_set.insert(digest));
-            assert_eq!(file_name, *expected_name);
+        if !force_plain {
+            let file_name = caps.get(2).unwrap().as_str().split(|c| c == '/' || c == '\\').last().expect("No file name!");
+            if !["LICENSE", "SHA512SUMS", "next"].iter().any(|str| file_name.eq_ignore_ascii_case(*str)) {
+                let expected_name = expected_map.get(digest).expect("Unknown digest!");
+                assert!(digest_set.insert(digest));
+                assert_eq!(file_name, *expected_name);
+            }
+        } else {
+            assert!(digest_set.insert(digest)); /* no file name available */
         }
     }
 
@@ -599,49 +623,97 @@ fn test_text_file_2e() {
 #[test]
 fn test_dir_1a() {
     let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf")]);
-    do_test_dir(&expected, false, false, false);
+    do_test_dir(&expected, false, false, false, false);
 }
 
 #[test]
 fn test_dir_1b() {
     let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf")]);
-    do_test_dir(&expected, false, false, true);
+    do_test_dir(&expected, false, false, false, true);
 }
 
 #[test]
 fn test_dir_1c() {
     let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf")]);
-    do_test_dir(&expected, false, true, false);
+    do_test_dir(&expected, false, false, true, false);
 }
 
 #[test]
 fn test_dir_1d() {
     let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf")]);
-    do_test_dir(&expected, false, true, true);
+    do_test_dir(&expected, false, false, true, true);
+}
+
+#[test]
+fn test_dir_1e() {
+    let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf")]);
+    do_test_dir(&expected, false, true, false, false);
+}
+
+#[test]
+fn test_dir_1f() {
+    let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf")]);
+    do_test_dir(&expected, false, true, false, true);
+}
+
+#[test]
+fn test_dir_1g() {
+    let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf")]);
+    do_test_dir(&expected, false, true, true, false);
+}
+
+#[test]
+fn test_dir_1h() {
+    let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf")]);
+    do_test_dir(&expected, false, true, true, true);
 }
 
 #[test]
 fn test_dir_2a() {
     let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf"), (EXPECTED[36usize], "dorian.pdf")]);
-    do_test_dir(&expected, true, false, false);
+    do_test_dir(&expected, true, false, false, false);
 }
 
 #[test]
 fn test_dir_2b() {
     let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf"), (EXPECTED[36usize], "dorian.pdf")]);
-    do_test_dir(&expected, true, false, true);
+    do_test_dir(&expected, true, false, false, true);
 }
 
 #[test]
 fn test_dir_2c() {
     let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf"), (EXPECTED[36usize], "dorian.pdf")]);
-    do_test_dir(&expected, true, true, false);
+    do_test_dir(&expected, true, false, true, false);
 }
 
 #[test]
 fn test_dir_2d() {
     let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf"), (EXPECTED[36usize], "dorian.pdf")]);
-    do_test_dir(&expected, true, true, true);
+    do_test_dir(&expected, true, false, true, true);
+}
+
+#[test]
+fn test_dir_2e() {
+    let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf"), (EXPECTED[36usize], "dorian.pdf")]);
+    do_test_dir(&expected, true, true, false, false);
+}
+
+#[test]
+fn test_dir_2f() {
+    let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf"), (EXPECTED[36usize], "dorian.pdf")]);
+    do_test_dir(&expected, true, true, false, true);
+}
+
+#[test]
+fn test_dir_2g() {
+    let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf"), (EXPECTED[36usize], "dorian.pdf")]);
+    do_test_dir(&expected, true, true, true, false);
+}
+
+#[test]
+fn test_dir_2h() {
+    let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf"), (EXPECTED[36usize], "dorian.pdf")]);
+    do_test_dir(&expected, true, true, true, true);
 }
 
 #[test]

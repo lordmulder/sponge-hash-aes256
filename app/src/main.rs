@@ -169,14 +169,10 @@ mod verify;
 
 use num::Integer;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
-use std::sync::Once;
+use std::process::abort;
 use std::thread;
 use std::time::Duration;
-use std::{
-    io::stdout,
-    process::{exit as exit_process, ExitCode},
-    sync::Arc,
-};
+use std::{io::stdout, process::ExitCode, sync::Arc};
 
 use crate::common::{Aborted, Flag};
 use crate::verify::verify_files;
@@ -199,18 +195,6 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 /// The actual "main" functiom
 fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
-    // Check for incompatible arguments
-    if args.text && args.binary {
-        print_error!(args, "Error: Options '--binary' and '--text' are mutually exclusive!");
-        return Ok(false);
-    }
-
-    // Check for options that cannot be used in `--check` mode
-    if args.check && args.length.is_some() {
-        print_error!(args, "Error: Option '--length' must not be used in '--check' mode!");
-        return Ok(false);
-    }
-
     // Compute the digest size, in bytes (falling back to the default, it unspecified)
     let (digest_size, digest_rem) = match args.length {
         Some(digest_bits) => digest_bits.get().div_rem(&(u8::BITS as usize)),
@@ -219,7 +203,7 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
 
     // Make sure that the digest size is divisble by eight
     if digest_rem != 0usize {
-        print_error!(args, "Error: Digest output size must be divisble by eight! (given value: {})", args.length.unwrap().get());
+        print_error!(args, "Error: Digest output size must be divisble by eight! (given value: {}, remainder: {})", args.length.unwrap().get(), digest_rem);
         return Ok(false);
     }
 
@@ -242,9 +226,9 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
     }
 
     // Install the interrupt (CTRL+C) handling routine
-    let halt = Arc::new(Flag::default());
-    let (halt_cloned, args_cloned) = (Arc::clone(&halt), Arc::clone(&args));
-    let _ = ctrlc::set_handler(move || ctrlc_handler(&args_cloned, &halt_cloned));
+    let halt = Arc::new(Default::default());
+    let halt_cloned = Arc::clone(&halt);
+    let _ctrlc = ctrlc::set_handler(move || ctrlc_handler(&halt_cloned));
 
     // Acquire stdout handle
     let mut output = stdout().lock();
@@ -265,23 +249,13 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
 // Interrupt handler
 // ---------------------------------------------------------------------------
 
-/// This function will be called when the process is aborting
-fn abort_process(args: &Args) -> ! {
-    static ABORT_ONLY_ONCE: Once = Once::new();
-    ABORT_ONLY_ONCE.call_once(|| {
-        print_error!(args, "Aborted: The process has been interrupted by the user!");
-        exit_process(130i32) /* 128 + 2 = 130 */
-    });
-    unreachable!()
-}
-
 /// The SIGINT (CTRL+C) interrupt handler routine
 ///
-/// If the process does not exit cleanly after 10 seconds, we just terminate it!
-fn ctrlc_handler(args: &Arc<Args>, halt: &Arc<Flag>) {
+/// If the process does not exit cleanly after 10 seconds, we just proceed with the abort!
+fn ctrlc_handler(halt: &Arc<Flag>) -> ! {
     let _ = halt.abort_process();
     thread::sleep(Duration::from_secs(10u64));
-    abort_process(args);
+    abort();
 }
 
 // ---------------------------------------------------------------------------
@@ -291,12 +265,18 @@ fn ctrlc_handler(args: &Arc<Args>, halt: &Arc<Flag>) {
 /// Applicationm entry point (“main” function)
 fn main() -> ExitCode {
     // Initialize the Args from the given command-line arguments
-    let args = Arc::new(Args::parse_command_line());
+    let args = match Args::try_parse_command_line() {
+        Ok(args) => Arc::new(args),
+        Err(exit_code) => return exit_code,
+    };
 
     // Call the actual "main" function
     match sponge256sum_main(Arc::clone(&args)) {
         Ok(true) => ExitCode::SUCCESS,
         Ok(false) => ExitCode::FAILURE,
-        Err(Aborted) => abort_process(&args),
+        Err(Aborted) => {
+            print_error!(args, "Aborted: The process has been interrupted by the user!");
+            ExitCode::from(130u8)
+        }
     }
 }

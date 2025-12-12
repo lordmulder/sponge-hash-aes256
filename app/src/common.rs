@@ -13,7 +13,7 @@ use tinyvec::TinyVec;
 // Common definitions
 // ---------------------------------------------------------------------------
 
-/// Maximum allowable level of snailyness
+/// Maximum allowable "snailyness" (throttling) level
 pub const MAX_SNAIL_LEVEL: u8 = 4u8;
 
 /// Maximum allowable digest size, specified in bytes
@@ -77,6 +77,28 @@ impl Default for Flag {
     #[inline]
     fn default() -> Self {
         Self(AtomicUsize::new(STATUS_RUNNING))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Option helper
+// ---------------------------------------------------------------------------
+
+pub trait AsBool {
+    fn is_set(&self) -> bool;
+}
+
+impl AsBool for bool {
+    #[inline]
+    fn is_set(&self) -> bool {
+        *self
+    }
+}
+
+impl<T> AsBool for Option<T> {
+    #[inline]
+    fn is_set(&self) -> bool {
+        self.is_some()
     }
 }
 

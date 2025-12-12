@@ -2,8 +2,12 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
+use crate::{common::AsBool, print_error};
 use build_time::build_time_utc;
-use clap::{ArgAction, Parser};
+use clap::{
+    error::{ContextKind, ContextValue, Error, ErrorKind},
+    ArgAction, Parser,
+};
 use const_format::formatcp;
 use rustc_version_const::rustc_version_full;
 use sponge_hash_aes256::version;
@@ -11,6 +15,7 @@ use std::{
     env::consts::{ARCH, OS},
     num::NonZeroUsize,
     path::PathBuf,
+    process::ExitCode,
 };
 use wild::args_os;
 
@@ -48,8 +53,8 @@ const HELP_TEXT: &str = "If no input files are specified, reads input data from 
 #[command(about = ABOUT_TEXT)]
 #[command(after_help = HELP_TEXT)]
 #[command(before_help = HEADER_LINE)]
-#[command(version = VERSION)]
 #[command(long_version = LONG_VERSION)]
+#[command(version = VERSION)]
 pub struct Args {
     /// Read the input file(s) in binary mode, i.e., default mode
     #[arg(short, long)]
@@ -117,7 +122,81 @@ pub struct Args {
 }
 
 impl Args {
-    pub fn parse_command_line() -> Self {
-        Self::parse_from(args_os())
+    /// Parse command-line arguments
+    pub fn try_parse_command_line() -> Result<Self, ExitCode> {
+        match Self::try_parse_from(args_os()) {
+            Ok(args) => validate(args),
+            Err(error) => Err(print_arg_error(error)),
+        }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Error handling
+// ---------------------------------------------------------------------------
+
+macro_rules! print_arg_error {
+    ($fmt:literal $(,$arg:expr)*$(,)?) => {
+        eprintln!(concat!("[sponge256sum] Error: ", $fmt) $(, $arg)*)
+    };
+}
+
+fn get_str(error: &Error, kind: ContextKind) -> &str {
+    static EMPTY_STRING: String = String::new();
+    if let Some(ContextValue::String(str_value)) = error.get(kind) {
+        str_value
+    } else {
+        &EMPTY_STRING
+    }
+}
+
+/// Print argument parser error
+fn print_arg_error(error: Error) -> ExitCode {
+    match error.kind() {
+        ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => {
+            eprint!("{}", error);
+            ExitCode::SUCCESS
+        }
+        ErrorKind::UnknownArgument => {
+            print_arg_error!("Unknown option \"{}\" encountered!", get_str(&error, ContextKind::InvalidArg));
+            ExitCode::FAILURE
+        }
+        ErrorKind::InvalidValue | ErrorKind::ValueValidation => {
+            let (invalid_arg, invalid_value) = (get_str(&error, ContextKind::InvalidArg), get_str(&error, ContextKind::InvalidValue));
+            if invalid_value.is_empty() {
+                print_arg_error!("The required value for option \"{}\" is missing!", invalid_arg);
+            } else {
+                print_arg_error!("The given value \"{}\" for option \"{}\" is invalid!", invalid_value, invalid_arg);
+            }
+            ExitCode::FAILURE
+        }
+        other => {
+            print_arg_error!("Invalid command-line arguments! ({:?})", other);
+            ExitCode::FAILURE
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Argument validation
+// ---------------------------------------------------------------------------
+
+macro_rules! check_option {
+    ($args:ident, $option_1:ident, $option_2:ident) => {
+        if $args.$option_1.is_set() && $args.$option_2.is_set() {
+            print_error!($args, "Error: Option '--{}' must not be used in '--{}' mode!", stringify!($option_2), stringify!($option_1));
+            return Err(ExitCode::FAILURE);
+        }
+    };
+}
+
+/// Validate the given options
+fn validate(args: Args) -> Result<Args, ExitCode> {
+    check_option!(args, binary, text);
+    check_option!(args, check, length);
+    check_option!(args, check, dirs);
+    check_option!(args, check, recursive);
+    check_option!(args, check, plain);
+
+    Ok(args)
 }

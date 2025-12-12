@@ -56,7 +56,7 @@ enum Hasher {
 impl Hasher {
     #[inline(always)]
     pub fn new(info: &Option<String>, snail_level: u8) -> Self {
-        assert!(snail_level <= MAX_SNAIL_LEVEL);
+        debug_assert!(snail_level <= MAX_SNAIL_LEVEL);
         match info {
             Some(info) => match snail_level {
                 0u8 => Self::Default(SpongeHash256::with_info(info)),
@@ -80,11 +80,11 @@ impl Hasher {
     #[inline(always)]
     pub fn update<T: AsRef<[u8]>>(&mut self, input: T) {
         match self {
-            Hasher::Default(hasher) => hasher.update(input),
-            Hasher::SnailV1(hasher) => hasher.update(input),
-            Hasher::SnailV2(hasher) => hasher.update(input),
-            Hasher::SnailV3(hasher) => hasher.update(input),
-            Hasher::SnailV4(hasher) => hasher.update(input),
+            Hasher::Default(hasher_instance) => hasher_instance.update(input),
+            Hasher::SnailV1(hasher_instance) => hasher_instance.update(input),
+            Hasher::SnailV2(hasher_instance) => hasher_instance.update(input),
+            Hasher::SnailV3(hasher_instance) => hasher_instance.update(input),
+            Hasher::SnailV4(hasher_instance) => hasher_instance.update(input),
         }
     }
 

@@ -70,21 +70,15 @@ macro_rules! break_cancelled {
 // ---------------------------------------------------------------------------
 
 // Verification result
-static VERIFICATION_STATUS: [&str; 2usize] = ["FAILED", "OK"];
+static VERIFICATION: [&str; 2usize] = ["FAILED", "OK"];
 
 /// Print a single verification result
 #[inline]
 fn print_match(output: &mut impl Write, is_match: bool, file_name: &Path, args: &Args) -> IoResult<()> {
     if args.null {
-        if args.plain {
-            write!(output, "{}\0", VERIFICATION_STATUS[is_match as usize])?;
-        } else {
-            write!(output, "{}: {}\0", file_name.to_string_lossy(), VERIFICATION_STATUS[is_match as usize])?;
-        }
-    } else if args.plain {
-        writeln!(output, "{}", VERIFICATION_STATUS[is_match as usize])?;
+        write!(output, "{}: {}\0", file_name.to_string_lossy(), VERIFICATION[is_match as usize])?;
     } else {
-        writeln!(output, "{}: {}", file_name.to_string_lossy(), VERIFICATION_STATUS[is_match as usize])?;
+        writeln!(output, "{}: {}", file_name.to_string_lossy(), VERIFICATION[is_match as usize])?;
     }
 
     if args.flush {
