@@ -2,7 +2,7 @@
 // SpongeHash-AES256
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
-include!("include/prelude.rs");
+include!("include/utils.rs");
 
 use sponge_hash_aes256::{SpongeHash256, DEFAULT_DIGEST_SIZE, DEFAULT_PERMUTE_ROUNDS};
 

@@ -230,14 +230,17 @@ impl<const R: usize> SpongeHash256<R> {
         while (self.offset != 0usize) && (source_next < source.end) {
             self.state.0[self.offset] ^= *source_next;
             self.offset += 1usize;
+            source_next = source_next.add(1usize);
+
             if self.offset >= BLOCK_SIZE {
                 self.permute(&mut scratch_buffer);
                 self.offset = 0usize;
             }
-            source_next = source_next.add(1usize);
         }
 
         if source_next < source.end {
+            debug_assert_eq!(self.offset, 0usize);
+
             while length(source_next, source.end) >= BLOCK_SIZE {
                 self.state.0.xor_with_u8_ptr(source_next);
                 self.permute(&mut scratch_buffer);
@@ -247,13 +250,11 @@ impl<const R: usize> SpongeHash256<R> {
             while source_next < source.end {
                 self.state.0[self.offset] ^= *source_next;
                 self.offset += 1usize;
-                if self.offset >= BLOCK_SIZE {
-                    self.permute(&mut scratch_buffer);
-                    self.offset = 0usize;
-                }
                 source_next = source_next.add(1usize);
             }
         }
+
+        debug_assert!(self.offset < BLOCK_SIZE);
     }
 
     /// Concludes the hash computation and returns the final digest.
