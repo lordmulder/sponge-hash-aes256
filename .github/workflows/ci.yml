@@ -298,7 +298,7 @@ jobs:
           usesh: true
           prepare: |
             fetch http://www.ravenports.com/repository/ravenports-downloader.sh -o - | /bin/sh
-            /raven/sbin/rvn install rust
+            /raven/sbin/rvn install -y rust
             git config --global --add safe.directory '*'
           run: |
             setenv PATH /raven/bin:$PATH
