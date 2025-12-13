@@ -301,7 +301,7 @@ jobs:
             /raven/sbin/rvn install -y rust
             git config --global --add safe.directory '*'
           run: |
-            setenv PATH /raven/bin:$PATH
+            export PATH=/raven/bin:/raven/sbin:$PATH
             cd .build/bsd-unix
             ./build-dragonfly.sh
       - uses: actions/upload-artifact@v4
