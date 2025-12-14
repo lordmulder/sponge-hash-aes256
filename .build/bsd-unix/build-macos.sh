@@ -20,8 +20,8 @@ unset RUSTC_BOOTSTRAP
 RUSTFLAGS="-Dwarnings -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort" \
 make MY_VENDOR=apple MY_OS=darwin MY_OUTFILENAME=macos MY_ARCH="aarch64 x86_64"
 
-IFS= read -r PKG_VERSION < target/.PKG_VERSION
-hdiutil create -ov -volname "spong256sum ${PKG_VERSION}" -fs HFS+ -srcfolder target/dist target/sponge256sum-${PKG_VERSION}-macos.dmg
-hdiutil convert -format UDZO -imagekey zlib-level=9 -o target/sponge256sum-${PKG_VERSION}-macos_compressed.dmg target/sponge256sum-${PKG_VERSION}-macos.dmg
-mv -vf target/sponge256sum-${PKG_VERSION}-macos_compressed.dmg target/sponge256sum-${PKG_VERSION}-macos.dmg
-chmod 444 target/sponge256sum-${PKG_VERSION}-macos.dmg
+IFS= read -r PKG_VERSION < out/target/.PKG_VERSION
+hdiutil create -ov -volname "spong256sum ${PKG_VERSION}" -fs HFS+ -srcfolder out/target/release out/target/sponge256sum-${PKG_VERSION}-macos.dmg
+hdiutil convert -format UDZO -imagekey zlib-level=9 -o out/target/sponge256sum-${PKG_VERSION}-macos_compressed.dmg out/target/sponge256sum-${PKG_VERSION}-macos.dmg
+mv -vf out/target/sponge256sum-${PKG_VERSION}-macos_compressed.dmg out/target/sponge256sum-${PKG_VERSION}-macos.dmg
+chmod 444 out/target/sponge256sum-${PKG_VERSION}-macos.dmg

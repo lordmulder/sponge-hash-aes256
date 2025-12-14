@@ -1,0 +1,4 @@
+*.cmd           text eol=crlf
+*.sh            text eol=lf
+Makefile        text eol=lf
+GNUmakefile     text eol=lf

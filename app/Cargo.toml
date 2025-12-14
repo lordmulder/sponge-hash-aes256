@@ -26,7 +26,7 @@ sponge-hash-aes256 = { path = "../lib", default-features = false }
 tinyvec = { version = "1.10.0", default-features = false, features = ["alloc"] }
 wild = { version = "2.2.1", default-features = false }
 
-[target.'cfg(all(any(all(target_os = "linux", target_env = "musl"), target_os = "windows"), any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64")))'.dependencies]
+[target.'cfg(any(all(target_os = "linux", target_env = "musl", any(target_arch = "x86_64", target_arch = "x86")), target_os = "windows"))'.dependencies]
 mimalloc = { version = "0.1.48", default-features = false }
 
 [dev-dependencies]

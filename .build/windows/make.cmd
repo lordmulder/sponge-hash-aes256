@@ -52,18 +52,23 @@ REM --------------------------------------------------------------------------
 REM Clean-up
 REM --------------------------------------------------------------------------
 
-if exist "%CD%\target" (
-	rmdir /S /Q "%CD%\target"
-	if exist "%CD%\target" (
+if exist "%CD%\out\target" (
+	rmdir /S /Q "%CD%\out\target"
+	if exist "%CD%\out\target" (
 		echo Failed to remove the existing "target" directory^^!
 	)
 )
 
-mkdir "%CD%\target" || goto:error
-mkdir "%CD%\target\dist" || goto:error
+mkdir "%CD%\out\target" || goto:error
+mkdir "%CD%\out\target\release" || goto:error
 
-set "DIST_DIR=%CD%\target\dist"
+set "DIST_DIR=%CD%\out\target\release"
 pushd "%CD%\..\..\app"
+
+:retry_mktemp
+set "CARGO_TARGET_DIR=%TEMP%\tmp_%RANDOM%"
+if exist "%CARGO_TARGET_DIR%" goto:retry_mktemp
+mkdir "%CARGO_TARGET_DIR%" || goto:error
 
 REM --------------------------------------------------------------------------
 REM Detect version
@@ -96,9 +101,9 @@ for %%t in (x86_64 i686 aarch64) do (
 	cargo clean || goto:error
 	cargo build --release --target %%t-pc-windows-msvc --verbose || goto:error
 	if "%%t" == "i686" (
-		copy /B /Y "target\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-i686-sse2.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-i686-sse2.exe" || goto:error
 	) else (
-		copy /B /Y "target\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-%%t.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-%%t.exe" || goto:error
 	)
 )
 
@@ -106,7 +111,7 @@ for %%v in (v2 v3) do (
 	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-cpu=x86-64-%%v"
 	cargo clean || goto:error
 	cargo build --release --target x86_64-pc-windows-msvc --verbose || goto:error
-	copy /B /Y "target\x86_64-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-x86_64-%%v.exe" || goto:error
+	copy /B /Y "%CARGO_TARGET_DIR%\x86_64-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-x86_64-%%v.exe" || goto:error
 )
 
 for %%t in (x86_64 i686) do (
@@ -114,9 +119,9 @@ for %%t in (x86_64 i686) do (
 	cargo clean || goto:error
 	cargo build --release --target %%t-pc-windows-msvc --verbose || goto:error
 	if "%%t" == "i686" (
-		copy /B /Y "target\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-i686-sse2-aes_ni.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-i686-sse2-aes_ni.exe" || goto:error
 	) else (
-		copy /B /Y "target\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-%%t-aes_ni.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-%%t-aes_ni.exe" || goto:error
 	)
 )
 
@@ -124,7 +129,7 @@ for %%v in (v2 v3) do (
 	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-cpu=x86-64-%%v -Ctarget-feature=+aes"
 	cargo clean || goto:error
 	cargo build --release --target x86_64-pc-windows-msvc --verbose || goto:error
-	copy /B /Y "target\x86_64-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-x86_64-%%v-aes_ni.exe" || goto:error
+	copy /B /Y "%CARGO_TARGET_DIR%\x86_64-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-x86_64-%%v-aes_ni.exe" || goto:error
 )
 
 REM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -140,9 +145,9 @@ for %%t in (x86_64 i686) do (
 	cargo clean || goto:error
 	cargo build -Zbuild-std=std,panic_abort --release --target %%t-win7-windows-msvc --verbose || goto:error
 	if "%%t" == "i686" (
-		copy /B /Y "target\%%t-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-i686-sse2.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%t-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-i686-sse2.exe" || goto:error
 	) else (
-		copy /B /Y "target\%%t-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-%%t.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%t-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-%%t.exe" || goto:error
 	)
 )
 
@@ -151,9 +156,9 @@ for %%t in (x86_64 i686) do (
 	cargo clean || goto:error
 	cargo build -Zbuild-std=std,panic_abort --release --target %%t-win7-windows-msvc --verbose || goto:error
 	if "%%t" == "i686" (
-		copy /B /Y "target\%%t-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-i686-sse2-aes_ni.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%t-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-i686-sse2-aes_ni.exe" || goto:error
 	) else (
-		copy /B /Y "target\%%t-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-%%t-aes_ni.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%t-win7-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\extra\sponge256sum-win7-%%t-aes_ni.exe" || goto:error
 	)
 )
 
@@ -162,11 +167,14 @@ REM Docs
 REM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 set "RUSTFLAGS=-Dwarnings"
-cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256 || goto:error
 
-cargo --version --verbose > "%CD%\target\.RUSTC_VERSION"
->> "%CD%\target\.RUSTC_VERSION" echo.
-cargo rustc -- --version --verbose >> "%CD%\target\.RUSTC_VERSION"
+cargo clean || goto:error
+cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256 || goto:error
+xcopy /E /H /I /Y "%CARGO_TARGET_DIR%\doc" "%DIST_DIR%\doc" || goto:error
+
+cargo --version --verbose > "%CARGO_TARGET_DIR%\.RUSTC_VERSION"
+>> "%CARGO_TARGET_DIR%\.RUSTC_VERSION" echo.
+cargo rustc -- --version --verbose >> "%CARGO_TARGET_DIR%\.RUSTC_VERSION"
 
 popd
 
@@ -175,37 +183,38 @@ REM Create info
 REM --------------------------------------------------------------------------
 
 for /F "usebackq tokens=*" %%i in (`git describe --long --tags --always --dirty`) do (
-	> "%CD%\target\dist\BUILD_INFO.txt" echo Revision: %%i
+	> "%CD%\out\target\release\BUILD_INFO.txt" echo Revision: %%i
 )
 
->> "%CD%\target\dist\BUILD_INFO.txt" echo Built: %DATE% %TIME%
->> "%CD%\target\dist\BUILD_INFO.txt" echo.
+>> "%CD%\out\target\release\BUILD_INFO.txt" echo Built: %DATE% %TIME%
+>> "%CD%\out\target\release\BUILD_INFO.txt" echo.
 
-type "%CD%\..\..\app\target\.RUSTC_VERSION" >> "%CD%\target\dist\BUILD_INFO.txt"
+type "%CARGO_TARGET_DIR%\.RUSTC_VERSION" >> "%CD%\out\target\release\BUILD_INFO.txt"
 
 REM --------------------------------------------------------------------------
 REM Packaging
 REM --------------------------------------------------------------------------
 
-xcopy /E /H /I /Y "%CD%\..\..\app\target\doc" "%CD%\target\dist\doc" || goto:error
-copy /B /Y "%CD%\..\..\.assets\html\index.html" "%CD%\target\dist\doc\index.html" || goto:error
-copy /B /Y "%CD%\..\..\LICENSE" "%CD%\target\dist\LICENSE.txt" || goto:error
+copy /B /Y "%CD%\..\..\.assets\html\index.html" "%CD%\out\target\release\doc\index.html" || goto:error
+copy /B /Y "%CD%\..\..\LICENSE" "%CD%\out\target\release\LICENSE.txt" || goto:error
 
-attrib +R "%CD%\target\*.*" /S || goto:error
+attrib +R "%CD%\out\target\*.*" /S || goto:error
 
-pushd "%CD%\target\dist"
+pushd "%CD%\out\target\release"
 7z a -t7z -mx=9 "..\sponge256sum-%PKG_VERSION%-windows.7z" * || goto:error
 popd
 
-attrib +R "%CD%\target\*.7z"  || goto:error
+attrib +R "%CD%\out\target\*.7z"  || goto:error
 
-makensis "-DOUTPUT_FILE=%CD%\target\sponge256sum-%PKG_VERSION%-windows.exe" "-DSOURCE_PATH=%CD%\target\dist" "-DPKG_VERSION=%PKG_VERSION%" "-DPKG_REGUUID=%PKG_REGUUID%" "%CD%\installer\installer.nsi" || goto:error
+makensis "-DOUTPUT_FILE=%CD%\out\target\sponge256sum-%PKG_VERSION%-windows.exe" "-DSOURCE_PATH=%CD%\out\target\release" "-DPKG_VERSION=%PKG_VERSION%" "-DPKG_REGUUID=%PKG_REGUUID%" "%CD%\installer\installer.nsi" || goto:error
 
-attrib +R "%CD%\target\*.exe" || goto:error
+attrib +R "%CD%\out\target\*.exe" || goto:error
 
 REM --------------------------------------------------------------------------
 REM Completed
 REM --------------------------------------------------------------------------
+
+rmdir /S /Q "%CARGO_TEMP_DIR%"
 
 echo Completed.
 goto:eof

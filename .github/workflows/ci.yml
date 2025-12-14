@@ -136,6 +136,7 @@ jobs:
     container:
       image: lordmulder/rust-xbuild:1.92-trixie-r2
     steps:
+      - run: git config --global --add safe.directory '*'
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
@@ -145,10 +146,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-linux
-          path: ${{ github.workspace }}/.build/linux/target/*.*
+          path: ${{ github.workspace }}/.build/linux/out/target/*.*
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ github.workspace }}/.build/linux/target/dist/doc
+          path: ${{ github.workspace }}/.build/linux/out/target/release/doc
 
   build-windows:
     runs-on: windows-latest
@@ -176,7 +177,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-windows
-          path: ${{ github.workspace }}/.build/windows/target/*.*
+          path: ${{ github.workspace }}/.build/windows/out/target/*.*
 
   build-macos:
     runs-on: macos-latest
@@ -198,7 +199,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-macos
-          path: ${{ github.workspace }}/.build/bsd-unix/target/*.*
+          path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.*
 
   build-freebsd:
     runs-on: ubuntu-latest
@@ -227,7 +228,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-freebsd
-          path: ${{ github.workspace }}/.build/bsd-unix/target/*.tar.xz
+          path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
 
   build-netbsd:
     runs-on: ubuntu-latest
@@ -256,7 +257,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-netbsd
-          path: ${{ github.workspace }}/.build/bsd-unix/target/*.tar.xz
+          path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
 
   build-openbsd:
     runs-on: ubuntu-latest
@@ -282,7 +283,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-openbsd
-          path: ${{ github.workspace }}/.build/bsd-unix/target/*.tar.xz
+          path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
 
   build-dragonfly:
     runs-on: ubuntu-latest
@@ -307,7 +308,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-dragonfly
-          path: ${{ github.workspace }}/.build/bsd-unix/target/*.tar.xz
+          path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
 
   build-solaris:
     runs-on: ubuntu-latest
@@ -333,7 +334,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-solaris
-          path: ${{ github.workspace }}/.build/bsd-unix/target/*.tar.xz
+          path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
 
   build-illumos:
     runs-on: ubuntu-latest
@@ -357,7 +358,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-illumos
-          path: ${{ github.workspace }}/.build/bsd-unix/target/*.tar.xz
+          path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
 
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   # Deploy pages

@@ -8,11 +8,7 @@ for i in lib app; do
 	printf -- "-------------------------------\n"
 	pushd "${i}"
 	cargo clean
-	cargo upgrade
-	cargo update
-	cargo fmt
-	cargo clippy
-	cargo build --release
+	cargo llvm-cov --release --open -- --include-ignored
 	popd
 done
 
