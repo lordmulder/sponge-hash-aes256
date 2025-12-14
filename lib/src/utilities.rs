@@ -34,8 +34,7 @@ impl BlockType {
     }
 
     /// Create a new block that is initialized from the given array
-    #[allow(dead_code)]
-    #[inline(always)]
+    #[cfg(test)]
     pub const fn from_array(value: [u8; BLOCK_SIZE]) -> Self {
         Self(u8x16::new(value))
     }
