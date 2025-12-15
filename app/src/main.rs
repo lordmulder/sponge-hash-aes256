@@ -202,7 +202,7 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
 
     // Make sure that the digest size is divisble by eight
     if digest_rem != 0usize {
-        print_error!(args, "Error: Digest output size must be divisble by eight! (given value: {}, remainder: {})", args.length.unwrap().get(), digest_rem);
+        print_error!(args, "Error: Digest output size must be divisible by eight! (given value: {}, remainder: {})", args.length.unwrap().get(), digest_rem);
         return Ok(false);
     }
 
@@ -220,7 +220,7 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
 
     // Check the maximum allowable info length
     if args.info.as_ref().is_some_and(|str| str.len() > u8::MAX as usize) {
-        print_error!(args, "Error: Length of \"info\" must not exceed 255 characters! (given length: {})", args.info.as_ref().unwrap().len());
+        print_error!(args, "Error: Length of context info must not exceed 255 characters! (given length: {})", args.info.as_ref().unwrap().len());
         return Ok(false);
     }
 

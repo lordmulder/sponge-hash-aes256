@@ -15,8 +15,10 @@ use std::{
     collections::{HashMap, HashSet},
     ffi::OsStr,
     fs::File,
+    hint::black_box,
     io::{BufRead, BufReader, BufWriter, Write},
     iter,
+    num::NonZeroUsize,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     sync::{LazyLock, Mutex},
@@ -45,9 +47,24 @@ static REGEX_CHECK: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([\x20-
 static REGEX_VERSION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^sponge256sum\s+v(\d+\.\d+\.\d+)[\s$]").unwrap());
 static REGEX_HELP: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Usage:\s+sponge256sum(\.exe)?[\s$]").unwrap());
 static REGEX_SELFTEST: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Successful.").unwrap());
+static REGEX_UNKNOWN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: Unknown option "([^"]+)" encountered!"#).unwrap());
+static REGEX_MUTEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The options "([^"]+)" and "([^"]+)" are mutually exclusive!"#).unwrap());
+static REGEX_MULTIPLE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The option "([^"]+)" can not be used more than once!"#).unwrap());
+static REGEX_MISSING: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The required value for option "([^"]+)" is missing!"#).unwrap());
+static REGEX_INVALID: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The given value "([^"]+)" for option "([^"]+)" is invalid!"#).unwrap());
+static REGEX_LEN_DIV: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Error: Digest output size must be divisible by eight!").unwrap());
+static REGEX_LEN_MAX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Error: Digest output size exceeds the allowable maximum!").unwrap());
+static REGEX_INFO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Error: Length of context info must not exceed 255 characters!").unwrap());
+static REGEX_FILE_FOPEN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to open input file: "([^"]+)""#).unwrap());
+static REGEX_CHECK_FOPEN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to open checksum file: "([^"]+)""#).unwrap());
+static REGEX_MALFORMED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Malformed checksum file: "([^"]+)" \[line #(\d+)\]"#).unwrap());
 
 #[cfg(unix)]
 static REGEX_ABORTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)\bAborted: The process has been interrupted").unwrap());
+#[cfg(unix)]
+static REGEX_FILE_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Input file is a directory: "([^"]+)""#).unwrap());
+#[cfg(unix)]
+static REGEX_CHECK_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Checksum file is a directory: "([^"]+)""#).unwrap());
 
 // ---------------------------------------------------------------------------
 // Randomness
@@ -138,22 +155,22 @@ where
     assert!(child.wait_with_output().unwrap().status.success());
 }
 
-fn run_binary_with_env<I, S>(args: I, env: HashMap<&str, String>) -> String
+fn run_binary_with_env<I, S>(args: I, env: HashMap<&str, String>, expected_success: bool, force_stderr: bool) -> String
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
     let output = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
         .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stdout(if force_stderr { Stdio::null() } else { Stdio::piped() })
+        .stderr(if force_stderr { Stdio::piped() } else { Stdio::null() })
         .stdin(Stdio::null())
         .envs(env)
         .output()
         .expect("Failed to run binary!");
 
-    assert!(output.status.success());
-    String::from_utf8(output.stdout).unwrap()
+    assert_eq!(output.status.success(), expected_success);
+    String::from_utf8(if force_stderr { output.stderr } else { output.stdout }).unwrap()
 }
 
 #[cfg(unix)]
@@ -176,6 +193,10 @@ where
     let output = child.wait_with_output().expect("Failed to wait for process!");
     assert_eq!(output.status.code().unwrap_or(-1i32), expected_status);
     String::from_utf8(if force_stderr { output.stderr } else { output.stdout }).unwrap()
+}
+
+fn get_file_name(path: &str) -> &str {
+    path.split(|c| c == '/' || c == '\\').last().unwrap_or(path)
 }
 
 fn modify_checksum_file(original_file: &Path, modified_file: PathBuf) -> PathBuf {
@@ -284,6 +305,32 @@ fn do_test_file_with_info(expected: &str, file_name: &str, info: &str, snail_lev
     assert!(digest_eq(caps.get(1).unwrap().as_str(), expected));
 }
 
+fn do_test_multi_file(expected_map: &HashMap<&str, &str>, thread_count: NonZeroUsize) {
+    let base_directory = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let paths: Vec<PathBuf> = expected_map.values().map(|file_name| base_directory.join("tests").join("data").join("binary").join(file_name)).collect();
+
+    let mut parameters = Vec::with_capacity(paths.len() + 1usize);
+    let mut digest_set = HashSet::with_capacity(paths.len());
+
+    if thread_count.get() > 1usize {
+        parameters.push(OsStr::new("--multi-threading"));
+    }
+
+    paths.iter().for_each(|path| parameters.push(path.as_os_str()));
+
+    let env = HashMap::from([("SPONGE256SUM_THREAD_COUNT", thread_count.to_string())]);
+    let output = run_binary_with_env(parameters, env, true, false);
+
+    for caps in REGEX_LINE.captures_iter(&output) {
+        let (digest, file_name) = (caps.get(1).unwrap().as_str(), get_file_name(caps.get(2).unwrap().as_str()));
+        let expected_name = expected_map.get(digest).expect("Unknown digest!");
+        assert!(digest_set.insert(digest));
+        assert_eq!(file_name, *expected_name);
+    }
+
+    expected_map.keys().for_each(|digest| assert!(digest_set.contains(digest)));
+}
+
 fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: bool, multi_threading: bool, force_null: bool, force_plain: bool) {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("binary");
     let mut parameters = Vec::with_capacity(4usize);
@@ -327,7 +374,7 @@ fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: bool, multi_thread
     for caps in matches {
         let digest = caps.get(1).unwrap().as_str();
         if !force_plain {
-            let file_name = caps.get(2).unwrap().as_str().split(|c| c == '/' || c == '\\').last().expect("No file name!");
+            let file_name = get_file_name(caps.get(2).unwrap().as_str());
             if !["LICENSE", "SHA512SUMS", "next"].iter().any(|str| file_name.eq_ignore_ascii_case(*str)) {
                 let expected_name = expected_map.get(digest).expect("Unknown digest!");
                 assert!(digest_set.insert(digest));
@@ -338,9 +385,7 @@ fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: bool, multi_thread
         }
     }
 
-    for file_name in expected_map.keys() {
-        assert!(digest_set.contains(file_name));
-    }
+    expected_map.keys().for_each(|digest| assert!(digest_set.contains(digest)));
 }
 
 fn do_test_data(expected: &str, data: &[u8], snail_mode: bool) {
@@ -388,6 +433,7 @@ fn do_verify_files(modify: bool, file_count: usize, multi_threading: bool) {
 // Test vectors
 // ---------------------------------------------------------------------------
 
+// Expected digest values
 static EXPECTED: [&str; 37usize] = [
     "68c0656ee81830fd73031bd53af43c4a793a353c4e086ba27b9851206c17398d",
     "0d74c2e49bc2458915d78321ceddd9566bfee73b5bdf63ea0326cdbd78603afc",
@@ -427,6 +473,22 @@ static EXPECTED: [&str; 37usize] = [
     "568dec19bb459f51651caa5fa28a201e1c1557d817c1e6a4344b89c7d787c120",
     "ac412f4791b0823bc8e9527dfe70bbee3e1c1f4ad286c60184e263573451271b",
 ];
+
+// Path to a non-existing file
+#[cfg(windows)]
+const FILE_PATH: &str = r#"C:\this\file\does\not\exist"#;
+#[cfg(not(windows))]
+const FILE_PATH: &str = "/this/file/does/not/exist";
+
+// Path to a directory (not a file)
+#[cfg(windows)]
+const DIRECTORY_PATH: &str = r#"C:\Windows"#;
+#[cfg(not(windows))]
+const DIRECTORY_PATH: &str = "/usr";
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// File tests
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 #[test]
 fn test_file_1a() {
@@ -481,6 +543,10 @@ fn test_file_2d() {
 fn test_file_2e() {
     do_test_file(EXPECTED[9usize], "dracula.pdf", false, 4usize);
 }
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// File tests with info
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 #[test]
 fn test_file_with_len_1a() {
@@ -566,6 +632,10 @@ fn test_file_with_info_2f() {
     do_test_file_with_info(EXPECTED[25usize], "dracula.pdf", "thingamabob", 4usize);
 }
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Text file tests
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 #[test]
 fn test_text_file_1a() {
     do_test_file(EXPECTED[26usize], "alice29.txt", true, 0usize);
@@ -619,6 +689,38 @@ fn test_text_file_2d() {
 fn test_text_file_2e() {
     do_test_file(EXPECTED[35usize], "asyoulik.txt", true, 4usize);
 }
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Multi file tests
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#[test]
+fn test_multi_file_1a() {
+    let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf")]);
+    do_test_multi_file(&expected, NonZeroUsize::MIN);
+}
+
+#[test]
+fn test_multi_file_1b() {
+    let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf")]);
+    do_test_multi_file(&expected, NonZeroUsize::new(expected.len()).unwrap());
+}
+
+#[test]
+fn test_multi_file_2a() {
+    let expected = HashMap::from([(EXPECTED[5usize], "dracula.pdf"), (EXPECTED[0usize], "frank.pdf")]);
+    do_test_multi_file(&expected, NonZeroUsize::MIN);
+}
+
+#[test]
+fn test_multi_file_2b() {
+    let expected = HashMap::from([(EXPECTED[5usize], "dracula.pdf"), (EXPECTED[0usize], "frank.pdf")]);
+    do_test_multi_file(&expected, NonZeroUsize::new(expected.len()).unwrap());
+}
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Directory tests
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 #[test]
 fn test_dir_1a() {
@@ -716,6 +818,10 @@ fn test_dir_2h() {
     do_test_dir(&expected, true, true, true, true);
 }
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Data (stdin) tests
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 #[test]
 fn test_data_1a() {
     static STDIN_DATA: &[u8] = include_bytes!("data/binary/frank.pdf");
@@ -760,6 +866,10 @@ fn test_verify_2b() {
     do_verify_files(true, 3usize, true);
 }
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Error tests
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 #[cfg(unix)]
 #[test]
 fn test_interrupt() {
@@ -768,10 +878,147 @@ fn test_interrupt() {
 }
 
 #[test]
+fn test_invalid_args_1a() {
+    let output = run_binary([OsStr::new("-x")], false, true);
+    assert!(REGEX_UNKNOWN.is_match(&output))
+}
+#[test]
+fn test_invalid_args_1b() {
+    let output = run_binary([OsStr::new("--foobar")], false, true);
+    assert!(REGEX_UNKNOWN.is_match(&output))
+}
+
+#[test]
+fn test_invalid_args_2a() {
+    let output = run_binary([OsStr::new("--binary"), OsStr::new("--text")], false, true);
+    assert!(REGEX_MUTEX.is_match(&output))
+}
+
+#[test]
+fn test_invalid_args_2b() {
+    let output = run_binary([OsStr::new("--binary"), OsStr::new("--binary")], false, true);
+    assert!(REGEX_MULTIPLE.is_match(&output))
+}
+
+#[test]
+fn test_invalid_args_3a() {
+    let output = run_binary([OsStr::new("--length")], false, true);
+    assert!(REGEX_MISSING.is_match(&output))
+}
+
+#[test]
+fn test_invalid_args_3b() {
+    let output = run_binary([OsStr::new("--length"), OsStr::new("yikes")], false, true);
+    assert!(REGEX_INVALID.is_match(&output))
+}
+
+#[test]
+fn test_invalid_args_3c() {
+    let output = run_binary([OsStr::new("--length"), OsStr::new("13")], false, true);
+    assert!(REGEX_LEN_DIV.is_match(&output))
+}
+
+#[test]
+fn test_invalid_args_3d() {
+    let output = run_binary([OsStr::new("--length"), OsStr::new("8192")], false, true);
+    assert!(REGEX_LEN_MAX.is_match(&output))
+}
+
+#[test]
+fn test_invalid_args_4a() {
+    let parameters: Vec<&OsStr> = iter::repeat_n(OsStr::new("--snail"), 5usize).collect();
+    black_box(run_binary(parameters, false, true));
+}
+
+#[test]
+fn test_invalid_args_4b() {
+    let long_info = str::from_utf8(&[0x41u8; 256usize]).unwrap();
+    let output = run_binary([OsStr::new("--info"), OsStr::new(long_info)], false, true);
+    assert!(REGEX_INFO.is_match(&output))
+}
+
+#[test]
+fn test_file_error_1a() {
+    let output = run_binary([OsStr::new(FILE_PATH)], false, true);
+    assert!(REGEX_FILE_FOPEN.is_match(&output))
+}
+
+#[test]
+fn test_file_error_1b() {
+    let output = run_binary([OsStr::new("--multi-threading"), OsStr::new(FILE_PATH)], false, true);
+    assert!(REGEX_FILE_FOPEN.is_match(&output))
+}
+
+#[test]
+fn test_file_error_2a() {
+    let output = run_binary([OsStr::new(DIRECTORY_PATH)], false, true);
+    #[cfg(windows)]
+    assert!(REGEX_FILE_FOPEN.is_match(&output));
+    #[cfg(unix)]
+    assert!(REGEX_FILE_ISDIR.is_match(&output));
+}
+
+#[test]
+fn test_file_error_2b() {
+    let output = run_binary([OsStr::new("--multi-threading"), OsStr::new(DIRECTORY_PATH)], false, true);
+    #[cfg(windows)]
+    assert!(REGEX_FILE_FOPEN.is_match(&output));
+    #[cfg(unix)]
+    assert!(REGEX_FILE_ISDIR.is_match(&output));
+}
+
+#[test]
+fn test_check_error_1a() {
+    let output = run_binary([OsStr::new("--check"), OsStr::new(FILE_PATH)], false, true);
+    assert!(REGEX_CHECK_FOPEN.is_match(&output))
+}
+
+#[test]
+fn test_check_error_1b() {
+    let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), OsStr::new(FILE_PATH)], false, true);
+    assert!(REGEX_CHECK_FOPEN.is_match(&output))
+}
+
+#[test]
+fn test_check_error_2a() {
+    let output = run_binary([OsStr::new("--check"), OsStr::new(DIRECTORY_PATH)], false, true);
+    #[cfg(windows)]
+    assert!(REGEX_CHECK_FOPEN.is_match(&output));
+    #[cfg(unix)]
+    assert!(REGEX_CHECK_ISDIR.is_match(&output));
+}
+
+#[test]
+fn test_check_error_2b() {
+    let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), OsStr::new(DIRECTORY_PATH)], false, true);
+    #[cfg(windows)]
+    assert!(REGEX_CHECK_FOPEN.is_match(&output));
+    #[cfg(unix)]
+    assert!(REGEX_CHECK_ISDIR.is_match(&output));
+}
+
+#[test]
+fn test_check_error_3a() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("text").join("alice29.txt");
+    let output = run_binary([OsStr::new("--check"), path.as_os_str()], false, true);
+    assert!(REGEX_MALFORMED.is_match(&output))
+}
+
+#[test]
+fn test_check_error_3b() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("text").join("alice29.txt");
+    let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), path.as_os_str()], false, true);
+    assert!(REGEX_MALFORMED.is_match(&output))
+}
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Version and help tests
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#[test]
 fn test_version() {
     let output = run_binary([OsStr::new("--version")], true, true);
     let caps = REGEX_VERSION.captures(&output).expect("Regex did not match!");
-
     assert_eq!(caps.get(1).unwrap().as_str(), env!("CARGO_PKG_VERSION"));
 }
 
@@ -780,10 +1027,13 @@ fn test_help() {
     assert!(REGEX_HELP.is_match(&run_binary([OsStr::new("--help")], true, true)));
 }
 
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Self-test
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 #[test]
 #[ignore]
 fn test_selftest() {
-    let mut env = HashMap::with_capacity(1);
-    env.insert("SPONGE256SUM_SELFTEST_PASSES", 1.to_string());
-    assert!(REGEX_SELFTEST.is_match(&run_binary_with_env([OsStr::new("--self-test")], env)));
+    let env = HashMap::from([("SPONGE256SUM_SELFTEST_PASSES", 1.to_string())]);
+    assert!(REGEX_SELFTEST.is_match(&run_binary_with_env([OsStr::new("--self-test")], env, true, false)));
 }

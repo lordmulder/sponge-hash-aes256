@@ -95,9 +95,9 @@ fn print_result(output: &mut impl Write, verify_result: &VerifyResult, args: &Ar
         Ok((is_match, path)) => print_match(output, *is_match, path, args).is_ok(),
         Err(error) => {
             match error {
-                Error::ChksumFileOpen(path) => print_error!(args, "Failed to open checksum file {:?}", path),
-                Error::ChksumFileRead(path) => print_error!(args, "Failed to read checksum file {:?}", path),
-                Error::ChksumParseErr(path, line) => print_error!(args, "Malformed checksum file {:?} [line #{}]", path, line),
+                Error::ChksumFileOpen(path) => print_error!(args, "Failed to open checksum file: {:?}", path),
+                Error::ChksumFileRead(path) => print_error!(args, "Failed to read checksum file: {:?}", path),
+                Error::ChksumParseErr(path, line) => print_error!(args, "Malformed checksum file: {:?} [line #{}]", path, line),
                 Error::ChksumSrcIsDir(path) => print_error!(args, "Checksum file is a directory: {:?}", path),
                 Error::ChksumStdnOpen => print_error!(args, "Failed to acquire the standard input stream for reading!"),
                 Error::TargetFileOpen(path) => print_error!(args, "Failed to open target file {:?}", path),
