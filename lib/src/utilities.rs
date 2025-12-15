@@ -7,6 +7,7 @@ use aes::{
     Aes256Enc,
 };
 use core::{
+    hint::unreachable_unchecked,
     mem::MaybeUninit,
     ops::{Index, IndexMut, RangeTo},
     ptr,
@@ -90,8 +91,8 @@ impl Index<usize> for BlockType {
     type Output = u8;
 
     #[inline(always)]
-    fn index(&self, index: usize) -> &Self::Output {
-        &self.0.as_array()[index]
+    fn index(&self, _index: usize) -> &Self::Output {
+        unsafe { unreachable_unchecked() }
     }
 }
 
