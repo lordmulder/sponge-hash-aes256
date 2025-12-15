@@ -127,6 +127,31 @@ jobs:
           cargo test --target ${{ matrix.arch }}-apple-darwin --release ${TEST_EXTRA_OPTS}
 
   # --------------------------------------------------------------------------
+  # Coverage
+  # --------------------------------------------------------------------------
+
+  coverage:
+    runs-on: ubuntu-latest
+    needs: check
+    container:
+      image: rust:1.92-trixie
+    steps:
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
+      - working-directory: ${{ github.workspace }}/lib
+        run: cargo llvm-cov --all-features --workspace --ignore-filename-regex test --lcov --output-path lcov.info
+      - working-directory: ${{ github.workspace }}/app
+        run: cargo llvm-cov --all-features --workspace --ignore-filename-regex test --lcov --output-path lcov.info
+      - uses: codecov/codecov-action@v5
+        with:
+          files: lib/lcov.info,app/lcov.info
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  # --------------------------------------------------------------------------
   # Build
   # --------------------------------------------------------------------------
 

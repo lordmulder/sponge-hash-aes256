@@ -6,6 +6,7 @@
 [![Release Date](https://img.shields.io/github/release-date/lordmulder/sponge-hash-aes256)](https://crates.io/crates/sponge-hash-aes256/versions)
 [![Docs.rs](https://img.shields.io/docsrs/sponge-hash-aes256)](https://docs.rs/sponge-hash-aes256/latest/)
 [![License](https://img.shields.io/crates/l/sponge-hash-aes256)](https://opensource.org/license/0BSD)
+[![Codecov](https://codecov.io/gh/lordmulder/sponge-hash-aes256/graph/badge.svg?token=O9IBQHXHDM)](https://codecov.io/gh/lordmulder/sponge-hash-aes256)
 
 ![SpongeHash-AES256](.assets/images/sponge-hash-aes256.png)
 
