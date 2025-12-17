@@ -2,12 +2,13 @@
 // sponge256sum
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
+use num::traits::SaturatingAdd;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
 use std::{
     num::NonZeroUsize,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use tinyvec::TinyVec;
+use tinyvec::{ArrayVec, TinyVec};
 
 // ---------------------------------------------------------------------------
 // Common definitions
@@ -85,18 +86,16 @@ impl Default for Flag {
 // ---------------------------------------------------------------------------
 
 pub trait TinyVecEx {
-    fn with_size(length: usize) -> Self;
+    fn with_length(length: usize) -> Self;
 }
 
-impl<const N: usize> TinyVecEx for TinyVec<[u8; N]> {
+impl<const N: usize, T: Copy + Default> TinyVecEx for TinyVec<[T; N]> {
     #[inline(always)]
-    fn with_size(length: usize) -> Self {
-        if length > N {
-            let mut digest = Self::with_capacity(length);
-            digest.resize(length, 0u8);
-            digest
+    fn with_length(length: usize) -> Self {
+        if length <= N {
+            TinyVec::Inline(ArrayVec::from_array_len([T::default(); N], length))
         } else {
-            Self::from_array_len([0u8; N], length)
+            TinyVec::Heap(vec![T::default(); length])
         }
     }
 }
@@ -107,8 +106,8 @@ impl<const N: usize> TinyVecEx for TinyVec<[u8; N]> {
 
 /// Increments the referenced counter by one (saturating)
 #[inline(always)]
-pub fn increment(counter: &mut u64) {
-    *counter = counter.saturating_add(1u64);
+pub fn increment<T: SaturatingAdd + From<u8>>(counter: &mut T) {
+    *counter = counter.saturating_add(&T::from(1u8));
 }
 
 /// Compute the thread-count-specific capacity for a bounded channel

@@ -132,7 +132,7 @@ macro_rules! break_cancelled {
 #[inline]
 fn print_digest(output: &mut impl Write, file_name: &OsStr, digest: &Digest, args: &Args) -> IoResult<()> {
     let hex_length = digest.len().checked_mul(2usize).unwrap();
-    let mut hex_buffer: TinyVec<[u8; 2usize * DEFAULT_DIGEST_SIZE]> = TinyVec::with_size(hex_length);
+    let mut hex_buffer: TinyVec<[u8; 2usize * DEFAULT_DIGEST_SIZE]> = TinyVec::with_length(hex_length);
 
     encode_to_slice(digest.as_slice(), hex_buffer.as_mut_slice()).unwrap();
     let hex_string = unsafe { from_utf8_unchecked(hex_buffer.as_slice()) };
@@ -197,7 +197,7 @@ fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt
             if source.is_directory() {
                 Ok(Err(Error::SrcIsDir(file_name)))
             } else {
-                let mut digest = TinyVec::with_size(digest_size);
+                let mut digest = TinyVec::with_length(digest_size);
                 match compute_digest(&mut source, digest.as_mut_slice(), args, halt) {
                     Ok(_) => Ok(Ok((digest, file_name))),
                     Err(DigestError::IoError) => Ok(Err(Error::FileRead(file_name))),
@@ -439,7 +439,7 @@ fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args>, h
         }
     };
 
-    let mut digest = TinyVec::with_size(digest_size);
+    let mut digest = TinyVec::with_length(digest_size);
 
     match compute_digest(&mut stdin, digest.as_mut_slice(), &args, &halt) {
         Ok(_) => Ok(print_digest(output, &STDIN_NAME, &digest, &args).is_ok()),

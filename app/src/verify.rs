@@ -18,7 +18,7 @@ use tinyvec::TinyVec;
 
 use crate::{
     arguments::Args,
-    common::{get_capacity, increment, Aborted, Digest, Flag, TinyVecEx},
+    common::{get_capacity, increment, Aborted, Digest, Flag, TinyVecEx, MAX_DIGEST_SIZE},
     digest::{compute_digest, digest_equal, Error as DigestError},
     io::{DataSource, STDIN_NAME},
     print_error,
@@ -133,7 +133,7 @@ type VerifyResult = Result<(bool, PathBuf), Error>;
 
 /// Compute checksum and compare to expected value
 fn verify_checksum(source: &mut dyn Read, digest_expected: &[u8], args: &Args, halt: &Flag) -> Result<bool, DigestError> {
-    let mut digest_computed: Digest = TinyVec::with_size(digest_expected.len());
+    let mut digest_computed: Digest = TinyVec::with_length(digest_expected.len());
     compute_digest(source, digest_computed.as_mut_slice(), args, halt)?;
     Ok(digest_equal(digest_computed.as_slice(), digest_expected))
 }
@@ -189,8 +189,8 @@ fn parse_checksum_line(line: &str) -> Result<(&OsStr, Digest), Malformed> {
     if let Some((digest_hex, input_name)) = line.split_once(|c: char| char::is_ascii_whitespace(&c)) {
         if (!digest_hex.is_empty()) && (!input_name.is_empty()) {
             let (length, remainder) = digest_hex.len().div_rem(&2usize);
-            if (length > usize::MIN) && (remainder == usize::MIN) {
-                let mut digest = TinyVec::with_size(length);
+            if (length > usize::MIN) && (length <= MAX_DIGEST_SIZE) && (remainder == usize::MIN) {
+                let mut digest = TinyVec::with_length(length);
                 if decode_to_slice(digest_hex, digest.as_mut_slice()).is_ok() {
                     return Ok((OsStr::new(input_name), digest));
                 }
