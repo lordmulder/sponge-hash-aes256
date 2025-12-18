@@ -188,8 +188,11 @@ use crate::{
     self_test::self_test,
 };
 
-// Enable MiMalloc on supported platforms
-#[cfg(any(all(target_os = "linux", target_env = "musl", any(target_arch = "x86_64", target_arch = "x86")), target_os = "windows"))]
+// Enable MiMalloc on supported configurations
+#[cfg(all(
+    any(all(target_os = "linux", target_env = "musl"), target_os = "windows"),
+    any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64")
+))]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
