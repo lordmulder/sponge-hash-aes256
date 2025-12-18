@@ -159,7 +159,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-linux, test-windows, test-macos]
     container:
-      image: lordmulder/rust-xbuild:1.92-trixie-r2
+      image: lordmulder/rust-xbuild:1.92-trixie-r4
     steps:
       - run: git config --global --add safe.directory '*'
       - uses: actions/checkout@v5
