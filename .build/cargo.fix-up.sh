@@ -2,18 +2,11 @@
 set -e
 cd -- "$(realpath -- "$(dirname -- "${BASH_SOURCE[0]}")/..")"
 
-for i in lib app; do
-	printf -- "-------------------------------\n"
-	printf -- "-------------[%3s]-------------\n" "${i}"
-	printf -- "-------------------------------\n"
-	pushd "${i}"
-	cargo clean
-	cargo upgrade
-	cargo update
-	cargo fmt
-	cargo clippy
-	cargo build --release
-	popd
-done
+cargo clean
+cargo upgrade
+cargo update --workspace
+cargo fmt --all
+cargo clippy --workspace
+cargo build --workspace --release
 
 echo "Completed successfully."

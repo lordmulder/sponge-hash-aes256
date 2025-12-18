@@ -333,34 +333,22 @@ mod tests {
 
         #[test]
         fn test_xor_arrays_1() {
-            do_xor_arrays(
-                &BlockType::from_array(hex!("75863721fe83cf3d6f0500df428126ae")),
-                &BlockType::from_array(hex!("cc39d4653cce685b8de3398eccfe9c48")),
-            );
+            do_xor_arrays(&BlockType::from_array(hex!("75863721fe83cf3d6f0500df428126ae")), &BlockType::from_array(hex!("cc39d4653cce685b8de3398eccfe9c48")));
         }
 
         #[test]
         fn test_xor_arrays_2() {
-            do_xor_arrays(
-                &BlockType::from_array(hex!("2381643e0214c832064a0e8fd074055d")),
-                &BlockType::from_array(hex!("ab290a75923b190ed775841e4cca9e25")),
-            );
+            do_xor_arrays(&BlockType::from_array(hex!("2381643e0214c832064a0e8fd074055d")), &BlockType::from_array(hex!("ab290a75923b190ed775841e4cca9e25")));
         }
 
         #[test]
         fn test_xor_arrays_3() {
-            do_xor_arrays(
-                &BlockType::from_array(hex!("62f828dce94781e2d31d9ffa786df6e4")),
-                &BlockType::from_array(hex!("ca6bb37d92d3f8a997d561d9e9d7030e")),
-            );
+            do_xor_arrays(&BlockType::from_array(hex!("62f828dce94781e2d31d9ffa786df6e4")), &BlockType::from_array(hex!("ca6bb37d92d3f8a997d561d9e9d7030e")));
         }
 
         #[test]
         fn test_xor_arrays_4() {
-            do_xor_arrays(
-                &BlockType::from_array(hex!("710180b32b5a982ee21d8e76d287e509")),
-                &BlockType::from_array(hex!("389b742402576214410c0633722c593a")),
-            );
+            do_xor_arrays(&BlockType::from_array(hex!("710180b32b5a982ee21d8e76d287e509")), &BlockType::from_array(hex!("389b742402576214410c0633722c593a")));
         }
     }
 
@@ -377,34 +365,22 @@ mod tests {
 
         #[test]
         fn test_concat_keys_1a() {
-            do_concat_keys(
-                &BlockType::from_array(hex!("000102030405060708090A0B0C0D0E0F")),
-                &BlockType::from_array(hex!("F0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFF")),
-            );
+            do_concat_keys(&BlockType::from_array(hex!("000102030405060708090A0B0C0D0E0F")), &BlockType::from_array(hex!("F0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFF")));
         }
 
         #[test]
         fn test_concat_keys_1b() {
-            do_concat_keys(
-                &BlockType::from_array(hex!("F0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFF")),
-                &BlockType::from_array(hex!("000102030405060708090A0B0C0D0E0F")),
-            );
+            do_concat_keys(&BlockType::from_array(hex!("F0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFF")), &BlockType::from_array(hex!("000102030405060708090A0B0C0D0E0F")));
         }
 
         #[test]
         fn test_concat_keys_2a() {
-            do_concat_keys(
-                &BlockType::from_array(hex!("00102030405060708090A0B0C0D0E0F0")),
-                &BlockType::from_array(hex!("0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFFF")),
-            );
+            do_concat_keys(&BlockType::from_array(hex!("00102030405060708090A0B0C0D0E0F0")), &BlockType::from_array(hex!("0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFFF")));
         }
 
         #[test]
         fn test_concat_keys_2b() {
-            do_concat_keys(
-                &BlockType::from_array(hex!("0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFFF")),
-                &BlockType::from_array(hex!("00102030405060708090A0B0C0D0E0F0")),
-            );
+            do_concat_keys(&BlockType::from_array(hex!("0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFFF")), &BlockType::from_array(hex!("00102030405060708090A0B0C0D0E0F0")));
         }
     }
 }

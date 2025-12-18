@@ -30,15 +30,9 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - working-directory: ${{ github.workspace }}/lib
-        run: |
-          cargo check --verbose
-          cargo clippy -- ${{ matrix.clippy_opts }}
-          cargo fmt --all --check --verbose
-      - working-directory: ${{ github.workspace }}/app
-        run: |
-          cargo check --verbose
-          cargo clippy -- ${{ matrix.clippy_opts }}
+      - run: |
+          cargo check --workspace --verbose
+          cargo clippy --workspace -- ${{ matrix.clippy_opts }}
           cargo fmt --all --check --verbose
 
   # --------------------------------------------------------------------------
@@ -53,7 +47,6 @@ jobs:
     strategy:
       matrix:
         rust: [1.89-bookworm, 1.92-trixie]
-        proj: [lib, app]
         arch: [x86_64, i686]
     env:
       TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
@@ -67,10 +60,9 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - working-directory: ${{ github.workspace }}/${{ matrix.proj }}
-        run: |
-          cargo test --target ${{ matrix.arch }}-unknown-linux-gnu ${TEST_EXTRA_OPTS}
-          cargo test --target ${{ matrix.arch }}-unknown-linux-gnu --release ${TEST_EXTRA_OPTS}
+      - run: |
+          cargo test --workspace --target ${{ matrix.arch }}-unknown-linux-gnu ${TEST_EXTRA_OPTS}
+          cargo test --workspace --target ${{ matrix.arch }}-unknown-linux-gnu --release ${TEST_EXTRA_OPTS}
 
   test-windows:
     runs-on: windows-latest
@@ -78,7 +70,6 @@ jobs:
     strategy:
       matrix:
         rust: [1.89.0, 1.92.0]
-        proj: [lib, app]
         arch: [x86_64, i686]
     env:
       TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
@@ -94,11 +85,10 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - working-directory: ${{ github.workspace }}/${{ matrix.proj }}
-        run: |
+      - run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc $env:TEST_EXTRA_OPTS"
-          iex "cargo test --target ${{ matrix.arch }}-pc-windows-msvc --release $env:TEST_EXTRA_OPTS"
+          iex "cargo test --workspace --target ${{ matrix.arch }}-pc-windows-msvc $env:TEST_EXTRA_OPTS"
+          iex "cargo test --workspace --target ${{ matrix.arch }}-pc-windows-msvc --release $env:TEST_EXTRA_OPTS"
 
   test-macos:
     runs-on: macos-latest
@@ -106,7 +96,6 @@ jobs:
     strategy:
       matrix:
         rust: [1.89.0, 1.92.0]
-        proj: [lib, app]
         arch: [x86_64, aarch64]
     env:
       TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
@@ -121,10 +110,9 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - working-directory: ${{ github.workspace }}/${{ matrix.proj }}
-        run: |
-          cargo test --target ${{ matrix.arch }}-apple-darwin ${TEST_EXTRA_OPTS}
-          cargo test --target ${{ matrix.arch }}-apple-darwin --release ${TEST_EXTRA_OPTS}
+      - run: |
+          cargo test --workspace --target ${{ matrix.arch }}-apple-darwin ${TEST_EXTRA_OPTS}
+          cargo test --workspace --target ${{ matrix.arch }}-apple-darwin --release ${TEST_EXTRA_OPTS}
 
   # --------------------------------------------------------------------------
   # Coverage
@@ -141,15 +129,12 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - working-directory: ${{ github.workspace }}/lib
-        run: cargo llvm-cov --all-features --workspace --ignore-filename-regex test --lcov --output-path lcov.info
-      - working-directory: ${{ github.workspace }}/app
-        run: cargo llvm-cov --all-features --workspace --ignore-filename-regex test --lcov --output-path lcov.info
+      - run: cargo llvm-cov --features with-mimalloc --workspace --ignore-filename-regex test --lcov --output-path lcov.info
       - uses: codecov/codecov-action@v5
         with:
-          files: lib/lcov.info,app/lcov.info
-          fail_ci_if_error: true
+          files: lcov.info
           token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
 
   # --------------------------------------------------------------------------
   # Build

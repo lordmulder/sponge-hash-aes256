@@ -2,14 +2,7 @@
 set -e
 cd -- "$(realpath -- "$(dirname -- "${BASH_SOURCE[0]}")/..")"
 
-for i in lib app; do
-	printf -- "-------------------------------\n"
-	printf -- "-------------[%3s]-------------\n" "${i}"
-	printf -- "-------------------------------\n"
-	pushd "${i}"
-	cargo clean
-	cargo llvm-cov --release --open -- --include-ignored
-	popd
-done
+cargo clean || goto:error
+cargo llvm-cov --features with-mimalloc --workspace --open -- --include-ignored || goto:error
 
 echo "Completed successfully."

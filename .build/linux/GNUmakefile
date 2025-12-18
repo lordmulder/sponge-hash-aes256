@@ -23,7 +23,7 @@ all: clean pkg
 build:
 	mkdir -p out/target/release /tmp/rust-build
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
-	cd ../../app
+	pushd ../..
 	for t in x86_64 i686 aarch64; do
 		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
 		TARGET_CC=/usr/local/musl/$$t/bin/musl-gcc \
@@ -36,7 +36,7 @@ build:
 vbuild:
 	mkdir -p out/target/release /tmp/rust-build
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
-	cd ../../app
+	pushd ../..
 	for v in v2 v3; do
 		RUSTFLAGS="-Dwarnings -Clinker=x86_64-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast -Ctarget-cpu=x86-64-$$v" \
 		TARGET_CC=/usr/local/musl/x86_64/bin/musl-gcc \
@@ -47,8 +47,8 @@ vbuild:
 
 wbuild:
 	mkdir -p out/target/release /tmp/rust-build
-	cd ../../app
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
+	pushd ../..
 	for t in x86_64 i686; do
 		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static,+aes -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
 		TARGET_CC=/usr/local/musl/$$t/bin/musl-gcc \
@@ -61,7 +61,7 @@ wbuild:
 xbuild:
 	mkdir -p out/target/release /tmp/rust-build
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
-	cd ../../app
+	pushd ../..
 	for v in v2 v3; do
 		export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
 		RUSTFLAGS="-Dwarnings -Clinker=x86_64-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static,+aes -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast -Ctarget-cpu=x86-64-$$v" \
@@ -74,7 +74,7 @@ xbuild:
 zbuild:
 	mkdir -p out/target/release /tmp/rust-build
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
-	cd ../../app
+	pushd ../..
 	for p in i586:i686 riscv64gc:riscv64 powerpc64le:powerpc64le; do
 		IFS=":" read -r -a q <<< "$$p"
 		RUSTFLAGS="-Dwarnings -Clinker=$${q[1]}-linux-gnu-gcc -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
@@ -86,12 +86,12 @@ zbuild:
 doc:
 	mkdir -p out/target/release /tmp/rust-build
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
-	cd ../../app
+	pushd ../..
 	RUSTFLAGS=-Dwarnings cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256
 	cp -rf $${CARGO_TARGET_DIR}/doc $(CURDIR)/out/target/release/
-	RUSTFLAGS= cargo pkgid | grep -Eo '[^@]+$$' | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//' > $(CURDIR)/out/target/.PKG_VERSION
-	printf '%s\n\n' "$$(RUSTFLAGS= cargo --version --verbose)" > $(CURDIR)/out/target/.RUSTC_VERSION
-	printf '%s\n' "$$(RUSTFLAGS= cargo rustc -- --version --verbose)" >> $(CURDIR)/out/target/.RUSTC_VERSION
+	RUSTFLAGS=-Dwarnings cargo pkgid --manifest-path app/Cargo.toml | grep -Eo '[^@]+$$' | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//' > $(CURDIR)/out/target/.PKG_VERSION
+	printf '%s\n\n' "$$(RUSTFLAGS=-Dwarnings cargo --version --verbose)" > $(CURDIR)/out/target/.RUSTC_VERSION
+	printf '%s\n' "$$(RUSTFLAGS=-Dwarnings cargo rustc --manifest-path app/Cargo.toml -- --version --verbose)" >> $(CURDIR)/out/target/.RUSTC_VERSION
 	rm -rf $${CARGO_TARGET_DIR}
 
 dist: build vbuild wbuild xbuild zbuild doc

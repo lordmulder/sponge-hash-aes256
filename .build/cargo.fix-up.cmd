@@ -1,19 +1,12 @@
 @echo off
 cd /d "%~dp0.."
 
-for %%i in (lib app) do (
-	echo -------------------------------
-	echo -------------[%%i]-------------
-	echo -------------------------------
-	pushd "%%~i" || goto:error
-	cargo clean || goto:error
-	cargo upgrade || goto:error
-	cargo update || goto:error
-	cargo fmt || goto:error
-	cargo clippy || goto:error
-	cargo build --release || goto:error
-	popd || goto:error
-)
+cargo clean || goto:error
+cargo upgrade || goto:error
+cargo update --workspace || goto:error
+cargo fmt --all || goto:error
+cargo clippy --workspace || goto:error
+cargo build --workspace --release || goto:error
 
 echo.
 echo Completed successfully.

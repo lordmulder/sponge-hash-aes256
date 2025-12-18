@@ -27,14 +27,7 @@ static ROUND_KEY_Z: BlockType = BlockType::new::<0x6Au8>();
 #[cfg(feature = "tracing")]
 macro_rules! trace {
     ($self:tt, $arg:tt) => {
-        log::trace!(
-            "SpongeHash256@{:p}: {} --> {:02X?} {:02X?} {:02X?}",
-            &$self,
-            $arg,
-            &$self.state.0,
-            &$self.state.1,
-            &$self.state.2
-        );
+        log::trace!("SpongeHash256@{:p}: {} --> {:02X?} {:02X?} {:02X?}", &$self, $arg, &$self.state.0, &$self.state.1, &$self.state.2);
     };
 }
 

@@ -542,6 +542,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "semver"
+version = "1.0.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d767eb0aabc880b29956c35734170f26ed551a859dbd361d140cdbeca61ab1e2"
+
+[[package]]
 name = "shlex"
 version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -562,7 +568,12 @@ name = "sponge-hash-aes256"
 version = "1.8.0"
 dependencies = [
  "aes",
+ "hex",
+ "hex-literal",
  "log",
+ "rolling-median",
+ "semver",
+ "simple_logger",
  "wide",
  "zeroize",
 ]

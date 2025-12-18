@@ -63,7 +63,7 @@ mkdir "%CD%\out\target" || goto:error
 mkdir "%CD%\out\target\release" || goto:error
 
 set "DIST_DIR=%CD%\out\target\release"
-pushd "%CD%\..\..\app"
+pushd "%CD%\..\.."
 
 :retry_mktemp
 set "CARGO_TARGET_DIR=%TEMP%\tmp_%RANDOM%"
@@ -77,7 +77,7 @@ REM --------------------------------------------------------------------------
 set PKG_VERSION=
 set PKG_REGUUID=
 
-for /F "usebackq tokens=1,* delims=@" %%a in (`cargo pkgid`) do (
+for /F "usebackq tokens=1,* delims=@" %%a in (`cargo pkgid --manifest-path app\Cargo.toml`) do (
 	set "PKG_VERSION=%%~b"
 )
 
@@ -94,7 +94,7 @@ REM --------------------------------------------------------------------------
 
 set RUSTC_BOOTSTRAP=
 
-set "DEFAULT_RUSTFLAGS=-Dwarnings -Ctarget-feature=+crt-static -Copt-level=3 -Ccodegen-units=1 -Clto=fat -Cdebuginfo=none -Cpanic=abort -Clink-arg=/DEBUG:NONE -Clink-arg=..\.build\windows\res\app-icon.res"
+set "DEFAULT_RUSTFLAGS=-Dwarnings -Ctarget-feature=+crt-static -Copt-level=3 -Ccodegen-units=1 -Clto=fat -Cdebuginfo=none -Cpanic=abort -Clink-arg=/DEBUG:NONE -Clink-arg=.build\windows\res\app-icon.res"
 set "RUSTFLAGS=%DEFAULT_RUSTFLAGS%"
 
 for %%t in (x86_64 i686 aarch64) do (
@@ -174,7 +174,7 @@ xcopy /E /H /I /Y "%CARGO_TARGET_DIR%\doc" "%DIST_DIR%\doc" || goto:error
 
 cargo --version --verbose > "%CARGO_TARGET_DIR%\.RUSTC_VERSION"
 >> "%CARGO_TARGET_DIR%\.RUSTC_VERSION" echo.
-cargo rustc -- --version --verbose >> "%CARGO_TARGET_DIR%\.RUSTC_VERSION"
+cargo rustc --manifest-path app\Cargo.toml -- --version --verbose >> "%CARGO_TARGET_DIR%\.RUSTC_VERSION"
 
 popd
 

@@ -1,15 +1,8 @@
 @echo off
 cd /d "%~dp0.."
 
-for %%i in (lib app) do (
-	echo -------------------------------
-	echo -------------[%%i]-------------
-	echo -------------------------------
-	pushd "%%~i" || goto:error
-	cargo clean || goto:error
-	cargo llvm-cov --release --open -- --include-ignored || goto:error
-	popd || goto:error
-)
+cargo clean
+cargo llvm-cov --features with-mimalloc --workspace --open -- --include-ignored
 
 echo.
 echo Completed successfully.

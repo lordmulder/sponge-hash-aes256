@@ -1,0 +1,10 @@
+[workspace]
+resolver = "2"
+members = ["lib", "app"]
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"
