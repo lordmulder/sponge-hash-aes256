@@ -99,7 +99,7 @@ set "RUSTFLAGS=%DEFAULT_RUSTFLAGS%"
 
 for %%t in (x86_64 i686 aarch64) do (
 	cargo clean || goto:error
-	cargo build --release --target %%t-pc-windows-msvc --verbose || goto:error
+	cargo build --release --target %%t-pc-windows-msvc --features with-mimalloc --verbose || goto:error
 	if "%%t" == "i686" (
 		copy /B /Y "%CARGO_TARGET_DIR%\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-i686-sse2.exe" || goto:error
 	) else (
@@ -110,14 +110,14 @@ for %%t in (x86_64 i686 aarch64) do (
 for %%v in (v2 v3) do (
 	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-cpu=x86-64-%%v"
 	cargo clean || goto:error
-	cargo build --release --target x86_64-pc-windows-msvc --verbose || goto:error
+	cargo build --release --target x86_64-pc-windows-msvc --features with-mimalloc --verbose || goto:error
 	copy /B /Y "%CARGO_TARGET_DIR%\x86_64-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-x86_64-%%v.exe" || goto:error
 )
 
 for %%t in (x86_64 i686) do (
 	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-feature=+aes"
 	cargo clean || goto:error
-	cargo build --release --target %%t-pc-windows-msvc --verbose || goto:error
+	cargo build --release --target %%t-pc-windows-msvc --features with-mimalloc --verbose || goto:error
 	if "%%t" == "i686" (
 		copy /B /Y "%CARGO_TARGET_DIR%\%%t-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-i686-sse2-aes_ni.exe" || goto:error
 	) else (
@@ -128,7 +128,7 @@ for %%t in (x86_64 i686) do (
 for %%v in (v2 v3) do (
 	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-cpu=x86-64-%%v -Ctarget-feature=+aes"
 	cargo clean || goto:error
-	cargo build --release --target x86_64-pc-windows-msvc --verbose || goto:error
+	cargo build --release --target x86_64-pc-windows-msvc --features with-mimalloc --verbose || goto:error
 	copy /B /Y "%CARGO_TARGET_DIR%\x86_64-pc-windows-msvc\release\sponge256sum.exe" "%DIST_DIR%\sponge256sum-x86_64-%%v-aes_ni.exe" || goto:error
 )
 

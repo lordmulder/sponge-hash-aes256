@@ -16,7 +16,7 @@ unexport RUSTFLAGS
 unexport RUSTC_BOOTSTRAP
 
 .ONESHELL:
-.PHONY: all build vbuild wbuild xbuild dist doc pkg clean
+.PHONY: all build vbuild wbuild xbuild zbuild dist doc pkg clean
 
 all: clean pkg
 
@@ -27,7 +27,7 @@ build:
 	for t in x86_64 i686 aarch64; do
 		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
 		TARGET_CC=/usr/local/musl/$$t/bin/musl-gcc \
-		cargo build --release --target $$t-unknown-linux-musl --verbose
+		cargo build --release --target $$t-unknown-linux-musl --features with-mimalloc --verbose
 		[ "$$t" = "i686" ] && suffix=i686-sse2 || suffix=$$t
 		install -v --mode 555 $${CARGO_TARGET_DIR}/$$t-unknown-linux-musl/release/sponge256sum $(CURDIR)/out/target/release/sponge256sum-$$suffix
 		rm -rf $${CARGO_TARGET_DIR}
@@ -39,7 +39,8 @@ vbuild:
 	cd ../../app
 	for v in v2 v3; do
 		RUSTFLAGS="-Dwarnings -Clinker=x86_64-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast -Ctarget-cpu=x86-64-$$v" \
-		cargo build --release --target x86_64-unknown-linux-musl --verbose
+		TARGET_CC=/usr/local/musl/x86_64/bin/musl-gcc \
+		cargo build --release --target x86_64-unknown-linux-musl --features with-mimalloc --verbose
 		install -v --mode 555 $${CARGO_TARGET_DIR}/x86_64-unknown-linux-musl/release/sponge256sum $(CURDIR)/out/target/release/sponge256sum-x86_64-$$v
 		rm -rf $${CARGO_TARGET_DIR}
 	done
@@ -50,20 +51,27 @@ wbuild:
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
 	for t in x86_64 i686; do
 		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static,+aes -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
-		cargo build --release --target $$t-unknown-linux-musl --verbose
+		TARGET_CC=/usr/local/musl/$$t/bin/musl-gcc \
+		cargo build --release --target $$t-unknown-linux-musl --features with-mimalloc --verbose
 		[ "$$t" = "i686" ] && arch_suffix=i686-sse2-aes_ni || arch_suffix=$$t-aes_ni
 		install -v --mode 555 $${CARGO_TARGET_DIR}/$$t-unknown-linux-musl/release/sponge256sum $(CURDIR)/out/target/release/sponge256sum-$$arch_suffix
 		rm -rf $${CARGO_TARGET_DIR}
 	done
+
+xbuild:
+	mkdir -p out/target/release /tmp/rust-build
+	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
+	cd ../../app
 	for v in v2 v3; do
 		export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
 		RUSTFLAGS="-Dwarnings -Clinker=x86_64-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static,+aes -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast -Ctarget-cpu=x86-64-$$v" \
-		cargo build --release --target x86_64-unknown-linux-musl --verbose
+		TARGET_CC=/usr/local/musl/x86_64/bin/musl-gcc \
+		cargo build --release --target x86_64-unknown-linux-musl --features with-mimalloc --verbose
 		install -v --mode 555 $${CARGO_TARGET_DIR}/x86_64-unknown-linux-musl/release/sponge256sum $(CURDIR)/out/target/release/sponge256sum-x86_64-$$v-aes_ni
 		rm -rf $${CARGO_TARGET_DIR}
 	done
 
-xbuild:
+zbuild:
 	mkdir -p out/target/release /tmp/rust-build
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
 	cd ../../app
@@ -86,7 +94,7 @@ doc:
 	printf '%s\n' "$$(RUSTFLAGS= cargo rustc -- --version --verbose)" >> $(CURDIR)/out/target/.RUSTC_VERSION
 	rm -rf $${CARGO_TARGET_DIR}
 
-dist: build vbuild wbuild xbuild doc
+dist: build vbuild wbuild xbuild zbuild doc
 	cp -f ../../.assets/html/index.html out/target/release/doc/index.html
 	cp -f ../../LICENSE out/target/release/LICENSE
 	printf 'Revision: %s\n' "$$(git describe --long --tags --always --dirty)" > out/target/release/BUILD_INFO

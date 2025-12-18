@@ -2,6 +2,8 @@
 set -eo pipefail
 cd -- "$(realpath -- "$(dirname -- "${BASH_SOURCE[0]}")")"
 
+unset RUSTC_BOOTSTRAP
+
 readonly IMAGE_NAME=lordmulder/rust-xbuild
 readonly IMAGE_VERS=1.92-trixie-r4
 

@@ -11,9 +11,9 @@ build:
 	set -e; \
 	mkdir -p out/target/release; \
 	ORIGINAL_DIR="`pwd`"; \
+	export CARGO_TARGET_DIR="`mktemp -d`"; \
 	cd ../../app; \
 	for t in $(MY_ARCH); do \
-		export CARGO_TARGET_DIR="`mktemp -d`"; \
 		cargo build --release --target "$$t-$(MY_VENDOR)-$(MY_OS)" --verbose; \
 		cp -f $${CARGO_TARGET_DIR}/$$t-$(MY_VENDOR)-$(MY_OS)/release/sponge256sum $${ORIGINAL_DIR}/out/target/release/sponge256sum-$$t; \
 		chmod 555 $${ORIGINAL_DIR}/out/target/release/sponge256sum-$$t; \
@@ -24,9 +24,9 @@ xbuild:
 	set -e; \
 	mkdir -p out/target/release; \
 	ORIGINAL_DIR="`pwd`"; \
+	export CARGO_TARGET_DIR="`mktemp -d`"; \
 	cd ../../app; \
 	for t in $(MY_XARCH); do \
-		export CARGO_TARGET_DIR="`mktemp -d`"; \
 		RUSTC_BOOTSTRAP=1 cargo build --release --target "$$t-$(MY_VENDOR)-$(MY_OS)" -Zbuild-std=std,panic_abort --verbose; \
 		cp -f $${CARGO_TARGET_DIR}/$$t-$(MY_VENDOR)-$(MY_OS)/release/sponge256sum $${ORIGINAL_DIR}/out/target/release/sponge256sum-$$t; \
 		chmod 555 $${ORIGINAL_DIR}/out/target/release/sponge256sum-$$t; \
@@ -37,8 +37,8 @@ doc:
 	set -e; \
 	mkdir -p out/target/release; \
 	ORIGINAL_DIR="`pwd`"; \
-	cd ../../app; \
 	export CARGO_TARGET_DIR="`mktemp -d`"; \
+	cd ../../app; \
 	RUSTFLAGS=-Dwarnings cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256; \
 	cp -rf $${CARGO_TARGET_DIR}/doc $${ORIGINAL_DIR}/out/target/release/; \
 	RUSTFLAGS= cargo pkgid | sed 's/^.*@//;s/^[[:space:]]*//;s/[[:space:]]*$$//' > $${ORIGINAL_DIR}/out/target/.PKG_VERSION; \

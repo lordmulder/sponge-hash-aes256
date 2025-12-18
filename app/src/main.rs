@@ -188,11 +188,8 @@ use crate::{
     self_test::self_test,
 };
 
-// Enable MiMalloc on supported configurations
-#[cfg(all(
-    any(all(target_os = "linux", target_env = "musl"), target_os = "windows"),
-    any(target_arch = "x86_64", target_arch = "x86", target_arch = "aarch64")
-))]
+// Enable MiMalloc, if the "with-mimalloc" feature is enabled
+#[cfg(feature = "with-mimalloc")]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
@@ -200,8 +197,12 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 // Main
 // ---------------------------------------------------------------------------
 
-/// The actual "main" functiom
+/// The actual "main" function
 fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
+    // Initialize the SimpleLogger, if the "with-logging" feature is enabled
+    #[cfg(feature = "with-logging")]
+    simple_logger::SimpleLogger::new().init().unwrap();
+
     // Compute the digest size, in bytes (falling back to the default, it unspecified)
     let (digest_size, digest_rem) = match args.length {
         Some(digest_bits) => digest_bits.get().div_rem(&(u8::BITS as usize)),

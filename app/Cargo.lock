@@ -548,10 +548,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fda2ff0d084019ba4d7c6f371c95d8fd75ce3524c3cb8fb653a3023f6323e64"
 
 [[package]]
+name = "simple_logger"
+version = "5.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "291bee647ce7310b0ea721bfd7e0525517b4468eb7c7e15eb8bd774343179702"
+dependencies = [
+ "log",
+ "windows-sys",
+]
+
+[[package]]
 name = "sponge-hash-aes256"
 version = "1.8.0"
 dependencies = [
  "aes",
+ "log",
  "wide",
  "zeroize",
 ]
@@ -574,6 +585,7 @@ dependencies = [
  "regex",
  "rolling-median",
  "rustc-version-const",
+ "simple_logger",
  "sponge-hash-aes256",
  "tinyvec",
  "wild",
