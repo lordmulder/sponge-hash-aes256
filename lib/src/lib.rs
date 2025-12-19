@@ -39,8 +39,8 @@
 //!
 //! ## See also
 //!
-//! &#128073; <https://crates.io/crates/sponge-hash-aes256>  
-//! &#128073; <https://github.com/lordmulder/sponge-hash-aes256>
+//! &#x1F517; <https://crates.io/crates/sponge-hash-aes256>  
+//! &#x1F517; <https://github.com/lordmulder/sponge-hash-aes256>
 
 mod sponge_hash;
 mod utilities;

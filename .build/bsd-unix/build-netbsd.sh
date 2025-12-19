@@ -3,7 +3,7 @@ set -e
 
 # [Prerequisites]
 # - /usr/sbin/pkg_add git curl clang
-# - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.91.0
+# - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.92.0
 # - rustup component add rust-src
 # - curl -sSf https://cdn.netbsd.org/pub/NetBSD/NetBSD-10.1/i386/binary/sets/base.tgz | tar -C /opt/sysroot/i386 -xzf - lib usr/lib
 # - curl -sSf https://cdn.netbsd.org/pub/NetBSD/NetBSD-10.1/i386/binary/sets/comp.tgz | tar -C /opt/sysroot/i386 -xzf - usr/lib

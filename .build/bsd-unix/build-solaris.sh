@@ -7,7 +7,7 @@ set -e
 
 # [Prerequisites (Illumos)]
 # - pkg install developer/build-essential developer/versioning/git
-# - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.91.0
+# - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.92.0
 
 if [ "$(uname -s)" != "SunOS" ]; then
     echo "Error: This script is supposed to run on a SunOS system!"

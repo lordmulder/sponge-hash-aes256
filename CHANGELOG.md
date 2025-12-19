@@ -5,23 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 1.8.0
+
+### Added
+
+- Implemented multi-threaded processing of files in the command-line application &#x1F680;
+- Added a “workspace” manifest (`Cargo.toml`) to the root of the repository to simplify the build process.
+- Added support for [`MiMalloc`](https://crates.io/crates/mimalloc) allocator to the command-line application.
+- Added code coverage analysis, via [Codecov.io](https://codecov.io/), and vastly improved the code coverage of our tests.
+
+### Changed
+
+- Minor performance improvements in the “core” library (yet again).
+- Code clean-up all over the place.
+- Updated GitHub workflow (CI) to create builds with Rust version 1.92.0 (2025-12-11).
+
 ## Version 1.7.0
 
 ### Added
 
 - Added additional unit tests and added new benchmarks for the `SpongeHash256` struct.
-
 - Added `SpongeHash256::update_range()` function to process a range specified by two “raw” pointers.
 
 ### Changed
 
-- Some additional performance improvements in the "core" library (again).
+- Some additional performance improvements in the “core” library (again).
 
 ## Version 1.6.1
 
 ### Changed
 
-- Some additional performance improvements in the "core" library.
+- Some additional performance improvements in the “core” library.
 
 ## Version 1.6.0
 

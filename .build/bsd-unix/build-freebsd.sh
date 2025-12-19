@@ -3,7 +3,7 @@ set -e
 
 # [Prerequisites]
 # - pkg install -y git curl
-# - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.91.0
+# - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.92.0
 # - rustup target add x86_64-unknown-freebsd i686-unknown-freebsd
 # - rustup component add rust-src
 # - curl -sSf https://download.freebsd.org/ftp/releases/arm64/14.3-RELEASE/base.txz | tar -C /opt/sysroot/arm64 -xJ lib usr/lib
