@@ -49,6 +49,17 @@ if not exist "%NSIS_INSTALL_DIR%\makensis.exe" (
 set "PATH=%CD%\bin;%CARGO_INSTALL_DIR%;%GIT_INSTALL_DIR%\cmd;%SEVENZIP_INSTALL_DIR%;%NSIS_INSTALL_DIR%;%SystemRoot%\System32;%SystemRoot%"
 
 REM --------------------------------------------------------------------------
+REM Check for uncommitted changes
+REM --------------------------------------------------------------------------
+
+git describe --long --tags --always --dirty || goto:error
+
+for /F "usebackq" %%a in (`git status --porcelain`) do (
+	echo Git: Uncommitted changes detected. Cowardly refusing to create an empty archive^^!
+	goto:error
+)
+
+REM --------------------------------------------------------------------------
 REM Clean-up
 REM --------------------------------------------------------------------------
 

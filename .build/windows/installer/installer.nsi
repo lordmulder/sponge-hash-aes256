@@ -23,7 +23,7 @@
 !define REG_INSTPATH `"Software\Microsoft\Windows\CurrentVersion\Uninstall\${PKG_REGUUID}"`
 
 Unicode true
-RequestExecutionLevel user
+RequestExecutionLevel highest
 XPStyle on
 ManifestSupportedOS all
 

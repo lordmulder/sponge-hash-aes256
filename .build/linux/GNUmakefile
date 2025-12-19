@@ -4,19 +4,23 @@
 SHELL = /bin/bash
 .SHELLFLAGS = -eo pipefail -c
 
-ifneq (Linux, $(shell uname -s))
+ifneq (Linux,$(shell uname -s))
 $(error Error: This script is supposed to run on a Linux system!)
 endif
 
-ifneq (x86_64, $(shell uname -m))
+ifneq (x86_64,$(shell uname -m))
 $(error Error: This script is supposed to run on the 'x86_64' architecture!)
+endif
+
+ifneq (,$(shell git status --porcelain))
+$(error Git: Uncommitted changes detected. Cowardly refusing to create an empty archive!)
 endif
 
 unexport RUSTFLAGS
 unexport RUSTC_BOOTSTRAP
 
 .ONESHELL:
-.PHONY: all build vbuild wbuild xbuild zbuild dist doc pkg clean
+.PHONY: all build vbuild wbuild xbuild zbuild doc dist pkg clean
 
 all: clean pkg
 
