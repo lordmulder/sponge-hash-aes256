@@ -38,9 +38,8 @@ InstallDir "$DESKTOP\sponge256sum-${PKG_VERSION}"
 SetCompressor /SOLID lzma
 SetCompressorDictSize 64
 
-
-Icon "app.ico"
-LicenseData "license.rtf"
+Icon "installer\app.ico"
+LicenseData "installer\license.rtf"
 LicenseForceSelection checkbox
 
 VIProductVersion "${PKG_VERSION}.0"

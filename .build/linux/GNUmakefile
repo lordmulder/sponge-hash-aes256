@@ -23,75 +23,69 @@ all: clean pkg
 build:
 	mkdir -p out/target/release /tmp/rust-build
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
-	pushd ../..
 	for t in x86_64 i686 aarch64; do
 		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
 		TARGET_CC=/usr/local/musl/$$t/bin/musl-gcc \
 		cargo build --release --target $$t-unknown-linux-musl --features with-mimalloc --verbose
 		[ "$$t" = "i686" ] && suffix=i686-sse2 || suffix=$$t
-		install -v --mode 555 $${CARGO_TARGET_DIR}/$$t-unknown-linux-musl/release/sponge256sum $(CURDIR)/out/target/release/sponge256sum-$$suffix
+		install -v --mode 555 $${CARGO_TARGET_DIR}/$$t-unknown-linux-musl/release/sponge256sum out/target/release/sponge256sum-$$suffix
 		rm -rf $${CARGO_TARGET_DIR}
 	done
 
 vbuild:
 	mkdir -p out/target/release /tmp/rust-build
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
-	pushd ../..
 	for v in v2 v3; do
 		RUSTFLAGS="-Dwarnings -Clinker=x86_64-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast -Ctarget-cpu=x86-64-$$v" \
 		TARGET_CC=/usr/local/musl/x86_64/bin/musl-gcc \
 		cargo build --release --target x86_64-unknown-linux-musl --features with-mimalloc --verbose
-		install -v --mode 555 $${CARGO_TARGET_DIR}/x86_64-unknown-linux-musl/release/sponge256sum $(CURDIR)/out/target/release/sponge256sum-x86_64-$$v
+		install -v --mode 555 $${CARGO_TARGET_DIR}/x86_64-unknown-linux-musl/release/sponge256sum out/target/release/sponge256sum-x86_64-$$v
 		rm -rf $${CARGO_TARGET_DIR}
 	done
 
 wbuild:
 	mkdir -p out/target/release /tmp/rust-build
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
-	pushd ../..
 	for t in x86_64 i686; do
 		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static,+aes -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
 		TARGET_CC=/usr/local/musl/$$t/bin/musl-gcc \
 		cargo build --release --target $$t-unknown-linux-musl --features with-mimalloc --verbose
 		[ "$$t" = "i686" ] && arch_suffix=i686-sse2-aes_ni || arch_suffix=$$t-aes_ni
-		install -v --mode 555 $${CARGO_TARGET_DIR}/$$t-unknown-linux-musl/release/sponge256sum $(CURDIR)/out/target/release/sponge256sum-$$arch_suffix
+		install -v --mode 555 $${CARGO_TARGET_DIR}/$$t-unknown-linux-musl/release/sponge256sum out/target/release/sponge256sum-$$arch_suffix
 		rm -rf $${CARGO_TARGET_DIR}
 	done
 
 xbuild:
 	mkdir -p out/target/release /tmp/rust-build
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
-	pushd ../..
 	for v in v2 v3; do
 		export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
 		RUSTFLAGS="-Dwarnings -Clinker=x86_64-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static,+aes -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast -Ctarget-cpu=x86-64-$$v" \
 		TARGET_CC=/usr/local/musl/x86_64/bin/musl-gcc \
 		cargo build --release --target x86_64-unknown-linux-musl --features with-mimalloc --verbose
-		install -v --mode 555 $${CARGO_TARGET_DIR}/x86_64-unknown-linux-musl/release/sponge256sum $(CURDIR)/out/target/release/sponge256sum-x86_64-$$v-aes_ni
+		install -v --mode 555 $${CARGO_TARGET_DIR}/x86_64-unknown-linux-musl/release/sponge256sum out/target/release/sponge256sum-x86_64-$$v-aes_ni
 		rm -rf $${CARGO_TARGET_DIR}
 	done
 
 zbuild:
 	mkdir -p out/target/release /tmp/rust-build
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
-	pushd ../..
 	for p in i586:i686 riscv64gc:riscv64 powerpc64le:powerpc64le; do
 		IFS=":" read -r -a q <<< "$$p"
 		RUSTFLAGS="-Dwarnings -Clinker=$${q[1]}-linux-gnu-gcc -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
 		cargo build --release --target $${q[0]}-unknown-linux-musl --verbose
-		install -v --mode 555 $${CARGO_TARGET_DIR}/$${q[0]}-unknown-linux-musl/release/sponge256sum $(CURDIR)/out/target/release/sponge256sum-$${q[0]}
+		install -v --mode 555 $${CARGO_TARGET_DIR}/$${q[0]}-unknown-linux-musl/release/sponge256sum out/target/release/sponge256sum-$${q[0]}
 		rm -rf $${CARGO_TARGET_DIR}
 	done
 
 doc:
 	mkdir -p out/target/release /tmp/rust-build
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
-	pushd ../..
 	RUSTFLAGS=-Dwarnings cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256
-	cp -rf $${CARGO_TARGET_DIR}/doc $(CURDIR)/out/target/release/
-	RUSTFLAGS=-Dwarnings cargo pkgid --manifest-path app/Cargo.toml | grep -Eo '[^@]+$$' | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//' > $(CURDIR)/out/target/.PKG_VERSION
-	printf '%s\n\n' "$$(RUSTFLAGS=-Dwarnings cargo --version --verbose)" > $(CURDIR)/out/target/.RUSTC_VERSION
-	printf '%s\n' "$$(RUSTFLAGS=-Dwarnings cargo rustc --manifest-path app/Cargo.toml -- --version --verbose)" >> $(CURDIR)/out/target/.RUSTC_VERSION
+	cp -rf $${CARGO_TARGET_DIR}/doc out/target/release/
+	RUSTFLAGS=-Dwarnings cargo pkgid --package sponge256sum | grep -Eo '[^@]+$$' | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//' > out/target/.PKG_VERSION
+	printf '%s\n\n' "$$(RUSTFLAGS=-Dwarnings cargo --version --verbose)" > out/target/.RUSTC_VERSION
+	printf '%s\n' "$$(RUSTFLAGS=-Dwarnings cargo rustc --package sponge256sum -- --version --verbose)" >> out/target/.RUSTC_VERSION
 	rm -rf $${CARGO_TARGET_DIR}
 
 dist: build vbuild wbuild xbuild zbuild doc
