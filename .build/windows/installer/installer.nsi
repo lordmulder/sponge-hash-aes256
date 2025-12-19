@@ -2,6 +2,8 @@
 # SpongeHash-AES256
 # Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
+!include 'LogicLib.nsh'
+
 !ifndef OUTPUT_FILE
   !error "Error: OUTPUT_FILE is not defined!"
 !endif
@@ -56,19 +58,28 @@ Page directory
 Page components
 Page instfiles
 
+!macro _SetOutPath DIR
+  ClearErrors
+  SetOutPath `${DIR}`
+  ${If} ${Errors}
+    MessageBox MB_ICONSTOP|MB_TOPMOST "Failed to create directory:$\n$\n${DIR}" /SD IDOK
+    Abort "Failed to create directory: ${DIR}"
+  ${EndIf}
+!macroend
+
 Section "Program files (required)"
   SectionIn RO
-  SetOutPath "$INSTDIR"
+  !insertmacro _SetOutPath "$INSTDIR"
   File "${SOURCE_PATH}\*.*"
 SectionEnd
 
-Section "Additional program files"
-  SetOutPath "$INSTDIR\extra"
+Section "Program files for old Windows versions"
+  !insertmacro _SetOutPath "$INSTDIR\extra"
   File "${SOURCE_PATH}\extra\*.*"
 SectionEnd
 
 Section "Documentation"
-  SetOutPath "$INSTDIR\doc"
+  !insertmacro _SetOutPath "$INSTDIR\doc"
   File /r "${SOURCE_PATH}\doc\*.*"
 SectionEnd
 
@@ -78,5 +89,7 @@ Section ""
 SectionEnd
 
 Function .onInstSuccess
-  ExecShell "open" "$INSTDIR"
+  ${IfNot} ${Silent}
+    ExecShell "open" "$INSTDIR"
+  ${EndIf}
 FunctionEnd
