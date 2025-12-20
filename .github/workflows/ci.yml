@@ -48,8 +48,6 @@ jobs:
       matrix:
         rust: [1.89-bookworm, 1.92-trixie]
         arch: [x86_64, i686]
-    env:
-      TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
     steps:
       - if:  ${{ matrix.arch == 'i686' }}
         run: |
@@ -61,8 +59,8 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
       - run: |
-          cargo test --workspace --target ${{ matrix.arch }}-unknown-linux-gnu ${TEST_EXTRA_OPTS}
-          cargo test --workspace --target ${{ matrix.arch }}-unknown-linux-gnu --release ${TEST_EXTRA_OPTS}
+          cargo test --workspace --target ${{ matrix.arch }}-unknown-linux-gnu --verbose
+          cargo test --workspace --target ${{ matrix.arch }}-unknown-linux-gnu --verbose --release -- --include-ignored
 
   test-windows:
     runs-on: windows-latest
@@ -71,8 +69,6 @@ jobs:
       matrix:
         rust: [1.89.0, 1.92.0]
         arch: [x86_64, i686]
-    env:
-      TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
     steps:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -87,8 +83,8 @@ jobs:
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
       - run: |
           $PSNativeCommandUseErrorActionPreference = $true
-          iex "cargo test --workspace --target ${{ matrix.arch }}-pc-windows-msvc $env:TEST_EXTRA_OPTS"
-          iex "cargo test --workspace --target ${{ matrix.arch }}-pc-windows-msvc --release $env:TEST_EXTRA_OPTS"
+          iex "cargo test --workspace --target ${{ matrix.arch }}-pc-windows-msvc --verbose"
+          iex "cargo test --workspace --target ${{ matrix.arch }}-pc-windows-msvc --verbose --release -- --include-ignored"
 
   test-macos:
     runs-on: macos-latest
@@ -97,8 +93,6 @@ jobs:
       matrix:
         rust: [1.89.0, 1.92.0]
         arch: [x86_64, aarch64]
-    env:
-      TEST_EXTRA_OPTS: --verbose${{ github.event_name == 'release' && ' -- --include-ignored' || '' }}
     steps:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
@@ -111,8 +105,8 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
       - run: |
-          cargo test --workspace --target ${{ matrix.arch }}-apple-darwin ${TEST_EXTRA_OPTS}
-          cargo test --workspace --target ${{ matrix.arch }}-apple-darwin --release ${TEST_EXTRA_OPTS}
+          cargo test --workspace --target ${{ matrix.arch }}-apple-darwin --verbose
+          cargo test --workspace --target ${{ matrix.arch }}-apple-darwin --verbose --release
 
   # --------------------------------------------------------------------------
   # Coverage
