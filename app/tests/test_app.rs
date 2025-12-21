@@ -58,6 +58,7 @@ static REGEX_INFO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Error: Length
 static REGEX_FILE_FOPEN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to open input file: "([^"]+)""#).unwrap());
 static REGEX_CHECK_FOPEN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to open checksum file: "([^"]+)""#).unwrap());
 static REGEX_MALFORMED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Malformed checksum file: "([^"]+)" \[line #(\d+)\]"#).unwrap());
+static REGEX_ENVIRON: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: Environment variable (\w+)="([^"]+)" is invalid!"#).unwrap());
 
 #[cfg(unix)]
 static REGEX_ABORTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)\bAborted: The process has been interrupted").unwrap());
@@ -318,7 +319,7 @@ fn do_test_multi_file(expected_map: &HashMap<&str, &str>, thread_count: NonZeroU
 
     paths.iter().for_each(|path| parameters.push(path.as_os_str()));
 
-    let env = HashMap::from([("SPONGE256SUM_THREAD_COUNT", thread_count.to_string())]);
+    let env = HashMap::from([("SPONGE256SUM_THREAD_COUNT", thread_count.to_string()), ("SPONGE256SUM_DIRWALK_STRATEGY", "BFS".to_owned())]);
     let output = run_binary_with_env(parameters, env, true, false);
 
     for caps in REGEX_LINE.captures_iter(&output) {
@@ -388,10 +389,18 @@ fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: bool, multi_thread
     expected_map.keys().for_each(|digest| assert!(digest_set.contains(digest)));
 }
 
-fn do_test_data(expected: &str, data: &[u8], snail_mode: bool) {
-    const NO_ARGS: iter::Empty<&OsStr> = iter::empty::<&OsStr>();
+fn do_test_data(expected: &str, data: &[u8], info: Option<&str>, snail_level: usize) {
+    let mut parameters = Vec::with_capacity(6usize);
 
-    let output = if snail_mode { run_binary_with_data([OsStr::new("--snail")], data) } else { run_binary_with_data(NO_ARGS, data) };
+    if let Some(info) = info {
+        parameters.extend_from_slice(&[OsStr::new("--info"), OsStr::new(info)]);
+    }
+
+    for _ in 0..snail_level {
+        parameters.push(OsStr::new("--snail"));
+    }
+
+    let output = run_binary_with_data(parameters, data);
     let caps = REGEX_LINE.captures(&output).expect("Regex did not match!");
 
     assert!(digest_eq(caps.get(1).unwrap().as_str(), expected));
@@ -434,7 +443,7 @@ fn do_verify_files(modify: bool, file_count: usize, multi_threading: bool) {
 // ---------------------------------------------------------------------------
 
 // Expected digest values
-static EXPECTED: [&str; 37usize] = [
+static EXPECTED: [&str; 45usize] = [
     "68c0656ee81830fd73031bd53af43c4a793a353c4e086ba27b9851206c17398d",
     "0d74c2e49bc2458915d78321ceddd9566bfee73b5bdf63ea0326cdbd78603afc",
     "a32cd2879cb337568324f064921072ce131d2ad981d84263731a3328c474187f",
@@ -472,6 +481,14 @@ static EXPECTED: [&str; 37usize] = [
     "a06aa9dc1c300910592b5f91dcaa77d51c88f495176a5f3bbce3c524e2c018c5",
     "568dec19bb459f51651caa5fa28a201e1c1557d817c1e6a4344b89c7d787c120",
     "ac412f4791b0823bc8e9527dfe70bbee3e1c1f4ad286c60184e263573451271b",
+    "0fcb324f81264fde86df8b25df92b1f1c08051cc9b92414843c5044d90ff5759",
+    "756349dfdfd63fb82bb4fa417b30c7695f86120f2a2d0c1dc2fa29a820c68442",
+    "76d0b2b94003c069172a228866436925e43cda64e9a7f6f0c0bc92e9f282ef26",
+    "658c2632fa26de9b7410bbe7a9a94b513875cc60ef499d2bd81f3aa159599c99",
+    "3ccc937a835d8cd4af63007c741d75f1a55efcac8ef9da4503a7c0cf4f1cc05e",
+    "a9f85f6c13049df99066ce72ca681ae0fa2d23cac7afff7da570c05638c856f2",
+    "cfc9bca044ff820959a5fcd08d3096c2ef637e3fd68091118c83d9fc52e3e784",
+    "2e6a8ce4c04f6ca518f06d109cb82514285b2e614584e2c65f874cf94ca074e5",
 ];
 
 // Path to a non-existing file
@@ -825,25 +842,73 @@ fn test_dir_2h() {
 #[test]
 fn test_data_1a() {
     static STDIN_DATA: &[u8] = include_bytes!("data/binary/frank.pdf");
-    do_test_data(EXPECTED[0usize], STDIN_DATA, false);
+    do_test_data(EXPECTED[0usize], STDIN_DATA, None, 0usize);
 }
 
 #[test]
 fn test_data_1b() {
     static STDIN_DATA: &[u8] = include_bytes!("data/binary/frank.pdf");
-    do_test_data(EXPECTED[1usize], STDIN_DATA, true);
+    do_test_data(EXPECTED[1usize], STDIN_DATA, None, 1usize);
 }
 
 #[test]
 fn test_data_2a() {
     static STDIN_DATA: &[u8] = include_bytes!("data/binary/dracula.pdf");
-    do_test_data(EXPECTED[5usize], STDIN_DATA, false);
+    do_test_data(EXPECTED[5usize], STDIN_DATA, None, 0usize);
 }
 
 #[test]
 fn test_data_2b() {
     static STDIN_DATA: &[u8] = include_bytes!("data/binary/dracula.pdf");
-    do_test_data(EXPECTED[6usize], STDIN_DATA, true);
+    do_test_data(EXPECTED[6usize], STDIN_DATA, None, 1usize);
+}
+
+#[test]
+fn test_data_3a() {
+    static STDIN_DATA: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    do_test_data(EXPECTED[37usize], STDIN_DATA, None, 2usize);
+}
+
+#[test]
+fn test_data_3b() {
+    static STDIN_DATA: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    do_test_data(EXPECTED[38usize], STDIN_DATA, None, 3usize);
+}
+
+#[test]
+fn test_data_3c() {
+    static STDIN_DATA: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    do_test_data(EXPECTED[39usize], STDIN_DATA, None, 4usize);
+}
+
+#[test]
+fn test_data_4a() {
+    static STDIN_DATA: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    do_test_data(EXPECTED[40usize], STDIN_DATA, Some("thingamabob"), 0usize);
+}
+
+#[test]
+fn test_data_4b() {
+    static STDIN_DATA: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    do_test_data(EXPECTED[41usize], STDIN_DATA, Some("thingamabob"), 1usize);
+}
+
+#[test]
+fn test_data_4c() {
+    static STDIN_DATA: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    do_test_data(EXPECTED[42usize], STDIN_DATA, Some("thingamabob"), 2usize);
+}
+
+#[test]
+fn test_data_4d() {
+    static STDIN_DATA: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    do_test_data(EXPECTED[43usize], STDIN_DATA, Some("thingamabob"), 3usize);
+}
+
+#[test]
+fn test_data_4e() {
+    static STDIN_DATA: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+    do_test_data(EXPECTED[44usize], STDIN_DATA, Some("thingamabob"), 4usize);
 }
 
 #[test]
@@ -1009,6 +1074,48 @@ fn test_check_error_3b() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("text").join("alice29.txt");
     let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), path.as_os_str()], false, true);
     assert!(REGEX_MALFORMED.is_match(&output))
+}
+
+#[test]
+fn test_invalid_env_1a() {
+    let env = HashMap::from([("SPONGE256SUM_DIRWALK_STRATEGY", "foo".to_owned())]);
+    let output = run_binary_with_env(&[""; 0usize], env, false, true);
+    assert!(REGEX_ENVIRON.is_match(&output))
+}
+
+#[test]
+fn test_invalid_env_1b() {
+    let env = HashMap::from([("SPONGE256SUM_DIRWALK_STRATEGY", "1".to_owned())]);
+    let output = run_binary_with_env(&[""; 0usize], env, false, true);
+    assert!(REGEX_ENVIRON.is_match(&output))
+}
+
+#[test]
+fn test_invalid_env_2a() {
+    let env = HashMap::from([("SPONGE256SUM_THREAD_COUNT", "foo".to_owned())]);
+    let output = run_binary_with_env(&[""; 0usize], env, false, true);
+    assert!(REGEX_ENVIRON.is_match(&output))
+}
+
+#[test]
+fn test_invalid_env_2b() {
+    let env = HashMap::from([("SPONGE256SUM_THREAD_COUNT", "-1".to_owned())]);
+    let output = run_binary_with_env(&[""; 0usize], env, false, true);
+    assert!(REGEX_ENVIRON.is_match(&output))
+}
+
+#[test]
+fn test_invalid_env_3a() {
+    let env = HashMap::from([("SPONGE256SUM_SELFTEST_PASSES", "foo".to_owned())]);
+    let output = run_binary_with_env(&[""; 0usize], env, false, true);
+    assert!(REGEX_ENVIRON.is_match(&output))
+}
+
+#[test]
+fn test_invalid_env_3b() {
+    let env = HashMap::from([("SPONGE256SUM_SELFTEST_PASSES", "0".to_owned())]);
+    let output = run_binary_with_env(&[""; 0usize], env, false, true);
+    assert!(REGEX_ENVIRON.is_match(&output))
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
