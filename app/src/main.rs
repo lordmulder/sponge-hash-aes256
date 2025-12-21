@@ -180,6 +180,7 @@ use std::time::Duration;
 use std::{io::stdout, process::ExitCode, sync::Arc};
 
 use crate::common::{Aborted, Flag};
+use crate::environment::Env;
 use crate::verify::verify_files;
 use crate::{
     arguments::Args,
@@ -233,6 +234,15 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
         return Ok(false);
     }
 
+    // Parse additional options from environment variables
+    let env = match Env::from_env() {
+        Ok(options) => options,
+        Err(error) => {
+            print_error!(args, "Error: Environment variable {}={:?} is invalid!", error.name, error.value);
+            return Ok(false);
+        }
+    };
+
     // Install the interrupt (CTRL+C) handling routine
     let halt = Arc::new(Default::default());
     let halt_cloned = Arc::clone(&halt);
@@ -243,13 +253,13 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
 
     // Run built-in self-test, if it was requested by the user
     if args.self_test {
-        self_test(&mut output, &args, &halt)
+        self_test(&mut output, &args, &env, &halt)
     } else if !args.check {
         // Process all input files/directories that were given on the command-line
-        process_files(&mut output, digest_size, args, halt)
+        process_files(&mut output, digest_size, args, &env, halt)
     } else {
         // Verify all checksum files that were given on the command-line
-        verify_files(&mut output, args, halt)
+        verify_files(&mut output, args, &env, halt)
     }
 }
 

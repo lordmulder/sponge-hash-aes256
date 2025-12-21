@@ -13,7 +13,7 @@ use sponge_hash_aes256::{SpongeHash256, DEFAULT_DIGEST_SIZE};
 use std::{
     hint::black_box,
     io::{Error as IoError, Write},
-    num::NonZeroU16,
+    num::NonZeroUsize,
     time::Instant,
 };
 
@@ -21,7 +21,7 @@ use crate::{
     arguments::{Args, HEADER_LINE},
     common::{Aborted, Flag},
     digest::digest_equal,
-    environment::get_selftest_passes,
+    environment::Env,
     print_error,
 };
 
@@ -122,11 +122,11 @@ fn do_self_test(output: &mut impl Write, halt: &Flag) -> Result<bool, Error> {
 }
 
 /// Runs the self-test routine for `passes` times
-fn test_runner(output: &mut impl Write, passes: NonZeroU16, args: &Args, halt: &Flag) -> Result<bool, Error> {
+fn test_runner(output: &mut impl Write, passes: NonZeroUsize, args: &Args, halt: &Flag) -> Result<bool, Error> {
     writeln!(output, "{}", HEADER_LINE)?;
     let mut median = Median::new();
 
-    for pass in 0u16..passes.get() {
+    for pass in 0usize..passes.get() {
         writeln!(output, "\nSelf-test pass {} of {} is running...", (pass as u32) + 1u32, passes)?;
         output.flush()?;
         check_cancelled!(halt);
@@ -158,14 +158,8 @@ fn test_runner(output: &mut impl Write, passes: NonZeroU16, args: &Args, halt: &
 // ---------------------------------------------------------------------------
 
 /// The built-in self-test (BIST)
-pub fn self_test(output: &mut impl Write, args: &Args, halt: &Flag) -> Result<bool, Aborted> {
-    let passes = match get_selftest_passes() {
-        Ok(value) => value.unwrap_or_else(|| NonZeroU16::new(3u16).unwrap()),
-        Err(error) => {
-            print_error!(args, "Error: Invalid number of self-test passes \"{}\" specified!", error);
-            return Ok(false);
-        }
-    };
+pub fn self_test(output: &mut impl Write, args: &Args, env: &Env, halt: &Flag) -> Result<bool, Aborted> {
+    let passes = env.sefltest_passes.unwrap_or(NonZeroUsize::new(3usize).unwrap());
 
     match test_runner(output, passes, args, halt) {
         Ok(result) => Ok(result),

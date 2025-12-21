@@ -20,6 +20,7 @@ use crate::{
     arguments::Args,
     common::{get_capacity, increment, Aborted, Digest, Flag, TinyVecEx, MAX_DIGEST_SIZE},
     digest::{compute_digest, digest_equal, Error as DigestError},
+    environment::Env,
     io::{DataSource, STDIN_NAME},
     print_error,
     thread_pool::{detect_thread_count, Cancelled, TaskResult, ThreadPool},
@@ -395,15 +396,9 @@ fn verify_st(output: &mut impl Write, args: &Arc<Args>, halt: &Arc<Flag>) -> Res
 // ---------------------------------------------------------------------------
 
 /// Verify all input files
-pub fn verify_files(output: &mut impl Write, args: Arc<Args>, halt: Arc<Flag>) -> Result<bool, Aborted> {
+pub fn verify_files(output: &mut impl Write, args: Arc<Args>, env: &Env, halt: Arc<Flag>) -> Result<bool, Aborted> {
     // Determine number of threads
-    let thread_count = match detect_thread_count(&args) {
-        Ok(value) => value,
-        Err(error) => {
-            print_error!(args, "Error: Invalid thread count \"{}\" has been specified!", error);
-            return Ok(false);
-        }
-    };
+    let thread_count = detect_thread_count(&args, env);
 
     if thread_count > NonZeroUsize::MIN {
         verify_mt(output, thread_count, &args, &halt)

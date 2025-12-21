@@ -10,10 +10,7 @@ use std::{
     thread::{self, available_parallelism, JoinHandle},
 };
 
-use crate::{
-    arguments::Args,
-    environment::{get_thread_count, InvalidValue},
-};
+use crate::{arguments::Args, environment::Env};
 
 /// Maximum number of threads
 pub const MAX_THREADS: usize = 64usize;
@@ -46,14 +43,14 @@ fn map_cores_to_threads(cores: NonZeroUsize) -> NonZeroUsize {
 }
 
 /// Determine the number of threads
-pub fn detect_thread_count(args: &Args) -> Result<NonZeroUsize, InvalidValue> {
+pub fn detect_thread_count(args: &Args, env: &Env) -> NonZeroUsize {
     if args.multi_threading {
-        match get_thread_count()?.map(|value| value.min(MAX_THREADS)).unwrap_or(usize::MIN) {
-            usize::MIN => Ok(map_cores_to_threads(available_parallelism().unwrap_or(NonZeroUsize::MIN))),
-            count => Ok(NonZeroUsize::new(count).unwrap()),
+        match env.thread_count.map(|value| value.min(MAX_THREADS)).unwrap_or(usize::MIN) {
+            usize::MIN => map_cores_to_threads(available_parallelism().unwrap_or(NonZeroUsize::MIN)),
+            count => NonZeroUsize::new(count).unwrap(),
         }
     } else {
-        Ok(NonZeroUsize::MIN)
+        NonZeroUsize::MIN
     }
 }
 

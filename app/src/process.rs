@@ -24,7 +24,7 @@ use crate::{
     arguments::Args,
     common::{get_capacity, increment, Aborted, Digest, Flag, TinyVecEx},
     digest::{compute_digest, Error as DigestError},
-    environment::get_search_strategy,
+    environment::Env,
     io::{DataSource, STDIN_NAME},
     print_error,
     thread_pool::{detect_thread_count, Cancelled, TaskResult, ThreadPool},
@@ -452,29 +452,17 @@ fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args>, h
 }
 
 /// Process all input files
-pub fn process_files(output: &mut impl Write, digest_size: usize, args: Arc<Args>, halt: Arc<Flag>) -> Result<bool, Aborted> {
+pub fn process_files(output: &mut impl Write, digest_size: usize, args: Arc<Args>, env: &Env, halt: Arc<Flag>) -> Result<bool, Aborted> {
     // Read input datat from 'stdin' stream?
     if args.files.is_empty() {
         return process_stdin(output, digest_size, args, halt).map_err(|_| Aborted);
     }
 
     // Determine number of threads
-    let thread_count = match detect_thread_count(&args) {
-        Ok(value) => value,
-        Err(error) => {
-            print_error!(args, "Error: Invalid thread count \"{}\" has been specified!", error);
-            return Ok(false);
-        }
-    };
+    let thread_count = detect_thread_count(&args, env);
 
     // Determine directory walking strategy
-    let breadth_first = match get_search_strategy() {
-        Ok(value) => value.unwrap_or(true),
-        Err(error) => {
-            print_error!(args, "Error: Invalid directory walking strategy \"{}\" specified!", error);
-            return Ok(false);
-        }
-    };
+    let breadth_first = env.dirwalk_strategy.unwrap_or(true);
 
     if thread_count > NonZeroUsize::MIN {
         process_mt(output, thread_count, digest_size, breadth_first, &args, &halt)
