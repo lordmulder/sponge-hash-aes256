@@ -589,7 +589,6 @@ dependencies = [
  "ctrlc",
  "hex",
  "hex-literal",
- "libc",
  "mimalloc",
  "nix",
  "num",

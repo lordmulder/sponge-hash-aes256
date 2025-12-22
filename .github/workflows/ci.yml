@@ -59,8 +59,10 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
       - run: |
-          cargo test --workspace --target ${{ matrix.arch }}-unknown-linux-gnu --verbose
-          cargo test --workspace --target ${{ matrix.arch }}-unknown-linux-gnu --verbose --release -- --include-ignored
+          setpriv --bounding-set=-dac_override cargo test --workspace --target ${{ matrix.arch }}-unknown-linux-gnu --verbose
+          setpriv --bounding-set=-dac_override cargo test --workspace --target ${{ matrix.arch }}-unknown-linux-gnu --verbose --release -- --include-ignored
+        env:
+          CARGO_TARGET_DIR: /tmp/sponge256sum-test
 
   test-windows:
     runs-on: windows-latest
@@ -85,6 +87,8 @@ jobs:
           $PSNativeCommandUseErrorActionPreference = $true
           iex "cargo test --workspace --target ${{ matrix.arch }}-pc-windows-msvc --verbose"
           iex "cargo test --workspace --target ${{ matrix.arch }}-pc-windows-msvc --verbose --release -- --include-ignored"
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}\sponge256sum-test
 
   test-macos:
     runs-on: macos-latest
@@ -107,6 +111,8 @@ jobs:
       - run: |
           cargo test --workspace --target ${{ matrix.arch }}-apple-darwin --verbose
           cargo test --workspace --target ${{ matrix.arch }}-apple-darwin --verbose --release
+        env:
+          CARGO_TARGET_DIR: /tmp/sponge256sum-test
 
   # --------------------------------------------------------------------------
   # Coverage
@@ -123,10 +129,12 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - run: cargo llvm-cov --features with-mimalloc --workspace --ignore-filename-regex test --lcov --output-path lcov.info
+      - run: setpriv --bounding-set=-dac_override cargo llvm-cov --features with-mimalloc --workspace --ignore-filename-regex test --lcov --output-path /tmp/sponge256sum.lcov
+        env:
+          CARGO_TARGET_DIR: /tmp/sponge256sum-coverage
       - uses: codecov/codecov-action@v5
         with:
-          files: lcov.info
+          files: /tmp/sponge256sum.lcov
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
 

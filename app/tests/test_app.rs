@@ -40,9 +40,6 @@ use nix::{
     unistd::Pid,
 };
 
-#[cfg(unix)]
-const CAP_DAC_OVERRIDE: i32 = 1i32;
-
 // ---------------------------------------------------------------------------
 // Regular expressions
 // ---------------------------------------------------------------------------
@@ -264,14 +261,6 @@ fn digest_eq(hexstr_1: &str, hexstr_2: &str) -> bool {
 
     false /* mismatch! */
 }
-
-#[cfg(all(target_family = "unix", target_os = "linux"))]
-fn drop_capability(capability: i32) {
-    unsafe { libc::prctl(libc::PR_CAPBSET_DROP, capability as libc::c_long) };
-}
-
-#[cfg(all(target_family = "unix", not(target_os = "linux")))]
-fn drop_capability(_capability: i32) {}
 
 // ---------------------------------------------------------------------------
 // Test functions
@@ -1057,7 +1046,6 @@ fn test_file_error_2b() {
 #[cfg(unix)]
 #[test]
 fn test_file_error_3a() {
-    drop_capability(CAP_DAC_OVERRIDE);
     let input_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
     File::create(&input_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
     set_permissions(&input_file, Permissions::from_mode(0u32)).unwrap();
@@ -1068,7 +1056,6 @@ fn test_file_error_3a() {
 #[cfg(unix)]
 #[test]
 fn test_file_error_3b() {
-    drop_capability(CAP_DAC_OVERRIDE);
     let input_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
     File::create(&input_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
     set_permissions(&input_file, Permissions::from_mode(0u32)).unwrap();
@@ -1163,7 +1150,6 @@ fn test_check_error_5b() {
 #[cfg(unix)]
 #[test]
 fn test_check_error_6a() {
-    drop_capability(CAP_DAC_OVERRIDE);
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
     File::create(&check_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
     set_permissions(&check_file, Permissions::from_mode(0u32)).unwrap();
@@ -1174,7 +1160,6 @@ fn test_check_error_6a() {
 #[cfg(unix)]
 #[test]
 fn test_check_error_6b() {
-    drop_capability(CAP_DAC_OVERRIDE);
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
     File::create(&check_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
     set_permissions(&check_file, Permissions::from_mode(0u32)).unwrap();
@@ -1185,7 +1170,6 @@ fn test_check_error_6b() {
 #[cfg(unix)]
 #[test]
 fn test_check_error_7a() {
-    drop_capability(CAP_DAC_OVERRIDE);
     let target_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
     File::create(&target_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
     set_permissions(&target_file, Permissions::from_mode(0u32)).unwrap();
@@ -1198,7 +1182,6 @@ fn test_check_error_7a() {
 #[cfg(unix)]
 #[test]
 fn test_check_error_7b() {
-    drop_capability(CAP_DAC_OVERRIDE);
     let target_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
     File::create(&target_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
     set_permissions(&target_file, Permissions::from_mode(0u32)).unwrap();
