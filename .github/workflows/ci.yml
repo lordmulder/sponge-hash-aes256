@@ -236,7 +236,6 @@ jobs:
 
   build-netbsd:
     runs-on: ubuntu-latest
-    if: false
     needs: [test-linux, test-windows, test-macos]
     steps:
       - uses: actions/checkout@v5
@@ -266,7 +265,6 @@ jobs:
 
   build-openbsd:
     runs-on: ubuntu-latest
-    if: false
     needs: [test-linux, test-windows, test-macos]
     steps:
       - uses: actions/checkout@v5
@@ -293,7 +291,6 @@ jobs:
 
   build-dragonfly:
     runs-on: ubuntu-latest
-    if: false
     needs: [test-linux, test-windows, test-macos]
     steps:
       - uses: actions/checkout@v5
@@ -319,7 +316,6 @@ jobs:
 
   build-solaris:
     runs-on: ubuntu-latest
-    if: false
     needs: [test-linux, test-windows, test-macos]
     steps:
       - uses: actions/checkout@v5
@@ -346,7 +342,6 @@ jobs:
 
   build-illumos:
     runs-on: ubuntu-latest
-    if: false
     needs: [test-linux, test-windows, test-macos]
     steps:
       - uses: actions/checkout@v5
