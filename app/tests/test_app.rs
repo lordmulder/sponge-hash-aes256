@@ -27,13 +27,21 @@ use std::{
 use tinyvec::TinyVec;
 
 #[cfg(unix)]
-use std::{thread, time::Duration};
+use std::{
+    fs::{set_permissions, Permissions},
+    os::unix::fs::PermissionsExt,
+    thread,
+    time::Duration,
+};
 
 #[cfg(unix)]
 use nix::{
     sys::signal::{kill, Signal},
     unistd::Pid,
 };
+
+#[cfg(unix)]
+const CAP_DAC_OVERRIDE: i32 = 1i32;
 
 // ---------------------------------------------------------------------------
 // Regular expressions
@@ -55,9 +63,13 @@ static REGEX_INVALID: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: Th
 static REGEX_LEN_DIV: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Error: Digest output size must be divisible by eight!").unwrap());
 static REGEX_LEN_MAX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Error: Digest output size exceeds the allowable maximum!").unwrap());
 static REGEX_INFO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Error: Length of context info must not exceed 255 characters!").unwrap());
+static REGEX_FILE_NOENT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Input file not found: "([^"]+)""#).unwrap());
 static REGEX_FILE_FOPEN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to open input file: "([^"]+)""#).unwrap());
+static REGEX_CHECK_NOENT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Checksum file not found: "([^"]+)""#).unwrap());
 static REGEX_CHECK_FOPEN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to open checksum file: "([^"]+)""#).unwrap());
 static REGEX_MALFORMED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Malformed checksum file: "([^"]+)" \[line #(\d+)\]"#).unwrap());
+static REGEX_TARGET_NOENT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Target file not found: "([^"]+)"#).unwrap());
+static REGEX_TARGET_FOPEN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to open target file: "([^"]+)"#).unwrap());
 static REGEX_ENVIRON: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: Environment variable (\w+)="([^"]+)" is invalid!"#).unwrap());
 
 #[cfg(unix)]
@@ -66,6 +78,8 @@ static REGEX_ABORTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)\bAbor
 static REGEX_FILE_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Input file is a directory: "([^"]+)""#).unwrap());
 #[cfg(unix)]
 static REGEX_CHECK_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Checksum file is a directory: "([^"]+)""#).unwrap());
+#[cfg(unix)]
+static REGEX_TARGET_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Target file is a directory: "([^"]+)"#).unwrap());
 
 // ---------------------------------------------------------------------------
 // Randomness
@@ -250,6 +264,14 @@ fn digest_eq(hexstr_1: &str, hexstr_2: &str) -> bool {
 
     false /* mismatch! */
 }
+
+#[cfg(all(target_family = "unix", target_os = "linux"))]
+fn drop_capability(capability: i32) {
+    unsafe { libc::prctl(libc::PR_CAPBSET_DROP, capability as libc::c_long) };
+}
+
+#[cfg(all(target_family = "unix", not(target_os = "linux")))]
+fn drop_capability(_capability: i32) {}
 
 // ---------------------------------------------------------------------------
 // Test functions
@@ -1005,13 +1027,13 @@ fn test_invalid_args_4b() {
 #[test]
 fn test_file_error_1a() {
     let output = run_binary([OsStr::new(FILE_PATH)], false, true);
-    assert!(REGEX_FILE_FOPEN.is_match(&output))
+    assert!(REGEX_FILE_NOENT.is_match(&output))
 }
 
 #[test]
 fn test_file_error_1b() {
     let output = run_binary([OsStr::new("--multi-threading"), OsStr::new(FILE_PATH)], false, true);
-    assert!(REGEX_FILE_FOPEN.is_match(&output))
+    assert!(REGEX_FILE_NOENT.is_match(&output))
 }
 
 #[test]
@@ -1032,16 +1054,38 @@ fn test_file_error_2b() {
     assert!(REGEX_FILE_ISDIR.is_match(&output));
 }
 
+#[cfg(unix)]
+#[test]
+fn test_file_error_3a() {
+    drop_capability(CAP_DAC_OVERRIDE);
+    let input_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
+    File::create(&input_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
+    set_permissions(&input_file, Permissions::from_mode(0u32)).unwrap();
+    let output = run_binary([input_file.as_os_str()], false, true);
+    assert!(REGEX_FILE_FOPEN.is_match(&output));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_file_error_3b() {
+    drop_capability(CAP_DAC_OVERRIDE);
+    let input_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
+    File::create(&input_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
+    set_permissions(&input_file, Permissions::from_mode(0u32)).unwrap();
+    let output = run_binary([OsStr::new("--multi-threading"), input_file.as_os_str()], false, true);
+    assert!(REGEX_FILE_FOPEN.is_match(&output));
+}
+
 #[test]
 fn test_check_error_1a() {
     let output = run_binary([OsStr::new("--check"), OsStr::new(FILE_PATH)], false, true);
-    assert!(REGEX_CHECK_FOPEN.is_match(&output))
+    assert!(REGEX_CHECK_NOENT.is_match(&output))
 }
 
 #[test]
 fn test_check_error_1b() {
     let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), OsStr::new(FILE_PATH)], false, true);
-    assert!(REGEX_CHECK_FOPEN.is_match(&output))
+    assert!(REGEX_CHECK_NOENT.is_match(&output))
 }
 
 #[test]
@@ -1064,16 +1108,104 @@ fn test_check_error_2b() {
 
 #[test]
 fn test_check_error_3a() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("text").join("alice29.txt");
-    let output = run_binary([OsStr::new("--check"), path.as_os_str()], false, true);
+    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
+    File::create(&check_file).unwrap().write_all(b"invalidchecksumfile\n").unwrap();
+    let output = run_binary([OsStr::new("--check"), check_file.as_os_str()], false, true);
     assert!(REGEX_MALFORMED.is_match(&output))
 }
 
 #[test]
 fn test_check_error_3b() {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("text").join("alice29.txt");
-    let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), path.as_os_str()], false, true);
+    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
+    File::create(&check_file).unwrap().write_all(b"invalidchecksumfile\n").unwrap();
+    let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), check_file.as_os_str()], false, true);
     assert!(REGEX_MALFORMED.is_match(&output))
+}
+
+#[test]
+fn test_check_error_4a() {
+    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
+    File::create(&check_file).unwrap().write_all(b"00000000 this-file-does-not-exist\n").unwrap();
+    let output = run_binary([OsStr::new("--check"), check_file.as_os_str()], false, true);
+    assert!(REGEX_TARGET_NOENT.is_match(&output))
+}
+
+#[test]
+fn test_check_error_4b() {
+    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
+    File::create(&check_file).unwrap().write_all(b"00000000 this-file-does-not-exist\n").unwrap();
+    let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), check_file.as_os_str()], false, true);
+    assert!(REGEX_TARGET_NOENT.is_match(&output))
+}
+
+#[test]
+fn test_check_error_5a() {
+    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
+    File::create(&check_file).unwrap().write_all(format!("00000000 {}\n", DIRECTORY_PATH).as_bytes()).unwrap();
+    let output = run_binary([OsStr::new("--check"), check_file.as_os_str()], false, true);
+    #[cfg(windows)]
+    assert!(REGEX_TARGET_FOPEN.is_match(&output));
+    #[cfg(unix)]
+    assert!(REGEX_TARGET_ISDIR.is_match(&output));
+}
+
+#[test]
+fn test_check_error_5b() {
+    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
+    File::create(&check_file).unwrap().write_all(format!("00000000 {}\n", DIRECTORY_PATH).as_bytes()).unwrap();
+    let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), check_file.as_os_str()], false, true);
+    #[cfg(windows)]
+    assert!(REGEX_TARGET_FOPEN.is_match(&output));
+    #[cfg(unix)]
+    assert!(REGEX_TARGET_ISDIR.is_match(&output));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_check_error_6a() {
+    drop_capability(CAP_DAC_OVERRIDE);
+    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
+    File::create(&check_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
+    set_permissions(&check_file, Permissions::from_mode(0u32)).unwrap();
+    let output = run_binary([OsStr::new("--check"), check_file.as_os_str()], false, true);
+    assert!(REGEX_CHECK_FOPEN.is_match(&output))
+}
+
+#[cfg(unix)]
+#[test]
+fn test_check_error_6b() {
+    drop_capability(CAP_DAC_OVERRIDE);
+    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
+    File::create(&check_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
+    set_permissions(&check_file, Permissions::from_mode(0u32)).unwrap();
+    let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), check_file.as_os_str()], false, true);
+    assert!(REGEX_CHECK_FOPEN.is_match(&output))
+}
+
+#[cfg(unix)]
+#[test]
+fn test_check_error_7a() {
+    drop_capability(CAP_DAC_OVERRIDE);
+    let target_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
+    File::create(&target_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
+    set_permissions(&target_file, Permissions::from_mode(0u32)).unwrap();
+    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
+    File::create(&check_file).unwrap().write_all(format!("00000000 {}\n", target_file.as_os_str().to_string_lossy()).as_bytes()).unwrap();
+    let output = run_binary([OsStr::new("--check"), check_file.as_os_str()], false, true);
+    assert!(REGEX_TARGET_FOPEN.is_match(&output));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_check_error_7b() {
+    drop_capability(CAP_DAC_OVERRIDE);
+    let target_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
+    File::create(&target_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
+    set_permissions(&target_file, Permissions::from_mode(0u32)).unwrap();
+    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
+    File::create(&check_file).unwrap().write_all(format!("00000000 {}\n", target_file.as_os_str().to_string_lossy()).as_bytes()).unwrap();
+    let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), check_file.as_os_str()], false, true);
+    assert!(REGEX_TARGET_FOPEN.is_match(&output));
 }
 
 #[test]

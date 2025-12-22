@@ -25,7 +25,7 @@ use crate::{
     common::{get_capacity, increment, Aborted, Digest, Flag, TinyVecEx},
     digest::{compute_digest, Error as DigestError},
     environment::Env,
-    io::{DataSource, STDIN_NAME},
+    io::{DataSource, Error as IoError, STDIN_NAME},
     print_error,
     thread_pool::{detect_thread_count, Cancelled, TaskResult, ThreadPool},
 };
@@ -38,6 +38,7 @@ use crate::{
 #[derive(Debug)]
 #[allow(dead_code)]
 enum Error {
+    NotFound(PathBuf),
     WalkOpen(PathBuf),
     WalkRead(PathBuf),
     SrcIsDir(PathBuf),
@@ -163,6 +164,7 @@ fn print_result(output: &mut impl Write, digest_result: &DigestResult, args: &Ar
         Ok(digest) => print_digest(output, digest.1.as_os_str(), &digest.0, args).is_ok(),
         Err(error) => {
             match error {
+                Error::NotFound(path) => print_error!(args, "Input file not found: {:?}", path),
                 Error::FileOpen(path) => print_error!(args, "Failed to open input file: {:?}", path),
                 Error::FileRead(path) => print_error!(args, "Failed to read input file: {:?}", path),
                 Error::SrcIsDir(path) => print_error!(args, "Input file is a directory: {:?}", path),
@@ -205,7 +207,11 @@ fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt
                 }
             }
         }
-        Err(_) => Ok(Err(Error::FileOpen(file_name))),
+        Err(error) => match error {
+            IoError::FileNotFound => Ok(Err(Error::NotFound(file_name))),
+            IoError::IsADirectory => Ok(Err(Error::SrcIsDir(file_name))),
+            _ => Ok(Err(Error::FileOpen(file_name))),
+        },
     }
 }
 

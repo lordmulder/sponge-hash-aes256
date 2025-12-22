@@ -36,5 +36,6 @@ with-logging = ["sponge-hash-aes256/tracing", "dep:simple_logger"]
 with-mimalloc = ["dep:mimalloc"]
 
 [dev-dependencies]
+libc = { version = "0.2.178", default-features = false }
 nix = { version = "0.30.1", default-features = false }
 regex = { version = "1.12.2", default-features = false, features = ["unicode"] }

@@ -16,8 +16,10 @@ use std::{
 
 #[derive(Debug)]
 pub enum Error {
-    Lock,
-    Open,
+    FileNotFound,
+    FailedToLock,
+    AccessDenied,
+    IsADirectory,
 }
 
 // ---------------------------------------------------------------------------
@@ -45,7 +47,7 @@ impl DataSource<'_> {
     pub fn from_stdin() -> Result<Self, Error> {
         match STDIN_MUTEX.try_lock() {
             Ok(guard) => Ok(Self::Stream((guard, stdin().lock()))),
-            Err(_) => Err(Error::Lock),
+            Err(_) => Err(Error::FailedToLock),
         }
     }
 
@@ -53,7 +55,11 @@ impl DataSource<'_> {
         if !STDIN_NAME.eq(path.as_ref()) {
             match File::open(path) {
                 Ok(file) => Ok(Self::File(file)),
-                Err(_) => Err(Error::Open),
+                Err(io_error) => match io_error.kind() {
+                    std::io::ErrorKind::NotFound => Err(Error::FileNotFound),
+                    std::io::ErrorKind::IsADirectory => Err(Error::IsADirectory),
+                    _ => Err(Error::AccessDenied),
+                },
             }
         } else {
             Self::from_stdin()
