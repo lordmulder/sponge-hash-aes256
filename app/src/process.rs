@@ -41,7 +41,7 @@ enum Error {
     NotFound(PathBuf),
     WalkOpen(PathBuf),
     WalkRead(PathBuf),
-    SrcIsDir(PathBuf),
+    ObjIsDir(PathBuf),
     FileOpen(PathBuf),
     FileRead(PathBuf),
 }
@@ -167,7 +167,7 @@ fn print_result(output: &mut impl Write, digest_result: &DigestResult, args: &Ar
                 Error::NotFound(path) => print_error!(args, "Input file not found: {:?}", path),
                 Error::FileOpen(path) => print_error!(args, "Failed to open input file: {:?}", path),
                 Error::FileRead(path) => print_error!(args, "Failed to read input file: {:?}", path),
-                Error::SrcIsDir(path) => print_error!(args, "Input file is a directory: {:?}", path),
+                Error::ObjIsDir(path) => print_error!(args, "Input file is a directory: {:?}", path),
                 Error::WalkOpen(path) => print_error!(args, "Failed to open directory: {:?}", path),
                 Error::WalkRead(path) => print_error!(args, "Failed to read directory: {:?}", path),
             }
@@ -196,20 +196,16 @@ type DigestResult = Result<(Digest, PathBuf), Error>;
 fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt: &Flag) -> Result<DigestResult, Cancelled> {
     match DataSource::from_path(&file_name) {
         Ok(mut source) => {
-            if source.is_directory() {
-                Ok(Err(Error::SrcIsDir(file_name)))
-            } else {
-                let mut digest = TinyVec::with_length(digest_size);
-                match compute_digest(&mut source, digest.as_mut_slice(), args, halt) {
-                    Ok(_) => Ok(Ok((digest, file_name))),
-                    Err(DigestError::IoError) => Ok(Err(Error::FileRead(file_name))),
-                    Err(DigestError::Cancelled) => Err(Cancelled),
-                }
+            let mut digest = TinyVec::with_length(digest_size);
+            match compute_digest(&mut source, digest.as_mut_slice(), args, halt) {
+                Ok(_) => Ok(Ok((digest, file_name))),
+                Err(DigestError::IoError) => Ok(Err(Error::FileRead(file_name))),
+                Err(DigestError::Cancelled) => Err(Cancelled),
             }
         }
         Err(error) => match error {
             IoError::FileNotFound => Ok(Err(Error::NotFound(file_name))),
-            IoError::IsADirectory => Ok(Err(Error::SrcIsDir(file_name))),
+            IoError::IsADirectory => Ok(Err(Error::ObjIsDir(file_name))),
             _ => Ok(Err(Error::FileOpen(file_name))),
         },
     }

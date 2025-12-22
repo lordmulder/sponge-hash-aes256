@@ -54,7 +54,13 @@ impl DataSource<'_> {
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
         if !STDIN_NAME.eq(path.as_ref()) {
             match File::open(path) {
-                Ok(file) => Ok(Self::File(file)),
+                Ok(file) => {
+                    if !Self::is_directory(&file) {
+                        Ok(Self::File(file))
+                    } else {
+                        Err(Error::IsADirectory)
+                    }
+                }
                 Err(io_error) => match io_error.kind() {
                     std::io::ErrorKind::NotFound => Err(Error::FileNotFound),
                     std::io::ErrorKind::IsADirectory => Err(Error::IsADirectory),
@@ -66,11 +72,9 @@ impl DataSource<'_> {
         }
     }
 
-    pub fn is_directory(&self) -> bool {
-        match self {
-            Self::File(file) => file.metadata().is_ok_and(|meta| meta.is_dir()),
-            Self::Stream(_) => false,
-        }
+    #[inline]
+    fn is_directory(file: &File) -> bool {
+        file.metadata().is_ok_and(|meta| meta.is_dir())
     }
 }
 
