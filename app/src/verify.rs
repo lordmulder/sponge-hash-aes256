@@ -31,18 +31,30 @@ use crate::{
 
 /// Error type for processing file tasks
 #[derive(Debug)]
-#[allow(dead_code)]
 enum Error {
-    ChksumNotFound(PathBuf),
-    ChksumObjIsDir(PathBuf),
-    ChksumFileOpen(PathBuf),
-    ChksumFileRead(PathBuf),
-    ChksumStdnOpen,
-    ChksumParseErr(PathBuf, usize),
-    TargetNotFound(PathBuf),
-    TargetObjIsDir(PathBuf),
-    TargetFileOpen(PathBuf),
-    TargetFileRead(PathBuf),
+    ChkSumFile(ErrorKind),
+    TargetFile(ErrorKind),
+}
+
+/// Error category that describes the error in greater detail
+#[derive(Debug)]
+enum ErrorKind {
+    FileOpen(PathBuf),
+    FileRead(PathBuf),
+    NotFound(PathBuf),
+    ObjIsDir(PathBuf),
+    ParseErr(PathBuf, usize),
+}
+
+impl ErrorKind {
+    #[inline]
+    fn from_io_error(error: IoError, path: PathBuf) -> Self {
+        match error {
+            IoError::AccessDenied => ErrorKind::FileOpen(path),
+            IoError::FileNotFound => ErrorKind::NotFound(path),
+            IoError::IsADirectory => ErrorKind::ObjIsDir(path),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -97,16 +109,20 @@ fn print_result(output: &mut impl Write, verify_result: &VerifyResult, args: &Ar
         Ok((is_match, path)) => print_match(output, *is_match, path, args).is_ok(),
         Err(error) => {
             match error {
-                Error::ChksumNotFound(path) => print_error!(args, "Checksum file not found: {:?}", path),
-                Error::ChksumFileOpen(path) => print_error!(args, "Failed to open checksum file: {:?}", path),
-                Error::ChksumFileRead(path) => print_error!(args, "Failed to read checksum file: {:?}", path),
-                Error::ChksumParseErr(path, line) => print_error!(args, "Malformed checksum file: {:?} [line #{}]", path, line),
-                Error::ChksumObjIsDir(path) => print_error!(args, "Checksum file is a directory: {:?}", path),
-                Error::ChksumStdnOpen => print_error!(args, "Failed to acquire the standard input stream for reading!"),
-                Error::TargetNotFound(path) => print_error!(args, "Target file not found: {:?}", path),
-                Error::TargetFileOpen(path) => print_error!(args, "Failed to open target file: {:?}", path),
-                Error::TargetFileRead(path) => print_error!(args, "Failed to read target file: {:?}", path),
-                Error::TargetObjIsDir(path) => print_error!(args, "Target file is a directory: {:?}", path),
+                Error::ChkSumFile(kind) => match kind {
+                    ErrorKind::FileOpen(path) => print_error!(args, "Failed to open checksum file: {:?}", path),
+                    ErrorKind::FileRead(path) => print_error!(args, "Failed to read checksum file: {:?}", path),
+                    ErrorKind::NotFound(path) => print_error!(args, "Checksum file not found: {:?}", path),
+                    ErrorKind::ObjIsDir(path) => print_error!(args, "Checksum file is a directory: {:?}", path),
+                    ErrorKind::ParseErr(path, line) => print_error!(args, "Malformed checksum file: {:?} [line #{}]", path, line),
+                },
+                Error::TargetFile(kind) => match kind {
+                    ErrorKind::FileOpen(path) => print_error!(args, "Failed to open target file: {:?}", path),
+                    ErrorKind::FileRead(path) => print_error!(args, "Failed to read target file: {:?}", path),
+                    ErrorKind::NotFound(path) => print_error!(args, "Target file not found: {:?}", path),
+                    ErrorKind::ObjIsDir(path) => print_error!(args, "Target file is a directory: {:?}", path),
+                    ErrorKind::ParseErr(_path, _line) => unreachable!(),
+                },
             }
             true
         }
@@ -114,6 +130,7 @@ fn print_result(output: &mut impl Write, verify_result: &VerifyResult, args: &Ar
 }
 
 /// Print the summary
+#[inline]
 fn print_summary(chck_errors: u64, file_errors: u64, args: &Args) {
     if (chck_errors > u64::MIN) || (file_errors > u64::MIN) {
         if args.keep_going {
@@ -147,14 +164,10 @@ fn verify_file(file_name: PathBuf, digest_expected: &Digest, args: &Args, halt: 
     match DataSource::from_path(&file_name) {
         Ok(mut file) => match verify_checksum(&mut file, digest_expected.as_slice(), args, halt) {
             Ok(is_match) => Ok(Ok((is_match, file_name))),
-            Err(DigestError::IoError) => Ok(Err(Error::TargetFileRead(file_name))),
+            Err(DigestError::IoError) => Ok(Err(Error::TargetFile(ErrorKind::FileRead(file_name)))),
             Err(DigestError::Cancelled) => Err(Cancelled),
         },
-        Err(error) => match error {
-            IoError::FileNotFound => Ok(Err(Error::TargetNotFound(file_name))),
-            IoError::IsADirectory => Ok(Err(Error::TargetObjIsDir(file_name))),
-            _ => Ok(Err(Error::TargetFileOpen(file_name))),
-        },
+        Err(error) => Ok(Err(Error::TargetFile(ErrorKind::from_io_error(error, file_name)))),
     }
 }
 
@@ -214,7 +227,7 @@ fn read_checksum_data(checksum_tx: &Sender<ReadResult>, input: &mut dyn Read, in
                     if let Ok((file_name, digest)) = parse_checksum_line(line_trimmed) {
                         checksum_tx.send(Ok((digest, PathBuf::from(file_name))))?;
                     } else {
-                        checksum_tx.send(Err(Error::ChksumParseErr(input_name.clone(), line_no + 1usize)))?;
+                        checksum_tx.send(Err(Error::ChkSumFile(ErrorKind::ParseErr(input_name.clone(), line_no + 1usize))))?;
                         if !args.keep_going {
                             return Ok(false);
                         }
@@ -222,7 +235,7 @@ fn read_checksum_data(checksum_tx: &Sender<ReadResult>, input: &mut dyn Read, in
                 };
             }
             Err(_) => {
-                checksum_tx.send(Err(Error::ChksumFileRead(input_name)))?;
+                checksum_tx.send(Err(Error::ChkSumFile(ErrorKind::FileRead(input_name))))?;
                 return Ok(false);
             }
         }
@@ -236,11 +249,7 @@ fn read_checksum_file(checksum_tx: &Sender<ReadResult>, file_name: PathBuf, args
     match DataSource::from_path(&file_name) {
         Ok(mut file) => read_checksum_data(checksum_tx, &mut file, file_name, args, halt),
         Err(error) => {
-            match error {
-                IoError::FileNotFound => checksum_tx.send(Err(Error::ChksumNotFound(file_name)))?,
-                IoError::IsADirectory => checksum_tx.send(Err(Error::ChksumObjIsDir(file_name)))?,
-                _ => checksum_tx.send(Err(Error::ChksumFileOpen(file_name)))?,
-            };
+            checksum_tx.send(Err(Error::ChkSumFile(ErrorKind::from_io_error(error, file_name))))?;
             Ok(false)
         }
     }
@@ -256,12 +265,8 @@ fn reader_thread(checksum_tx: &Sender<ReadResult>, args: &Args, halt: &Flag) -> 
             }
         }
     } else {
-        match DataSource::from_stdin() {
-            Ok(mut stdin_stream) => {
-                read_checksum_data(checksum_tx, &mut stdin_stream, PathBuf::from(&*STDIN_NAME), args, halt)?;
-            }
-            Err(_) => checksum_tx.send(Err(Error::ChksumStdnOpen))?,
-        }
+        let mut stdin_stream = DataSource::from_stdin();
+        read_checksum_data(checksum_tx, &mut stdin_stream, PathBuf::from(&*STDIN_NAME), args, halt)?;
     }
 
     Ok(())

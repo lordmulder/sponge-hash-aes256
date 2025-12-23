@@ -36,7 +36,6 @@ use crate::{
 
 /// Error type for processing file tasks
 #[derive(Debug)]
-#[allow(dead_code)]
 enum Error {
     NotFound(PathBuf),
     WalkOpen(PathBuf),
@@ -44,6 +43,17 @@ enum Error {
     ObjIsDir(PathBuf),
     FileOpen(PathBuf),
     FileRead(PathBuf),
+}
+
+impl Error {
+    #[inline]
+    fn from_io_error(error: IoError, path: PathBuf) -> Self {
+        match error {
+            IoError::AccessDenied => Error::FileOpen(path),
+            IoError::FileNotFound => Error::NotFound(path),
+            IoError::IsADirectory => Error::ObjIsDir(path),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -164,9 +174,9 @@ fn print_result(output: &mut impl Write, digest_result: &DigestResult, args: &Ar
         Ok(digest) => print_digest(output, digest.1.as_os_str(), &digest.0, args).is_ok(),
         Err(error) => {
             match error {
-                Error::NotFound(path) => print_error!(args, "Input file not found: {:?}", path),
                 Error::FileOpen(path) => print_error!(args, "Failed to open input file: {:?}", path),
                 Error::FileRead(path) => print_error!(args, "Failed to read input file: {:?}", path),
+                Error::NotFound(path) => print_error!(args, "Input file not found: {:?}", path),
                 Error::ObjIsDir(path) => print_error!(args, "Input file is a directory: {:?}", path),
                 Error::WalkOpen(path) => print_error!(args, "Failed to open directory: {:?}", path),
                 Error::WalkRead(path) => print_error!(args, "Failed to read directory: {:?}", path),
@@ -177,6 +187,7 @@ fn print_result(output: &mut impl Write, digest_result: &DigestResult, args: &Ar
 }
 
 /// Print the summary
+#[inline]
 fn print_summary(file_errors: u64, args: &Args) {
     if file_errors > u64::MIN {
         if args.keep_going {
@@ -203,11 +214,7 @@ fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt
                 Err(DigestError::Cancelled) => Err(Cancelled),
             }
         }
-        Err(error) => match error {
-            IoError::FileNotFound => Ok(Err(Error::NotFound(file_name))),
-            IoError::IsADirectory => Ok(Err(Error::ObjIsDir(file_name))),
-            _ => Ok(Err(Error::FileOpen(file_name))),
-        },
+        Err(error) => Ok(Err(Error::from_io_error(error, file_name))),
     }
 }
 
@@ -433,14 +440,7 @@ fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc
 
 /// Process data from 'stdin' stream
 fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args>, halt: Arc<Flag>) -> Result<bool, Cancelled> {
-    let mut stdin = match DataSource::from_stdin() {
-        Ok(stream) => stream,
-        Err(_) => {
-            print_error!(args, "Failed to acquire the standard input stream for reading!");
-            return Ok(false);
-        }
-    };
-
+    let mut stdin = DataSource::from_stdin();
     let mut digest = TinyVec::with_length(digest_size);
 
     match compute_digest(&mut stdin, digest.as_mut_slice(), &args, &halt) {
