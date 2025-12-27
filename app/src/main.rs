@@ -28,6 +28,7 @@
 //!   -c, --check            Read and verify checksums from the provided input file(s)
 //!   -d, --dirs             Enable processing of directories as arguments
 //!   -r, --recursive        Recursively process the provided directories (implies -d)
+//!   -a, --all              Iterate all kinds of files, instead of just regular files
 //!   -k, --keep-going       Continue processing even if errors are encountered
 //!   -l, --length <LENGTH>  Digest output size, in bits (default: 256, maximum: 2048)
 //!   -i, --info <INFO>      Include additional context information

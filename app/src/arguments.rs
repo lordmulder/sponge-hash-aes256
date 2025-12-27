@@ -66,7 +66,7 @@ pub struct Args {
     pub text: bool,
 
     /// Read and verify checksums from the provided input file(s)
-    #[arg(short, long, group = "mtx_dirs", group = "mtx_recursive", group = "mtx_length", group = "mtx_plain", group = "mtx_selftest")]
+    #[arg(short, long, group = "mtx_dirs", group = "mtx_recursive", group = "mtx_all", group = "mtx_length", group = "mtx_plain", group = "mtx_selftest")]
     pub check: bool,
 
     /// Enable processing of directories as arguments
@@ -76,6 +76,10 @@ pub struct Args {
     /// Recursively process the provided directories (implies -d)
     #[arg(short, long, group = "mtx_recursive")]
     pub recursive: bool,
+
+    /// Iterate all kinds of files, instead of just regular files
+    #[arg(short, long, group = "mtx_all")]
+    pub all: bool,
 
     /// Continue processing even if errors are encountered.
     #[arg(short, long)]

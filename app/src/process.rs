@@ -70,7 +70,7 @@ mod file_id {
 
     /// Get the unique file id
     #[inline(always)]
-    pub fn get(meta: &Metadata) -> Option<FileId> {
+    pub fn get(meta: Metadata) -> Option<FileId> {
         Some((meta.dev(), meta.ino()))
     }
 }
@@ -80,7 +80,7 @@ mod file_id {
     use super::*;
 
     #[inline(always)]
-    pub fn get(_: &Metadata) -> Option<FileId> {
+    pub fn get(_: Metadata) -> Option<FileId> {
         None
     }
 }
@@ -89,20 +89,14 @@ mod file_id {
 // Utility functions
 // ---------------------------------------------------------------------------
 
-/// Check if a directory entry is a directory (or a symlink to a directory)
+/// Get file type from a directory entry (will resolve symlinks, if necessary)
 #[inline]
-fn is_directory(dir_entry: &DirEntry) -> Option<Metadata> {
+fn get_metadata(dir_entry: &DirEntry) -> Option<Metadata> {
     match dir_entry.metadata() {
-        Ok(meta_data) => {
-            let file_type = meta_data.file_type();
-            match file_type.is_dir() {
-                false => match file_type.is_symlink() {
-                    true => fs::metadata(dir_entry.path()).ok().filter(|value| value.is_dir()),
-                    false => None,
-                },
-                true => Some(meta_data),
-            }
-        }
+        Ok(meta_data) => match meta_data.is_symlink() {
+            false => Some(meta_data),
+            true => fs::metadata(dir_entry.path()).ok(),
+        },
         Err(_) => None,
     }
 }
@@ -259,10 +253,11 @@ fn iterate_directory(path_tx: &Sender<PathResult>, dir_name: PathBuf, visited: &
         match element {
             Ok(dir_entry) => {
                 check_cancelled!(halt);
-                if let Some(meta_data) = is_directory(&dir_entry) {
+                let meta_data = get_metadata(&dir_entry);
+                if meta_data.as_ref().is_some_and(|meta| meta.is_dir()) {
                     if args.recursive {
-                        let file_id = file_id::get(&meta_data);
-                        if file_id.is_none_or(|id| !visited.contains(&id)) {
+                        let file_id = file_id::get(meta_data.unwrap());
+                        if file_id.is_none_or(|uid| !visited.contains(&uid)) {
                             if bfs {
                                 dir_queue.push((file_id, dir_entry.path()));
                             } else if !(iterate_directory(path_tx, dir_entry.path(), &append(visited, file_id), bfs, args, halt)? || args.keep_going) {
@@ -270,7 +265,7 @@ fn iterate_directory(path_tx: &Sender<PathResult>, dir_name: PathBuf, visited: &
                             }
                         }
                     }
-                } else {
+                } else if args.all || meta_data.is_none_or(|meta| meta.is_file()) {
                     path_tx.send(Ok(dir_entry.path()))?;
                 }
             }
@@ -299,7 +294,7 @@ fn iterate_thread(path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &F
         check_cancelled!(halt);
         let directory_info = if handle_directories { fs::metadata(&file_name).ok().filter(|meta| meta.is_dir()) } else { None };
         if let Some(meta_data) = directory_info {
-            let visited = file_id::get(&meta_data).map_or_else(FileIdSet::new, |dir_id| iter::once(dir_id).collect());
+            let visited = file_id::get(meta_data).map_or_else(FileIdSet::new, |dir_id| iter::once(dir_id).collect());
             if !(iterate_directory(path_tx, file_name, &visited, bfs, args, halt)? || args.keep_going) {
                 break;
             }
