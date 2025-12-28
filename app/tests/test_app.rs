@@ -926,6 +926,24 @@ fn test_data_4e() {
     do_test_data(EXPECTED[44usize], STDIN_DATA, Some("thingamabob"), 4usize);
 }
 
+#[cfg(unix)]
+#[test]
+fn test_data_5a() {
+    let output = run_binary([OsStr::new("/dev/stdin")], true, false);
+    assert!(output.contains("/dev/stdin"));
+}
+
+#[cfg(windows)]
+#[test]
+fn test_data_5b() {
+    let output = run_binary([OsStr::new("CONIN$")], true, false);
+    assert!(output.contains("CONIN$"));
+}
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Verify tests
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 #[test]
 fn test_verify_1a() {
     do_verify_files(false, 3usize, false);

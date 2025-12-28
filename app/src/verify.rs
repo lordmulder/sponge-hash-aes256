@@ -200,11 +200,11 @@ struct Malformed;
 
 /// Parse a single line from checksum file
 #[allow(clippy::collapsible_if)]
-fn parse_checksum_line(line: &str) -> Result<(&OsStr, Digest), Malformed> {
+fn parse_checksum_line(line: &str, expected_len: Option<usize>) -> Result<(&OsStr, Digest), Malformed> {
     if let Some((digest_hex, input_name)) = line.split_once(|c: char| char::is_ascii_whitespace(&c)) {
         if (!digest_hex.is_empty()) && (!input_name.is_empty()) {
             let (length, remainder) = digest_hex.len().div_rem(&2usize);
-            if (length > usize::MIN) && (length <= MAX_DIGEST_SIZE) && (remainder == usize::MIN) {
+            if (length > usize::MIN) && (length <= MAX_DIGEST_SIZE) && (remainder == usize::MIN) && expected_len.is_none_or(|val| val == length) {
                 let mut digest = TinyVec::with_length(length);
                 if decode_to_slice(digest_hex, digest.as_mut_slice()).is_ok() {
                     return Ok((OsStr::new(input_name), digest));
@@ -218,13 +218,15 @@ fn parse_checksum_line(line: &str) -> Result<(&OsStr, Digest), Malformed> {
 
 /// Read all checksums from source
 fn read_checksum_data(checksum_tx: &Sender<ReadResult>, input: &mut dyn Read, input_name: PathBuf, args: &Args, halt: &Flag) -> Result<bool, Cancelled> {
+    let mut expected_len = None;
     for (line_no, line) in BufReader::new(input).lines().enumerate() {
         check_cancelled!(halt);
         match line {
             Ok(line) => {
                 let line_trimmed = line.trim_start();
                 if !line_trimmed.is_empty() {
-                    if let Ok((file_name, digest)) = parse_checksum_line(line_trimmed) {
+                    if let Ok((file_name, digest)) = parse_checksum_line(line_trimmed, expected_len) {
+                        expected_len.get_or_insert_with(|| digest.len());
                         checksum_tx.send(Ok((digest, PathBuf::from(file_name))))?;
                     } else {
                         checksum_tx.send(Err(Error::ChkSumFile(ErrorKind::ParseErr(input_name.clone(), line_no + 1usize))))?;

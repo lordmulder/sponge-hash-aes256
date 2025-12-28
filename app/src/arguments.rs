@@ -12,6 +12,7 @@ use rustc_version_const::rustc_version_full;
 use sponge_hash_aes256::version;
 use std::{
     env::consts::{ARCH, OS},
+    iter::Peekable,
     num::NonZeroUsize,
     path::PathBuf,
     process::ExitCode,
@@ -117,7 +118,7 @@ pub struct Args {
     pub flush: bool,
 
     /// Run the built-in self-test (BIST)
-    #[arg(short = 'T', long)]
+    #[arg(short = 'T', long, conflicts_with = "check")]
     pub self_test: bool,
 
     /// Files to be processed
@@ -136,7 +137,7 @@ impl Args {
 }
 
 // ---------------------------------------------------------------------------
-// Error handling
+// Helper functions
 // ---------------------------------------------------------------------------
 
 macro_rules! print_arg_error {
@@ -165,6 +166,27 @@ fn context_vec(error: &Error, kind: ContextKind) -> &str {
     }
 }
 
+#[inline]
+fn join_args<'a, I: Iterator<Item = &'a str>>(mut arg_iter: Peekable<I>) -> String {
+    if let Some(token) = arg_iter.next() {
+        let mut result_buffer = format!("{:?}", token);
+        while let Some(token) = arg_iter.next() {
+            if arg_iter.peek().is_none() {
+                result_buffer.push_str(&format!(" or {:?}", token));
+            } else {
+                result_buffer.push_str(&format!(", {:?}", token));
+            }
+        }
+        result_buffer
+    } else {
+        String::new()
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Error handling
+// ---------------------------------------------------------------------------
+
 /// Print argument parser error
 fn print_arg_error(error: Error) -> ExitCode {
     match error.kind() {
@@ -173,33 +195,33 @@ fn print_arg_error(error: Error) -> ExitCode {
             ExitCode::SUCCESS
         }
         ErrorKind::UnknownArgument => {
-            print_arg_error!("Unknown option \"{}\" encountered!", context_str(&error, ContextKind::InvalidArg));
+            print_arg_error!("Unknown option {:?} encountered!", context_str(&error, ContextKind::InvalidArg));
             ExitCode::FAILURE
         }
         ErrorKind::InvalidValue | ErrorKind::ValueValidation => {
             let (invalid_arg, invalid_value) = (context_str(&error, ContextKind::InvalidArg), context_str(&error, ContextKind::InvalidValue));
             if invalid_value.is_empty() {
-                print_arg_error!("The required value for option \"{}\" is missing!", invalid_arg);
+                print_arg_error!("The required value for option {:?} is missing!", invalid_arg);
             } else {
-                print_arg_error!("The given value \"{}\" for option \"{}\" is invalid!", invalid_value, invalid_arg);
+                print_arg_error!("The given value {:?} for option {:?} is invalid!", invalid_value, invalid_arg);
             }
             ExitCode::FAILURE
         }
         ErrorKind::ArgumentConflict => {
             let (invalid_arg, prior_arg) = (context_str(&error, ContextKind::InvalidArg), context_str(&error, ContextKind::PriorArg));
             if prior_arg.is_empty() || (prior_arg == invalid_arg) {
-                print_arg_error!("The option \"{}\" can not be used more than once!", invalid_arg);
+                print_arg_error!("The option {:?} can not be used more than once!", invalid_arg);
             } else {
-                print_arg_error!("The options \"{}\" and \"{}\" are mutually exclusive!", invalid_arg, prior_arg);
+                print_arg_error!("The options {:?} and {:?} are mutually exclusive!", invalid_arg, prior_arg);
             }
             ExitCode::FAILURE
         }
         ErrorKind::MissingRequiredArgument => {
-            let missing_option = context_vec(&error, ContextKind::InvalidArg).trim_start_matches("<").trim_end_matches(">");
-            if !missing_option.contains("|") {
-                print_arg_error!("The required option \"{}\" is missing!", missing_option);
+            let arg_name = context_vec(&error, ContextKind::InvalidArg).trim_start_matches("<").trim_end_matches(">");
+            if !arg_name.contains('|') {
+                print_arg_error!("The required option {:?} is missing!", arg_name);
             } else {
-                print_arg_error!("One of the required options \"{}\" is missing!", missing_option.replace("|", "\" or \""));
+                print_arg_error!("One of the required options {} is missing!", join_args(arg_name.split('|').peekable()));
             }
             ExitCode::FAILURE
         }

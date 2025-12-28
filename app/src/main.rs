@@ -60,7 +60,7 @@
 //!   $ sponge256sum /path/to/*.dat
 //!   ```
 //!
-//! * Perform a recursive scan of an entire directory tree:
+//! * Process all files in a directory, *including* all files found in all subdirectories:
 //!   ```sh
 //!   $ sponge256sum --recursive /path/to/base-dir
 //!   ```
@@ -78,6 +78,35 @@
 //! ## Options
 //!
 //! The following options are available, among others:
+//!
+//! - **Directory processing**
+//!
+//!   The `--dirs` option enables directory processing. This means that for each input file name (path) that resolves to a directory, the program processes all files contained in that directory, but **without** descending into subdirectories.
+//!
+//!   Additionally, the `--recursive` option enables *recursive* directory scanning, behaving identically to the `--dirs` option except that it also traverses subdirectories. The `--recursive` option implies the `--dirs` option.
+//!
+//!   Furthermore, the `--all` option can be combined with the `--dirs` or `--recursive` options to process **all** files found in a directory. By default, the program will only process “regular” files, *skipping* special files like FIFOs or sockets.
+//!
+//! - **Checksum verification**
+//!
+//!   The `--check` option runs the program in verification mode. This means that a list of checksums (hash values) is read from each given input file, and those checksums are then verified against the corresponding target files.
+//!
+//!   This mode expects input files to contain one checksum (and its corresponding file path) per line, formatted as follows:
+//!   ```
+//!   <HASH_VALUE_HEX><SPACE><FILE_PATH><EOL>
+//!   ```
+//!
+//!   All checksums (hash values) in a particular checksum file are expected to have the same length, in bits.
+//!
+//!   If the `--info`, `--text` or `--snail` option has been used to calculate the hash values in a checksum file, then the ***same*** `--info`, `--text` or `--snail` parameter(s) **must** be used for the checksum verification again! &#128680;
+//!
+//! - **Multi-threading**
+//!
+//!   The `--multi-threading` option enables [multithreading](https://en.wikipedia.org/wiki/Thread_(computing)) mode, in which multiple files can be processed concurrently.
+//!
+//!   Note that, in this mode, the order in which the files will be processed is ***undefined***. That is because the work will be distributed across multiple “worker” threads and each result is printed as soon as it becomes available.
+//!
+//!   Also note that each file still is processed by a single thread, so this mode is mostly useful when processing ***many*** files.
 //!
 //! - **Output length**
 //!
@@ -112,14 +141,6 @@
 //!   The `--text` option enables “text” mode. In this mode, the input file is read as a *text* file, line by line.
 //!
 //!   Unlike in “binary” mode (the default), platform-specific line endings will be normalized to a single `\n` character.
-//!
-//! - **Multi-threading**
-//!
-//!   The `--multi-threading` option enables [multithreading](https://en.wikipedia.org/wiki/Thread_(computing)) mode, in which multiple files can be processed concurrently.
-//!
-//!   Note that, in this mode, the order in which the files will be processed is ***undefined***.
-//!
-//!   Also note that each file still is processed by a single thread, so this mode is only useful when processing *many* files.
 //!
 //! ## Environment
 //!

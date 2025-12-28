@@ -3,8 +3,7 @@
 // Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
 
 use std::ffi::OsString;
-use std::sync::{LazyLock, Mutex, MutexGuard, TryLockResult};
-use std::thread;
+use std::sync::{LazyLock, Mutex, MutexGuard};
 use std::{
     fs::File,
     io::{stdin, Read, Result as IoResult, StdinLock},
@@ -27,32 +26,10 @@ pub enum Error {
 // ---------------------------------------------------------------------------
 
 #[cfg(target_family = "windows")]
-pub static STDIN_NAME: LazyLock<OsString> = LazyLock::new(|| OsString::from("CON"));
+pub static STDIN_NAME: LazyLock<OsString> = LazyLock::new(|| OsString::from("CONIN$"));
 
 #[cfg(target_family = "unix")]
 pub static STDIN_NAME: LazyLock<OsString> = LazyLock::new(|| OsString::from("/dev/stdin"));
-
-// ---------------------------------------------------------------------------
-// Mutex helper
-// ---------------------------------------------------------------------------
-
-trait MutexEx<T: ?Sized> {
-    fn try_lock_n(&self, retry: usize) -> TryLockResult<MutexGuard<'_, T>>;
-}
-
-impl<T: ?Sized> MutexEx<T> for Mutex<T> {
-    #[inline]
-    fn try_lock_n(&self, retry: usize) -> TryLockResult<MutexGuard<'_, T>> {
-        for _ in 0usize..retry {
-            if let Ok(guard) = self.try_lock() {
-                return Ok(guard);
-            } else {
-                thread::yield_now();
-            }
-        }
-        self.try_lock()
-    }
-}
 
 // ---------------------------------------------------------------------------
 // I/O wrapper
@@ -67,10 +44,8 @@ pub enum DataSource<'a> {
 
 impl DataSource<'_> {
     pub fn from_stdin() -> Self {
-        match STDIN_MUTEX.try_lock_n(128usize) {
-            Ok(guard) => Self::Stream((guard, stdin().lock())),
-            Err(_) => panic!("Failed to lock 'stdin' stream!"),
-        }
+        let guard = STDIN_MUTEX.try_lock().expect("Failed to lock 'stdin' stream!");
+        Self::Stream((guard, stdin().lock()))
     }
 
     pub fn from_path<P: AsRef<Path>>(path: P) -> Result<Self, Error> {
