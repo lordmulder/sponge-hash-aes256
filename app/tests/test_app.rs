@@ -58,7 +58,8 @@ static REGEX_SELFTEST: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Succ
 static REGEX_UNKNOWN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: Unknown option "([^"]+)" encountered!"#).unwrap());
 static REGEX_MUTEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The options "([^"]+)" and "([^"]+)" are mutually exclusive!"#).unwrap());
 static REGEX_MULTIPLE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The option "([^"]+)" can not be used more than once!"#).unwrap());
-static REGEX_MISSING: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The required value for option "([^"]+)" is missing!"#).unwrap());
+static REGEX_MISSING_VAL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The required value for option "([^"]+)" is missing!"#).unwrap());
+static REGEX_MISSING_ARG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: One of the required options "(.+)" is missing!"#).unwrap());
 static REGEX_INVALID: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The given value "([^"]+)" for option "([^"]+)" is invalid!"#).unwrap());
 static REGEX_LEN_DIV: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Error: Digest output size must be divisible by eight!").unwrap());
 static REGEX_LEN_MAX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Error: Digest output size exceeds the allowable maximum!").unwrap());
@@ -982,7 +983,7 @@ fn test_invalid_args_2b() {
 #[test]
 fn test_invalid_args_3a() {
     let output = run_binary([OsStr::new("--length")], false, true);
-    assert!(REGEX_MISSING.is_match(&output))
+    assert!(REGEX_MISSING_VAL.is_match(&output))
 }
 
 #[test]
@@ -1014,6 +1015,12 @@ fn test_invalid_args_4b() {
     let long_info = str::from_utf8(&[0x41u8; 256usize]).unwrap();
     let output = run_binary([OsStr::new("--info"), OsStr::new(long_info)], false, true);
     assert!(REGEX_INFO.is_match(&output))
+}
+
+#[test]
+fn test_invalid_args_5() {
+    let output = run_binary([OsStr::new("--all")], false, true);
+    assert!(REGEX_MISSING_ARG.is_match(&output))
 }
 
 #[test]

@@ -5,7 +5,7 @@
 use build_time::build_time_utc;
 use clap::{
     error::{ContextKind, ContextValue, Error, ErrorKind},
-    ArgAction, Parser,
+    ArgAction, ArgGroup, Parser,
 };
 use const_format::formatcp;
 use rustc_version_const::rustc_version_full;
@@ -54,31 +54,30 @@ const HELP_TEXT: &str = "If no input files are specified, reads input data from 
 #[command(before_help = HEADER_LINE)]
 #[command(long_version = LONG_VERSION)]
 #[command(version = VERSION)]
+#[command(group(ArgGroup::new("walk").args(["dirs", "recursive"]).multiple(true)))]
 pub struct Args {
     /// Read the input file(s) in binary mode, i.e., default mode
-    #[arg(short, long)]
-    #[arg(group = "input_mode")]
+    #[arg(short, long, conflicts_with = "text")]
     pub binary: bool,
 
     /// Read the input file(s) in text mode
-    #[arg(short, long)]
-    #[arg(group = "input_mode")]
+    #[arg(short, long, conflicts_with = "binary")]
     pub text: bool,
 
     /// Read and verify checksums from the provided input file(s)
-    #[arg(short, long, group = "mtx_dirs", group = "mtx_recursive", group = "mtx_all", group = "mtx_length", group = "mtx_plain", group = "mtx_selftest")]
+    #[arg(short, long)]
     pub check: bool,
 
     /// Enable processing of directories as arguments
-    #[arg(short, long, group = "mtx_dirs")]
+    #[arg(short, long, conflicts_with = "check")]
     pub dirs: bool,
 
     /// Recursively process the provided directories (implies -d)
-    #[arg(short, long, group = "mtx_recursive")]
+    #[arg(short, long, conflicts_with = "check")]
     pub recursive: bool,
 
     /// Iterate all kinds of files, instead of just regular files
-    #[arg(short, long, group = "mtx_all")]
+    #[arg(short, long, requires = "walk")]
     pub all: bool,
 
     /// Continue processing even if errors are encountered.
@@ -86,7 +85,7 @@ pub struct Args {
     pub keep_going: bool,
 
     /// Digest output size, in bits (default: 256, maximum: 2048)
-    #[arg(short, long, group = "mtx_length")]
+    #[arg(short, long, conflicts_with = "check")]
     pub length: Option<NonZeroUsize>,
 
     /// Include additional context information
@@ -102,7 +101,7 @@ pub struct Args {
     pub quiet: bool,
 
     /// Print digest(s) in plain format, i.e., without file names
-    #[arg(short, long, group = "mtx_plain")]
+    #[arg(short, long, conflicts_with = "check")]
     pub plain: bool,
 
     /// Separate digest(s) by NULL characters instead of newlines
@@ -110,7 +109,7 @@ pub struct Args {
     pub null: bool,
 
     /// Enable multi-threaded processing of input files
-    #[arg(short, long, group = "mtx_threads")]
+    #[arg(short, long, conflicts_with = "self_test")]
     pub multi_threading: bool,
 
     /// Explicitly flush 'stdout' stream after printing a digest
@@ -118,7 +117,7 @@ pub struct Args {
     pub flush: bool,
 
     /// Run the built-in self-test (BIST)
-    #[arg(short = 'T', long, group = "mtx_selftest", group = "mtx_threads")]
+    #[arg(short = 'T', long)]
     pub self_test: bool,
 
     /// Files to be processed
@@ -156,6 +155,16 @@ fn context_str(error: &Error, kind: ContextKind) -> &str {
     }
 }
 
+#[inline]
+fn context_vec(error: &Error, kind: ContextKind) -> &str {
+    static EMPTY_STRING: String = String::new();
+    if let Some(ContextValue::Strings(str_value)) = error.get(kind) {
+        str_value.first().unwrap_or(&EMPTY_STRING)
+    } else {
+        &EMPTY_STRING
+    }
+}
+
 /// Print argument parser error
 fn print_arg_error(error: Error) -> ExitCode {
     match error.kind() {
@@ -182,6 +191,15 @@ fn print_arg_error(error: Error) -> ExitCode {
                 print_arg_error!("The option \"{}\" can not be used more than once!", invalid_arg);
             } else {
                 print_arg_error!("The options \"{}\" and \"{}\" are mutually exclusive!", invalid_arg, prior_arg);
+            }
+            ExitCode::FAILURE
+        }
+        ErrorKind::MissingRequiredArgument => {
+            let missing_option = context_vec(&error, ContextKind::InvalidArg).trim_start_matches("<").trim_end_matches(">");
+            if !missing_option.contains("|") {
+                print_arg_error!("The required option \"{}\" is missing!", missing_option);
+            } else {
+                print_arg_error!("One of the required options \"{}\" is missing!", missing_option.replace("|", "\" or \""));
             }
             ExitCode::FAILURE
         }
