@@ -457,8 +457,11 @@ fn do_verify_files(modify: bool, file_count: usize, multi_threading: bool) {
 // Test vectors
 // ---------------------------------------------------------------------------
 
+// Input data to be hashed
+static INPUT_MESSAGE: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+
 // Expected digest values
-static EXPECTED: [&str; 45usize] = [
+static EXPECTED: [&str; 47usize] = [
     "68c0656ee81830fd73031bd53af43c4a793a353c4e086ba27b9851206c17398d",
     "0d74c2e49bc2458915d78321ceddd9566bfee73b5bdf63ea0326cdbd78603afc",
     "a32cd2879cb337568324f064921072ce131d2ad981d84263731a3328c474187f",
@@ -504,6 +507,8 @@ static EXPECTED: [&str; 45usize] = [
     "a9f85f6c13049df99066ce72ca681ae0fa2d23cac7afff7da570c05638c856f2",
     "cfc9bca044ff820959a5fcd08d3096c2ef637e3fd68091118c83d9fc52e3e784",
     "2e6a8ce4c04f6ca518f06d109cb82514285b2e614584e2c65f874cf94ca074e5",
+    "c75a794e49090b7a9a7144c0acb984e20f4534b4e11e5bbacbe2ec05d44fe85a",
+    "3e948059e44ebe75efd4c4359853ecff5f337c96c23e9bc72f346eae8d05b8f2",
 ];
 
 // Path to a non-existing file
@@ -517,6 +522,12 @@ const FILE_PATH: &str = "/this/file/does/not/exist";
 const DIRECTORY_PATH: &str = r#"C:\Windows"#;
 #[cfg(not(windows))]
 const DIRECTORY_PATH: &str = "/usr";
+
+// The standard input stream device file path
+#[cfg(windows)]
+const STDIN_DEV_FILE: &str = "CONIN$";
+#[cfg(not(windows))]
+const STDIN_DEV_FILE: &str = "/dev/stdin";
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // File tests
@@ -880,64 +891,56 @@ fn test_data_2b() {
 
 #[test]
 fn test_data_3a() {
-    static STDIN_DATA: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-    do_test_data(EXPECTED[37usize], STDIN_DATA, None, 2usize);
+    do_test_data(EXPECTED[37usize], INPUT_MESSAGE, None, 2usize);
 }
 
 #[test]
 fn test_data_3b() {
-    static STDIN_DATA: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-    do_test_data(EXPECTED[38usize], STDIN_DATA, None, 3usize);
+    do_test_data(EXPECTED[38usize], INPUT_MESSAGE, None, 3usize);
 }
 
 #[test]
 fn test_data_3c() {
-    static STDIN_DATA: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-    do_test_data(EXPECTED[39usize], STDIN_DATA, None, 4usize);
+    do_test_data(EXPECTED[39usize], INPUT_MESSAGE, None, 4usize);
 }
 
 #[test]
 fn test_data_4a() {
-    static STDIN_DATA: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-    do_test_data(EXPECTED[40usize], STDIN_DATA, Some("thingamabob"), 0usize);
+    do_test_data(EXPECTED[40usize], INPUT_MESSAGE, Some("thingamabob"), 0usize);
 }
 
 #[test]
 fn test_data_4b() {
-    static STDIN_DATA: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-    do_test_data(EXPECTED[41usize], STDIN_DATA, Some("thingamabob"), 1usize);
+    do_test_data(EXPECTED[41usize], INPUT_MESSAGE, Some("thingamabob"), 1usize);
 }
 
 #[test]
 fn test_data_4c() {
-    static STDIN_DATA: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-    do_test_data(EXPECTED[42usize], STDIN_DATA, Some("thingamabob"), 2usize);
+    do_test_data(EXPECTED[42usize], INPUT_MESSAGE, Some("thingamabob"), 2usize);
 }
 
 #[test]
 fn test_data_4d() {
-    static STDIN_DATA: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-    do_test_data(EXPECTED[43usize], STDIN_DATA, Some("thingamabob"), 3usize);
+    do_test_data(EXPECTED[43usize], INPUT_MESSAGE, Some("thingamabob"), 3usize);
 }
 
 #[test]
 fn test_data_4e() {
-    static STDIN_DATA: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-    do_test_data(EXPECTED[44usize], STDIN_DATA, Some("thingamabob"), 4usize);
+    do_test_data(EXPECTED[44usize], INPUT_MESSAGE, Some("thingamabob"), 4usize);
 }
 
-#[cfg(unix)]
 #[test]
 fn test_data_5a() {
-    let output = run_binary([OsStr::new("/dev/stdin")], true, false);
-    assert!(output.contains("/dev/stdin"));
+    let output = run_binary_with_data([OsStr::new(STDIN_DEV_FILE)], INPUT_MESSAGE);
+    let caps = REGEX_LINE.captures(&output).unwrap();
+    assert!(digest_eq(caps.get(1).unwrap().as_str(), EXPECTED[45usize]));
 }
 
-#[cfg(windows)]
 #[test]
 fn test_data_5b() {
-    let output = run_binary([OsStr::new("CONIN$")], true, false);
-    assert!(output.contains("CONIN$"));
+    let output = run_binary_with_data([OsStr::new("--snail"), OsStr::new(STDIN_DEV_FILE)], INPUT_MESSAGE);
+    let caps = REGEX_LINE.captures(&output).unwrap();
+    assert!(digest_eq(caps.get(1).unwrap().as_str(), EXPECTED[46usize]));
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
