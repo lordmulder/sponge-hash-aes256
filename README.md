@@ -26,7 +26,7 @@ In order to use this crate, add it under `[dependencies]` to your **`Cargo.toml`
 
 ```
 [dependencies]
-sponge-hash-aes256 = "1.8.0"
+sponge-hash-aes256 = "1.8.1"
 ```
 
 ### Usage
@@ -58,11 +58,13 @@ fn main() {
 
 ## Command-line tool
 
-The **`sponge256sum`** command-line tool:
+The **`sponge256sum`** command-line tool, similar to [`sha256sum`](https://man7.org/linux/man-pages/man1/sha256sum.1.html) and friends:
 
 ![sponge256sum](.assets/images/sponge256sum.png)
 
 ### Usage
+
+This command-line application can be used as follows:
 
 ```
 Usage: sponge256sum [OPTIONS] [FILES]...

@@ -118,7 +118,7 @@ pub struct Args {
     pub flush: bool,
 
     /// Run the built-in self-test (BIST)
-    #[arg(short = 'T', long, conflicts_with = "check")]
+    #[arg(short = 'T', long, conflicts_with_all = ["check", "files"])]
     pub self_test: bool,
 
     /// Files to be processed

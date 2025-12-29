@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 1.8.1
+
+### Added
+
+- Added option `--all` to process *all* files found in a directory (instead of "regular" files only).
+
+### Changed
+
+- The `--dirs` and `--recursive` options now skip non-regular files (such as FIFOs and sockets) by default.
+- Various small improvements.
+
 ## Version 1.8.0
 
 ### Added

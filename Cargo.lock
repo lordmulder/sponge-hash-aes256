@@ -606,7 +606,7 @@ dependencies = [
 
 [[package]]
 name = "sponge-hash-aes256"
-version = "1.8.0"
+version = "1.8.1"
 dependencies = [
  "aes",
  "hex",
@@ -621,7 +621,7 @@ dependencies = [
 
 [[package]]
 name = "sponge256sum"
-version = "1.8.0"
+version = "1.8.1"
 dependencies = [
  "build-time",
  "clap",

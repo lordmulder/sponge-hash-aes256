@@ -12,7 +12,7 @@
 //!
 //! Please see the [library documentation](sponge_hash_aes256) for details! &#128161;
 //!
-//! ## Usage
+//! ## Synopsis
 //!
 //! This command-line application can be used as follows:
 //!

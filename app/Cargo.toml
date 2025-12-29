@@ -6,7 +6,7 @@ license = "0BSD"
 repository = "https://github.com/lordmulder/sponge-hash-aes256/"
 readme = "../README-cargo.md"
 edition = "2021"
-version = "1.8.0"
+version = "1.8.1"
 categories = ["algorithms", "cryptography", "no-std", "security"]
 keywords = ["hash", "digest", "sponge", "crypto", "aes"]
 
