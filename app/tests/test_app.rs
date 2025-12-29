@@ -52,6 +52,7 @@ static REGEX_PLAIN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([0-9a-
 static REGEX_ZERO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([0-9a-fA-F]+)\s([\x20-\x7E]+)\x00").unwrap());
 static REGEX_PLAIN_ZERO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([0-9a-fA-F]+)\x00").unwrap());
 static REGEX_CHECK: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^([\x20-\x7E]+):\s(\w+)$").unwrap());
+static REGEX_CHECK_ZERO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([\x20-\x7E]+):\s(\w+)\x00").unwrap());
 static REGEX_VERSION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^sponge256sum\s+v(\d+\.\d+\.\d+)[\s$]").unwrap());
 static REGEX_HELP: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Usage:\s+sponge256sum(\.exe)?[\s$]").unwrap());
 static REGEX_SELFTEST: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Successful.").unwrap());
@@ -421,7 +422,7 @@ fn do_test_data(expected: &str, data: &[u8], info: Option<&str>, snail_level: us
     assert!(digest_eq(caps.get(1).unwrap().as_str(), expected));
 }
 
-fn do_verify_files(modify: bool, file_count: usize, multi_threading: bool) {
+fn do_verify_files(modify: bool, file_count: usize, multi_threading: bool, force_null: bool) {
     let source_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data");
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
 
@@ -434,15 +435,24 @@ fn do_verify_files(modify: bool, file_count: usize, multi_threading: bool) {
         check_file.clone()
     };
 
-    let output = if multi_threading {
-        run_binary([OsStr::new("--check"), OsStr::new("--keep-going"), OsStr::new("--multi-threading"), input_file.as_os_str()], !modify, false)
-    } else {
-        run_binary([OsStr::new("--check"), OsStr::new("--keep-going"), input_file.as_os_str()], !modify, false)
-    };
+    let mut parameters = Vec::with_capacity(5usize);
+    parameters.extend_from_slice(&[OsStr::new("--check"), OsStr::new("--keep-going")]);
+
+    if force_null {
+        parameters.push(OsStr::new("--null"));
+    }
+
+    if multi_threading {
+        parameters.push(OsStr::new("--multi-threading"));
+    }
+
+    parameters.push(input_file.as_os_str());
 
     let mut result_set = HashSet::with_capacity(file_count);
+    let output = run_binary(parameters, !modify, false);
+    let matches = if force_null { REGEX_CHECK_ZERO.captures_iter(&output) } else { REGEX_CHECK.captures_iter(&output) };
 
-    for caps in REGEX_CHECK.captures_iter(&output) {
+    for caps in matches {
         let (file_name, result) = (caps.get(1).unwrap().as_str(), caps.get(2).unwrap().as_str());
         if file_name.ends_with(".pdf") {
             assert_eq!(result, if modify { "FAILED" } else { "OK" });
@@ -949,22 +959,32 @@ fn test_data_5b() {
 
 #[test]
 fn test_verify_1a() {
-    do_verify_files(false, 3usize, false);
+    do_verify_files(false, 3usize, false, false);
 }
 
 #[test]
 fn test_verify_1b() {
-    do_verify_files(false, 3usize, true);
+    do_verify_files(false, 3usize, true, false);
 }
 
 #[test]
 fn test_verify_2a() {
-    do_verify_files(true, 3usize, false);
+    do_verify_files(true, 3usize, false, false);
 }
 
 #[test]
 fn test_verify_2b() {
-    do_verify_files(true, 3usize, true);
+    do_verify_files(true, 3usize, true, false);
+}
+
+#[test]
+fn test_verify_3a() {
+    do_verify_files(false, 3usize, false, true);
+}
+
+#[test]
+fn test_verify_3b() {
+    do_verify_files(false, 3usize, true, true);
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1141,6 +1161,14 @@ fn test_check_error_3b() {
 }
 
 #[test]
+fn test_check_error_3c() {
+    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
+    File::create(&check_file).unwrap().write_all(b"invalidchecksumfile\n").unwrap();
+    let output = run_binary([OsStr::new("--check"), OsStr::new("--keep-going"), check_file.as_os_str()], false, true);
+    assert!(REGEX_MALFORMED.is_match(&output))
+}
+
+#[test]
 fn test_check_error_4a() {
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
     File::create(&check_file).unwrap().write_all(b"00000000 this-file-does-not-exist\n").unwrap();
@@ -1153,6 +1181,14 @@ fn test_check_error_4b() {
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
     File::create(&check_file).unwrap().write_all(b"00000000 this-file-does-not-exist\n").unwrap();
     let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), check_file.as_os_str()], false, true);
+    assert!(REGEX_TARGET_NOENT.is_match(&output))
+}
+
+#[test]
+fn test_check_error_4c() {
+    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
+    File::create(&check_file).unwrap().write_all(b"00000000 this-file-does-not-exist\n").unwrap();
+    let output = run_binary([OsStr::new("--check"), OsStr::new("--keep-going"), check_file.as_os_str()], false, true);
     assert!(REGEX_TARGET_NOENT.is_match(&output))
 }
 
