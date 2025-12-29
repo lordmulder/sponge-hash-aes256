@@ -44,8 +44,12 @@ fn main() {
 
 ## Command-line application
 
+[![sponge256sum](https://raw.githubusercontent.com/lordmulder/sponge-hash-aes256/main/.assets/images/sponge256sum-512px.png)](https://raw.githubusercontent.com/lordmulder/sponge-hash-aes256/main/.assets/images/sponge256sum.png)
+
 Download the **`sponge256sum`** application here:  
-<https://github.com/lordmulder/sponge-hash-aes256/releases>
+&#128279; <https://github.com/lordmulder/sponge-hash-aes256/releases>  
+&#128279; <https://codeberg.org/MuldeR/sponge-hash-aes256/releases>  
+&#128279; <https://gitlab.com/lord_mulder/sponge-hash-aes256/-/releases>
 
 ## License
 

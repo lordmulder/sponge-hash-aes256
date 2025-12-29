@@ -58,7 +58,11 @@ fn main() {
 
 ## Command-line tool
 
-The **`sponge256sum`** command-line tool can be used as follows:
+The **`sponge256sum`** command-line tool:
+
+![sponge256sum](.assets/images/sponge256sum.png)
+
+### Usage
 
 ```
 Usage: sponge256sum [OPTIONS] [FILES]...
