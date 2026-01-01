@@ -19,7 +19,6 @@ if [[ ! -v SPONGE256SUM_ARCH || -z "${SPONGE256SUM_ARCH}" ]]; then
         x86_64 | amd64)
             SPONGE256SUM_ARCH="x86_64"
             if cpu_features cx16 lahf_lm popcnt sse4_1 sse4_2 ssse3; then
-                SPONGE256SUM_ARCH="x86_64-v2"
                 if cpu_features avx avx2 bmi1 bmi2 f16c fma abm movbe xsave; then
                     SPONGE256SUM_ARCH="x86_64-v3"
                 fi
