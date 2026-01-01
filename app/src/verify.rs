@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: 0BSD
 // sponge256sum
-// Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
+// Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>
 
 use crossbeam_channel::{bounded, Receiver, Sender};
 use hex::decode_to_slice;

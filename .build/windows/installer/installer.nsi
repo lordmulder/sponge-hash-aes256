@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: 0BSD
 # SpongeHash-AES256
-# Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
+# Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>
 
 !include 'LogicLib.nsh'
 
@@ -49,7 +49,7 @@ VIFileVersion "${PKG_VERSION}.0"
 VIAddVersionKey /LANG=1033 "CompanyName" "LoRd_MuldeR <mulder2@gmx.de>"
 VIAddVersionKey /LANG=1033 "FileDescription" "sponge256hash"
 VIAddVersionKey /LANG=1033 "FileVersion" "${PKG_VERSION}"
-VIAddVersionKey /LANG=1033 "LegalCopyright" "Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>"
+VIAddVersionKey /LANG=1033 "LegalCopyright" "Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>"
 VIAddVersionKey /LANG=1033 "ProductName" "SpongeHash-AES256"
 VIAddVersionKey /LANG=1033 "ProductVersion" "${PKG_VERSION}"
 

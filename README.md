@@ -150,4 +150,4 @@ Official Git mirrors are available here:
 
 This software is released under the BSD Zero Clause (“0BSD”) License.
 
-Copyright (C) 2025 by LoRd_MuldeR &lt;mulder2@gmx.de&gt;.
+Copyright (C) 2025-2026 by LoRd_MuldeR &lt;mulder2@gmx.de&gt;.

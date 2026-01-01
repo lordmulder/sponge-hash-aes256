@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: 0BSD
 // SpongeHash-AES256
-// Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
+// Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>
 
 #![no_std]
 #![allow(clippy::needless_doctest_main)]
@@ -31,7 +31,7 @@
 //!
 //! ## License
 //!
-//! Copyright (C) 2025 by LoRd_MuldeR &lt;mulder2@gmx.de&gt;
+//! Copyright (C) 2025-2026 by LoRd_MuldeR &lt;mulder2@gmx.de&gt;
 //!
 //! Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted.
 //!

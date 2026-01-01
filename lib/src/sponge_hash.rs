@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: 0BSD
 // SpongeHash-AES256
-// Copyright (C) 2025 by LoRd_MuldeR <mulder2@gmx.de>
+// Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>
 
 use crate::utilities::{length, Aes256Crypto, BlockType, BLOCK_SIZE};
 use core::ops::Range;
