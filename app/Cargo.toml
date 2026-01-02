@@ -39,3 +39,7 @@ with-mimalloc = ["dep:mimalloc"]
 drop-root-caps = { version = "1.2.1", default-features = false, features = ["ctor"] }
 nix = { version = "0.30.1", default-features = false }
 regex = { version = "1.12.2", default-features = false, features = ["unicode"] }
+
+[[bench]]
+name = "app_bench"
+harness = false
