@@ -133,7 +133,7 @@ fn main() {
         }
 
         // Update median
-        median.push(elapsed.as_secs_f64());
+        median.push(elapsed.as_secs_f64()).expect("Invalid elapsed time!");
     }
 
     // Update status
