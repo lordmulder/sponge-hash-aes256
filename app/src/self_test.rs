@@ -141,7 +141,7 @@ fn test_runner(output: &mut impl Write, passes: NonZeroUsize, args: &Args, halt:
             return Ok(false);
         }
 
-        median.push(elapsed.as_secs_f64());
+        median.push(elapsed.as_secs_f64()).expect("Invalid elapsed time!");
     }
 
     let secs_median = median.get().unwrap_or(f64::MAX);
