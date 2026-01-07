@@ -25,7 +25,7 @@ fn main() {
 
     // Encode to hex
     let mut hex_buffer = [0u8; 2usize * DEFAULT_DIGEST_SIZE];
-    encode_to_slice(&digest, &mut hex_buffer).unwrap();
+    encode_to_slice(digest, &mut hex_buffer).unwrap();
 
     // Print the digest (hex format)
     println!("0x{}", from_utf8(&hex_buffer).unwrap());

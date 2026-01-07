@@ -20,7 +20,7 @@ hex = { version = "0.4.3", default-features = true }
 hex-literal = { version = "1.1.0", default-features = false }
 num = { version = "0.4.3", default-features = false }
 rand_pcg = { version = "0.9.0", default-features = false }
-rolling-median = { version = "1.5.2", default-features = false }
+rolling-median = { version = "1.5.5", default-features = false }
 rustc-version-const = { version = "1.1.0", default-features = false }
 sponge-hash-aes256 = { path = "../lib", default-features = false }
 tinyvec = { version = "1.10.0", default-features = false, features = ["alloc"] }

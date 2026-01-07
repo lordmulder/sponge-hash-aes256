@@ -79,7 +79,7 @@ fn process_input(set: &mut HashSet<[u8; DEFAULT_DIGEST_SIZE]>, counter: &mut usi
     let success = set.insert(digest);
     if (!success) || (*counter >= PROGRESS_UPDATE_CYCLE) {
         let mut hex_buffer = [0u8; 64usize];
-        if encode_to_slice(&digest, &mut hex_buffer).is_ok() {
+        if encode_to_slice(digest, &mut hex_buffer).is_ok() {
             let digest_string = unsafe { str::from_utf8_unchecked(&hex_buffer) };
             println!("[{:0>9}] {} << {:?}", set.len(), digest_string, input);
         }
@@ -103,7 +103,7 @@ fn main() {
     let mut rolling_median = Median::new();
 
     for _i in 0u16..passes {
-        rolling_median.push(stress_test().as_secs_f64());
+        assert!(rolling_median.push(stress_test().as_secs_f64()).is_ok());
         println!("--------");
     }
 

@@ -213,7 +213,7 @@ where
 }
 
 fn get_file_name(path: &str) -> &str {
-    path.split(|c| c == '/' || c == '\\').last().unwrap_or(path)
+    path.split(['/', '\\']).next_back().unwrap_or(path)
 }
 
 fn modify_checksum_file(original_file: &Path, modified_file: PathBuf) -> PathBuf {
@@ -380,19 +380,17 @@ fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: bool, multi_thread
         } else {
             REGEX_ZERO.captures_iter(&output)
         }
+    } else if force_plain {
+        REGEX_PLAIN.captures_iter(&output)
     } else {
-        if force_plain {
-            REGEX_PLAIN.captures_iter(&output)
-        } else {
-            REGEX_LINE.captures_iter(&output)
-        }
+        REGEX_LINE.captures_iter(&output)
     };
 
     for caps in matches {
         let digest = caps.get(1).unwrap().as_str();
         if !force_plain {
             let file_name = get_file_name(caps.get(2).unwrap().as_str());
-            if !["LICENSE", "SHA512SUMS", "next"].iter().any(|str| file_name.eq_ignore_ascii_case(*str)) {
+            if !["LICENSE", "SHA512SUMS", "next"].iter().any(|str| file_name.eq_ignore_ascii_case(str)) {
                 let expected_name = expected_map.get(digest).expect("Unknown digest!");
                 assert!(digest_set.insert(digest));
                 assert_eq!(file_name, *expected_name);
@@ -1099,7 +1097,7 @@ fn test_file_error_2b() {
 fn test_file_error_3a() {
     let input_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
     File::create(&input_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
-    set_permissions(&input_file, Permissions::from_mode(0u32)).unwrap();
+    set_permissions(&input_file, Permissions::from_mode(0o0u32)).unwrap();
     let output = run_binary([input_file.as_os_str()], false, true);
     assert!(REGEX_FILE_FOPEN.is_match(&output));
 }
@@ -1109,7 +1107,7 @@ fn test_file_error_3a() {
 fn test_file_error_3b() {
     let input_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
     File::create(&input_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
-    set_permissions(&input_file, Permissions::from_mode(0u32)).unwrap();
+    set_permissions(&input_file, Permissions::from_mode(0o0u32)).unwrap();
     let output = run_binary([OsStr::new("--multi-threading"), input_file.as_os_str()], false, true);
     assert!(REGEX_FILE_FOPEN.is_match(&output));
 }
@@ -1219,7 +1217,7 @@ fn test_check_error_5b() {
 fn test_check_error_6a() {
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
     File::create(&check_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
-    set_permissions(&check_file, Permissions::from_mode(0u32)).unwrap();
+    set_permissions(&check_file, Permissions::from_mode(0o0u32)).unwrap();
     let output = run_binary([OsStr::new("--check"), check_file.as_os_str()], false, true);
     assert!(REGEX_CHECK_FOPEN.is_match(&output))
 }
@@ -1229,7 +1227,7 @@ fn test_check_error_6a() {
 fn test_check_error_6b() {
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
     File::create(&check_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
-    set_permissions(&check_file, Permissions::from_mode(0u32)).unwrap();
+    set_permissions(&check_file, Permissions::from_mode(0o0u32)).unwrap();
     let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), check_file.as_os_str()], false, true);
     assert!(REGEX_CHECK_FOPEN.is_match(&output))
 }
@@ -1239,7 +1237,7 @@ fn test_check_error_6b() {
 fn test_check_error_7a() {
     let target_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
     File::create(&target_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
-    set_permissions(&target_file, Permissions::from_mode(0u32)).unwrap();
+    set_permissions(&target_file, Permissions::from_mode(0o0u32)).unwrap();
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
     File::create(&check_file).unwrap().write_all(format!("00000000 {}\n", target_file.as_os_str().to_string_lossy()).as_bytes()).unwrap();
     let output = run_binary([OsStr::new("--check"), check_file.as_os_str()], false, true);
@@ -1251,7 +1249,7 @@ fn test_check_error_7a() {
 fn test_check_error_7b() {
     let target_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("file_{:016X}.txt", random_u64()));
     File::create(&target_file).unwrap().write_all(b"justsomearbitrarydatainthefile\n").unwrap();
-    set_permissions(&target_file, Permissions::from_mode(0u32)).unwrap();
+    set_permissions(&target_file, Permissions::from_mode(0o0u32)).unwrap();
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
     File::create(&check_file).unwrap().write_all(format!("00000000 {}\n", target_file.as_os_str().to_string_lossy()).as_bytes()).unwrap();
     let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), check_file.as_os_str()], false, true);
@@ -1261,42 +1259,42 @@ fn test_check_error_7b() {
 #[test]
 fn test_invalid_env_1a() {
     let env = HashMap::from([("SPONGE256SUM_DIRWALK_STRATEGY", "foo".to_owned())]);
-    let output = run_binary_with_env(&[""; 0usize], env, false, true);
+    let output = run_binary_with_env([""; 0usize], env, false, true);
     assert!(REGEX_ENVIRON.is_match(&output))
 }
 
 #[test]
 fn test_invalid_env_1b() {
     let env = HashMap::from([("SPONGE256SUM_DIRWALK_STRATEGY", "1".to_owned())]);
-    let output = run_binary_with_env(&[""; 0usize], env, false, true);
+    let output = run_binary_with_env([""; 0usize], env, false, true);
     assert!(REGEX_ENVIRON.is_match(&output))
 }
 
 #[test]
 fn test_invalid_env_2a() {
     let env = HashMap::from([("SPONGE256SUM_THREAD_COUNT", "foo".to_owned())]);
-    let output = run_binary_with_env(&[""; 0usize], env, false, true);
+    let output = run_binary_with_env([""; 0usize], env, false, true);
     assert!(REGEX_ENVIRON.is_match(&output))
 }
 
 #[test]
 fn test_invalid_env_2b() {
     let env = HashMap::from([("SPONGE256SUM_THREAD_COUNT", "-1".to_owned())]);
-    let output = run_binary_with_env(&[""; 0usize], env, false, true);
+    let output = run_binary_with_env([""; 0usize], env, false, true);
     assert!(REGEX_ENVIRON.is_match(&output))
 }
 
 #[test]
 fn test_invalid_env_3a() {
     let env = HashMap::from([("SPONGE256SUM_SELFTEST_PASSES", "foo".to_owned())]);
-    let output = run_binary_with_env(&[""; 0usize], env, false, true);
+    let output = run_binary_with_env([""; 0usize], env, false, true);
     assert!(REGEX_ENVIRON.is_match(&output))
 }
 
 #[test]
 fn test_invalid_env_3b() {
     let env = HashMap::from([("SPONGE256SUM_SELFTEST_PASSES", "0".to_owned())]);
-    let output = run_binary_with_env(&[""; 0usize], env, false, true);
+    let output = run_binary_with_env([""; 0usize], env, false, true);
     assert!(REGEX_ENVIRON.is_match(&output))
 }
 

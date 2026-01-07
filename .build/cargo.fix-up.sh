@@ -6,7 +6,7 @@ cargo clean
 cargo upgrade
 cargo update --workspace
 cargo fmt --all
-cargo clippy --workspace
+cargo clippy --workspace --all-targets --all-features
 cargo build --workspace --release
 
 echo "Completed successfully."

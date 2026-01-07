@@ -5,7 +5,7 @@ cargo clean || goto:error
 cargo upgrade || goto:error
 cargo update --workspace || goto:error
 cargo fmt --all || goto:error
-cargo clippy --workspace || goto:error
+cargo clippy --workspace --all-targets --all-features || goto:error
 cargo build --workspace --release || goto:error
 
 echo.

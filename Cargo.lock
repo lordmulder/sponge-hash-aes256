@@ -545,9 +545,9 @@ checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 
 [[package]]
 name = "rolling-median"
-version = "1.5.2"
+version = "1.5.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "969c7ebd82029f628cd6fceb1d59035c46d681323badecf57fa8cf54beeed3d9"
+checksum = "b20679bcd32728ca2a0fd2c3cde7cba36595e3eea021d7cb9ef83206365f15e0"
 
 [[package]]
 name = "rustc-version-const"

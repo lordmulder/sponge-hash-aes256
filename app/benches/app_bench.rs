@@ -41,7 +41,7 @@ fn create_temp_folder(random: &mut Pcg64) -> Result<PathBuf, Error> {
             Ok(_) => return Ok(temp_folder),
             Err(error) => {
                 error_counter += 1u16;
-                if error_counter >= u16::MAX {
+                if error_counter == u16::MAX {
                     return Err(error);
                 }
             }
@@ -104,6 +104,9 @@ fn main() {
     // Initialize median computation
     let mut median: Median<f64> = Median::new();
 
+    // Prepare regular expression
+    let regex_digest = Regex::new(r"^([0-9a-fA-F]+)\s([\x20-\x7E]+)$").expect("Failed to create regular expression!");
+
     // Run the specified number of measuring passes
     for i in 0usize..PASSES {
         println!("Measuring pass {} of {} is running, please wait...", i.saturating_add(1usize), PASSES);
@@ -121,7 +124,6 @@ fn main() {
         let elapsed = start_time.elapsed();
 
         // Parse the output
-        let regex_digest = Regex::new(r"^([0-9a-fA-F]+)\s([\x20-\x7E]+)$").expect("Failed to create regular expression!");
         let mut unique: BTreeSet<String> = BTreeSet::new();
         for captures in output.unwrap().lines().filter_map(|line| regex_digest.captures(line)) {
             unique.insert(captures.get(1usize).unwrap().as_str().to_ascii_lowercase());

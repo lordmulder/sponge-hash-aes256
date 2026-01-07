@@ -30,7 +30,7 @@ fn measure_function<T: Fn()>(function: T) -> f64 {
         let start_time = Instant::now();
         function();
         let duration = start_time.elapsed();
-        rolling_median.push(duration.as_secs_f64());
+        assert!(rolling_median.push(duration.as_secs_f64()).is_ok());
     }
 
     rolling_median.get().unwrap_or(f64::MAX)
