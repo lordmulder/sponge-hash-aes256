@@ -225,21 +225,15 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - uses: vmactions/freebsd-vm@v1
+      - uses: cross-platform-actions/action@v0.32.0
         with:
-          release: "15.0"
-          usesh: true
-          prepare: |
-            pkg update && pkg upgrade && pkg install -y git curl
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.92.0
-            mkdir -p /opt/sysroot/arm64
-            curl -sSf https://download.freebsd.org/ftp/releases/arm64/14.3-RELEASE/base.txz | tar -C /opt/sysroot/arm64 -xJ lib usr/lib
-            . "$HOME/.cargo/env"
-            rustup target add x86_64-unknown-freebsd i686-unknown-freebsd
-            rustup component add rust-src
-            git config --global --add safe.directory '*'
+          operating_system: freebsd
+          version: '15.0'
+          shell: bash
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-freebsd-builder/releases/download/v4/freebsd-15.0-x86-64.qcow2'
           run: |
-            . "$HOME/.cargo/env"
+            git config --global --add safe.directory '*'
+            . /opt/rust/cargo/env
             ( cd .build/bsd-unix && ./build-freebsd.sh )
       - uses: actions/upload-artifact@v4
         with:
