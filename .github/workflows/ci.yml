@@ -214,7 +214,7 @@ jobs:
           path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.*
 
   # --------------------------------------------------------------------------
-  # Build (cross)
+  # Build (cross-platform)
   # --------------------------------------------------------------------------
 
   build-freebsd:
@@ -239,6 +239,54 @@ jobs:
         with:
           name: sponge256sum-freebsd
           path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
+
+  build-openbsd:
+    runs-on: ubuntu-latest
+    needs: [test-linux, test-windows, test-macos]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
+      - uses: cross-platform-actions/action@v0.32.0
+        with:
+          operating_system: openbsd
+          version: '7.8'
+          shell: bash
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-openbsd-builder/releases/download/v1/openbsd-7.8-x86-64.qcow2'
+          run: |
+            git config --global --add safe.directory '*'
+            ( cd .build/bsd-unix && ./build-openbsd.sh )
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sponge256sum-openbsd
+          path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
+
+  build-haikuos:
+    runs-on: ubuntu-latest
+    needs: [test-linux, test-windows, test-macos]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
+      - uses: cross-platform-actions/action@v0.32.0
+        with:
+          operating_system: haiku
+          version: 'r1beta5'
+          shell: bash
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-haiku-builder/releases/download/v1/haiku-r1beta5-x86-64.qcow2'
+          run: |
+            git config --global --add safe.directory '*'
+            ( cd .build/bsd-unix && ./build-haiku.sh )
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sponge256sum-haiku
+          path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
+
+  # --------------------------------------------------------------------------
+  # Build (vmactions)
+  # --------------------------------------------------------------------------
 
   build-netbsd:
     runs-on: ubuntu-latest
@@ -267,32 +315,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-netbsd
-          path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
-
-  build-openbsd:
-    runs-on: ubuntu-latest
-    needs: [test-linux, test-windows, test-macos]
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - uses: vmactions/openbsd-vm@v1
-        with:
-          release: "7.8"
-          usesh: true
-          prepare: |
-            pkg_add -u && pkg_add git rust rust-src
-            mkdir -p /opt/sysroot/i386 /opt/sysroot/arm64
-            curl -sSf https://cdn.openbsd.org/pub/OpenBSD/7.8/i386/base78.tgz | tar -C /opt/sysroot/i386 -xzf - ./usr/lib
-            curl -sSf https://cdn.openbsd.org/pub/OpenBSD/7.8/arm64/base78.tgz | tar -C /opt/sysroot/arm64 -xzf - ./usr/lib
-            git config --global --add safe.directory '*'
-          run: |
-            cd .build/bsd-unix
-            ./build-openbsd.sh
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sponge256sum-openbsd
           path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
 
   build-dragonfly:
@@ -368,28 +390,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-illumos
-          path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
-
-  build-haikuos:
-    runs-on: ubuntu-latest
-    needs: [test-linux, test-windows, test-macos]
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - uses: cross-platform-actions/action@v0.32.0
-        with:
-          operating_system: haiku
-          version: 'r1beta5'
-          shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-haiku-builder/releases/download/v1/haiku-r1beta5-x86-64.qcow2'
-          run: |
-            git config --global --add safe.directory '*'
-            ( cd .build/bsd-unix && ./build-haiku.sh )
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sponge256sum-haiku
           path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
 
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
