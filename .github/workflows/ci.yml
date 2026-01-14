@@ -240,6 +240,29 @@ jobs:
           name: sponge256sum-freebsd
           path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
 
+  build-netbsd:
+    runs-on: ubuntu-latest
+    needs: [test-linux, test-windows, test-macos]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
+      - uses: cross-platform-actions/action@v0.32.0
+        with:
+          operating_system: netbsd
+          version: '10.1'
+          shell: bash
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-netbsd-builder/releases/download/v2/netbsd-10.1-x86-64.qcow2'
+          run: |
+            git config --global --add safe.directory '*'
+            . /opt/rust/cargo/env
+            ( cd .build/bsd-unix && ./build-netbsd.sh )
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sponge256sum-netbsd
+          path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
+
   build-openbsd:
     runs-on: ubuntu-latest
     needs: [test-linux, test-windows, test-macos]
@@ -287,35 +310,6 @@ jobs:
   # --------------------------------------------------------------------------
   # Build (vmactions)
   # --------------------------------------------------------------------------
-
-  build-netbsd:
-    runs-on: ubuntu-latest
-    needs: [test-linux, test-windows, test-macos]
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - uses: vmactions/netbsd-vm@v1
-        with:
-          release: "10.1"
-          usesh: true
-          prepare: |
-            /usr/sbin/pkg_add -u git curl clang
-            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.92.0
-            mkdir -p /opt/sysroot/i386
-            curl -sSf https://cdn.netbsd.org/pub/NetBSD/NetBSD-10.1/i386/binary/sets/base.tgz | tar -C /opt/sysroot/i386 -xzf - lib usr/lib
-            curl -sSf https://cdn.netbsd.org/pub/NetBSD/NetBSD-10.1/i386/binary/sets/comp.tgz | tar -C /opt/sysroot/i386 -xzf - usr/lib
-            . "$HOME/.cargo/env"
-            rustup component add rust-src
-            git config --global --add safe.directory '*'
-          run: |
-            . "$HOME/.cargo/env"
-            ( cd .build/bsd-unix && ./build-netbsd.sh )
-      - uses: actions/upload-artifact@v4
-        with:
-          name: sponge256sum-netbsd
-          path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
 
   build-dragonfly:
     runs-on: ubuntu-latest
