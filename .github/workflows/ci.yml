@@ -41,7 +41,7 @@ jobs:
   # --------------------------------------------------------------------------
 
   test-linux:
-    runs-on: ubuntu-24.04${{ matrix.arch == 'aarch64' && '-arm' }}
+    runs-on: ubuntu-24.04${{ matrix.arch == 'aarch64' && '-arm' || '' }}
     needs: check
     strategy:
       matrix:

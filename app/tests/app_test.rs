@@ -13,7 +13,7 @@ use regex::Regex;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
 use std::{
     collections::{HashMap, HashSet},
-    ffi::OsStr,
+    ffi::{OsStr, OsString},
     fs::File,
     hint::black_box,
     io::{BufRead, BufReader, BufWriter, Write},
@@ -40,6 +40,9 @@ use nix::{
     unistd::Pid,
 };
 
+#[cfg(windows)]
+use std::os::windows::ffi::OsStringExt;
+
 #[used]
 static DROP_ROOT_CAPS: () = drop_root_caps::set_up();
 
@@ -61,7 +64,8 @@ static REGEX_MUTEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The 
 static REGEX_MULTIPLE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The option "([^"]+)" can not be used more than once!"#).unwrap());
 static REGEX_MISSING_VAL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The required value for option "([^"]+)" is missing!"#).unwrap());
 static REGEX_MISSING_ARG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: One of the required options "(.+)" is missing!"#).unwrap());
-static REGEX_INVALID: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The given value "([^"]+)" for option "([^"]+)" is invalid!"#).unwrap());
+static REGEX_INVALID_UTF: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: Invalid command-line arguments! \(InvalidUtf8\)"#).unwrap());
+static REGEX_INVALID_VAL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The given value "([^"]+)" for option "([^"]+)" is invalid!"#).unwrap());
 static REGEX_LEN_DIV: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Error: Digest output size must be divisible by eight!").unwrap());
 static REGEX_LEN_MAX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Error: Digest output size exceeds the allowable maximum!").unwrap());
 static REGEX_INFO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Error: Length of context info must not exceed 255 characters!").unwrap());
@@ -1028,7 +1032,7 @@ fn test_invalid_args_3a() {
 #[test]
 fn test_invalid_args_3b() {
     let output = run_binary([OsStr::new("--length"), OsStr::new("yikes")], false, true);
-    assert!(REGEX_INVALID.is_match(&output))
+    assert!(REGEX_INVALID_VAL.is_match(&output))
 }
 
 #[test]
@@ -1057,9 +1061,19 @@ fn test_invalid_args_4b() {
 }
 
 #[test]
-fn test_invalid_args_5() {
+fn test_invalid_args_5a() {
     let output = run_binary([OsStr::new("--all")], false, true);
     assert!(REGEX_MISSING_ARG.is_match(&output))
+}
+
+#[test]
+fn test_invalid_args_5b() {
+    #[cfg(not(windows))]
+    let invalid_string = unsafe { OsString::from_encoded_bytes_unchecked(b"\xE9".to_vec()) };
+    #[cfg(windows)]
+    let invalid_string = OsString::from_wide(&[0xD800]);
+    let output = run_binary([OsStr::new("--info"), invalid_string.as_os_str()], false, true);
+    assert!(REGEX_INVALID_UTF.is_match(&output))
 }
 
 #[test]
