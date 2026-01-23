@@ -234,7 +234,7 @@ jobs:
           operating_system: freebsd
           version: '15.0'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-freebsd-builder/releases/download/v4/freebsd-15.0-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-freebsd-builder/releases/download/v5/freebsd-15.0-x86-64.qcow2'
           run: |
             git config --global --add safe.directory '*'
             . /opt/rust/cargo/env
