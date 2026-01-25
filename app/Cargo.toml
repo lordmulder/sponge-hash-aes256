@@ -6,7 +6,7 @@ license = "0BSD"
 repository = "https://github.com/lordmulder/sponge-hash-aes256/"
 readme = "../README-cargo.md"
 edition = "2021"
-version = "1.8.1"
+version = "1.8.2"
 categories = ["algorithms", "cryptography", "no-std", "security"]
 keywords = ["hash", "digest", "sponge", "crypto", "aes"]
 
@@ -37,7 +37,7 @@ with-mimalloc = ["dep:mimalloc"]
 
 [dev-dependencies]
 drop-root-caps = { version = "1.2.1", default-features = false, features = ["ctor"] }
-nix = { version = "0.31.0", default-features = false, features = ["signal"] }
+nix = { version = "0.31.1", default-features = false, features = ["signal"] }
 regex = { version = "1.12.2", default-features = false, features = ["unicode"] }
 
 [[bench]]

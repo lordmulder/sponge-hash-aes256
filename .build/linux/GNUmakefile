@@ -43,7 +43,7 @@ vbuild:
 		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static,+aes -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
 		TARGET_CC=/usr/local/musl/$$t/bin/musl-gcc \
 		cargo build --release --target $$t-unknown-linux-musl --features with-mimalloc --verbose
-		[ "$$t" = "i686" ] && suffix=i686-sse2-aes_ni || suffix=$$t-aes_ni
+		[ "$$t" = "i686" ] && suffix=i686-sse2-aes || suffix=$$t-aes
 		install -v --mode 555 $${CARGO_TARGET_DIR}/$$t-unknown-linux-musl/release/sponge256sum out/target/release/sponge256sum-$$suffix
 		rm -rf $${CARGO_TARGET_DIR}
 	done
@@ -55,7 +55,7 @@ wbuild:
 		RUSTFLAGS="-Dwarnings -Clinker=x86_64-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static$${a:+,+}$$a -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast -Ctarget-cpu=x86-64-v3" \
 		TARGET_CC=/usr/local/musl/x86_64/bin/musl-gcc \
 		cargo build --release --target x86_64-unknown-linux-musl --features with-mimalloc --verbose
-		[ "$$a" = "aes" ] && suffix=v3-aes_ni || suffix=v3
+		[ "$$a" = "aes" ] && suffix=v3-aes || suffix=v3
 		install -v --mode 555 $${CARGO_TARGET_DIR}/x86_64-unknown-linux-musl/release/sponge256sum out/target/release/sponge256sum-x86_64-$$suffix
 		rm -rf $${CARGO_TARGET_DIR}
 	done

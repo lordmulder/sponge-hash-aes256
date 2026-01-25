@@ -127,9 +127,9 @@ for %%t in (x86_64 i686) do (
 	cargo clean || goto:error
 	cargo build --release --target %%t-pc-windows-msvc --features with-mimalloc --verbose || goto:error
 	if "%%t" == "i686" (
-		copy /B /Y "%CARGO_TARGET_DIR%\%%t-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-i686-sse2-aes_ni.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%t-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-i686-sse2-aes.exe" || goto:error
 	) else (
-		copy /B /Y "%CARGO_TARGET_DIR%\%%t-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-%%t-aes_ni.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%t-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-%%t-aes.exe" || goto:error
 	)
 )
 
@@ -137,7 +137,7 @@ for %%v in (v2 v3) do (
 	set "RUSTFLAGS=%DEFAULT_RUSTFLAGS% -Ctarget-cpu=x86-64-%%v -Ctarget-feature=+aes"
 	cargo clean || goto:error
 	cargo build --release --target x86_64-pc-windows-msvc --features with-mimalloc --verbose || goto:error
-	copy /B /Y "%CARGO_TARGET_DIR%\x86_64-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-x86_64-%%v-aes_ni.exe" || goto:error
+	copy /B /Y "%CARGO_TARGET_DIR%\x86_64-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-x86_64-%%v-aes.exe" || goto:error
 )
 
 REM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -164,9 +164,9 @@ for %%t in (x86_64 i686) do (
 	cargo clean || goto:error
 	cargo build -Zbuild-std=std,panic_abort --release --target %%t-win7-windows-msvc --verbose || goto:error
 	if "%%t" == "i686" (
-		copy /B /Y "%CARGO_TARGET_DIR%\%%t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\extra\sponge256sum-win7-i686-sse2-aes_ni.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\extra\sponge256sum-win7-i686-sse2-aes.exe" || goto:error
 	) else (
-		copy /B /Y "%CARGO_TARGET_DIR%\%%t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\extra\sponge256sum-win7-%%t-aes_ni.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\extra\sponge256sum-win7-%%t-aes.exe" || goto:error
 	)
 )
 
