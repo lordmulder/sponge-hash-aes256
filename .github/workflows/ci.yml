@@ -31,6 +31,10 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
+      - if: ${{ github.event_name == 'release' }}
+        run: |
+          [ "$(cd app && cargo pkgid | grep -Po '@\K[\d.]+$')" = "${{ github.event.release.tag_name}}" ]
+          [ "$(cd lib && cargo pkgid | grep -Po '@\K[\d.]+$')" = "${{ github.event.release.tag_name}}" ]
       - run: |
           cargo check --workspace --all-targets --all-features --verbose
           cargo clippy --workspace --all-targets --all-features
@@ -427,3 +431,24 @@ jobs:
           args: artifacts/
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'release' }}
+    needs: [build-linux, build-windows, build-macos, build-freebsd, build-netbsd, build-openbsd, build-dragonfly, build-solaris, build-illumos, build-haikuos]
+    steps:
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: 1.93.0
+          target: x86_64-unknown-linux-gnu
+          cache: false
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
+      - run: |
+          cargo build --release --locked
+          cargo publish --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        working-directory: ./lib

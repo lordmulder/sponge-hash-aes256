@@ -1,6 +1,5 @@
 #!/bin/sh
 set -eu
-INSTALL_DIR="{{SPONGE256SUM_INSTDIR}}"
 LSCPU_FLAGS="$(lscpu 2>/dev/null | grep -E -m1 '^Flags:' | cut -d':' -f2- | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
 cpu_features() {
@@ -11,7 +10,7 @@ cpu_features() {
     done
 }
 
-if [ -z "${SPONGE256SUM_ARCH:=}" ]; then
+if [ "${SPONGE256SUM_ARCH:=undefined}" = "undefined" ]; then
     case "$(uname -m)" in
         x86_64 | amd64)
             SPONGE256SUM_ARCH="x86_64"
@@ -47,4 +46,4 @@ if [ -z "${SPONGE256SUM_ARCH:=}" ]; then
     esac
 fi
 
-exec "${INSTALL_DIR}/sponge256sum-${SPONGE256SUM_ARCH}" "$@"
+exec "{{SPONGE256SUM_INSTDIR}}/sponge256sum-${SPONGE256SUM_ARCH}" "$@"
