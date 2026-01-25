@@ -1,0 +1,21 @@
+name: Monitor
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '51 23 * * *'
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: 1.93.0
+          target: x86_64-unknown-linux-gnu
+          cache: false
+      - uses: actions/checkout@v5
+      - run: |
+          cargo run --release
+        working-directory: ./.github/workflows/monitor

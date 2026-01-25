@@ -1,0 +1,10 @@
+[package]
+name = "sponge-hash-aes256-example-program"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+
+[dependencies]
+hex = "0.4.3"
+sponge-hash-aes256 = "1"
