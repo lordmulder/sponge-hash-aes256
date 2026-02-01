@@ -8,3 +8,7 @@ edition = "2024"
 [dependencies]
 hex = "0.4.3"
 sponge-hash-aes256 = "1"
+
+# Workaround for AES build error
+# https://github.com/RustCrypto/block-ciphers/issues/529
+crypto-common = "=0.2.0-rc.13"
