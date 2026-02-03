@@ -6,13 +6,13 @@ license = "0BSD"
 repository = "https://github.com/lordmulder/sponge-hash-aes256/"
 readme = "../README-cargo.md"
 edition = "2021"
-version = "1.8.3"
+version = "1.8.4"
 categories = ["algorithms", "cryptography", "no-std", "security"]
 keywords = ["hash", "digest", "sponge", "crypto", "aes"]
 
 [dependencies]
 build-time = { version = "0.1.3", default-features = false }
-clap = { version = "4.5.56", default-features = false, features = ["std", "derive", "help", "usage", "error-context"] }
+clap = { version = "4.5.57", default-features = false, features = ["std", "derive", "help", "usage", "error-context"] }
 const_format = { version = "0.2.35", default-features = false }
 crossbeam-channel = { version = "0.5.15", default-features = false, features = ["std"] }
 ctrlc = { version = "3.5.1", default-features = false }
@@ -38,7 +38,7 @@ with-mimalloc = ["dep:mimalloc"]
 [dev-dependencies]
 drop-root-caps = { version = "1.2.1", default-features = false, features = ["ctor"] }
 nix = { version = "0.31.1", default-features = false, features = ["signal"] }
-regex = { version = "1.12.2", default-features = false, features = ["unicode"] }
+regex = { version = "1.12.3", default-features = false, features = ["unicode"] }
 
 [[bench]]
 name = "app_bench"

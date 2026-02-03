@@ -26,7 +26,7 @@ In order to use this crate, add it under `[dependencies]` to your **`Cargo.toml`
 
 ```
 [dependencies]
-sponge-hash-aes256 = "1.8.3"
+sponge-hash-aes256 = "1.8.4"
 ```
 
 ### Usage
