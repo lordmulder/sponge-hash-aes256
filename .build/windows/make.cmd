@@ -182,7 +182,7 @@ xcopy /E /H /I /Y "%CARGO_TARGET_DIR%\doc" "out\target\release\doc" || goto:erro
 
 cargo --version --verbose > "%CARGO_TARGET_DIR%\.RUSTC_VERSION"
 >> "%CARGO_TARGET_DIR%\.RUSTC_VERSION" echo.
-cargo rustc --manifest-path src/Cargo.toml -- --version --verbose >> "%CARGO_TARGET_DIR%\.RUSTC_VERSION"
+cargo rustc --manifest-path ../.auxiliary-files/blank-project/Cargo.toml -- --version --verbose >> "%CARGO_TARGET_DIR%\.RUSTC_VERSION"
 
 REM --------------------------------------------------------------------------
 REM Create info

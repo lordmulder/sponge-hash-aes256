@@ -78,7 +78,7 @@ doc:
 	cp -rf $${CARGO_TARGET_DIR}/doc out/target/release/
 	RUSTFLAGS=-Dwarnings cargo pkgid --package sponge256sum | grep -Eo '[^@]+$$' | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//' > out/target/.PKG_VERSION
 	printf '%s\n\n' "$$(RUSTFLAGS=-Dwarnings cargo --version --verbose)" > out/target/.RUSTC_VERSION
-	printf '%s\n' "$$(RUSTFLAGS=-Dwarnings cargo rustc --manifest-path src/Cargo.toml -- --version --verbose)" >> out/target/.RUSTC_VERSION
+	printf '%s\n' "$$(RUSTFLAGS=-Dwarnings cargo rustc --manifest-path ../.auxiliary-files/blank-project/Cargo.toml -- --version --verbose)" >> out/target/.RUSTC_VERSION
 	rm -rf $${CARGO_TARGET_DIR}
 
 dist: build vbuild wbuild xbuild doc

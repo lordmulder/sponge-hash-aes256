@@ -2,7 +2,7 @@
 cd /d "%~dp0.."
 
 cargo clean || goto:error
-cargo upgrade || goto:error
+cargo upgrade --recursive --incompatible --pinned || goto:error
 cargo update --workspace || goto:error
 cargo fmt --all || goto:error
 cargo clippy --workspace --all-targets --all-features || goto:error
