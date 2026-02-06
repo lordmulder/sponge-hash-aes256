@@ -92,9 +92,10 @@ dist: build vbuild wbuild xbuild doc
 
 pkg: dist
 	IFS= read -r PKG_VERSION < out/target/.PKG_VERSION
-	cat bin/launcher.sh | sed "s|{{SPONGE256SUM_INSTDIR}}|/opt/sponge256sum/$${PKG_VERSION}|g" | install -D --mode=555 /dev/stdin out/target/bin/sponge256sum.sh
 	( cd out/target/release && XZ_OPT=-9e tar --owner=0 --group=0 -cJvf ../sponge256sum-$${PKG_VERSION}-linux.tar.xz * )
-	fpm -s dir -t deb -n sponge256sum -v $${PKG_VERSION} -a all -p out/target/sponge256sum-$${PKG_VERSION}-linux.deb --description "SpongeHash-AES256" --maintainer "MuldeR <mulder2@gmx.de>" --vendor "Muldersoft" --url "https://crates.io/crates/sponge-hash-aes256" --license 0BSD --deb-changelog ../../CHANGELOG.md out/target/bin/sponge256sum.sh=/usr/bin/sponge256sum out/target/release/=/opt/sponge256sum/$${PKG_VERSION}/
+	./bin/mk-appimage.sh $${PKG_VERSION} x86_64 out/target/sponge256sum-$${PKG_VERSION}-linux-x86_64.AppImage out/target/release/sponge256sum-x86_64*
+	./bin/mk-appimage.sh $${PKG_VERSION} i686 out/target/sponge256sum-$${PKG_VERSION}-linux-i686.AppImage out/target/release/sponge256sum-i586 out/target/release/sponge256sum-i686*
+	./bin/mk-appimage.sh $${PKG_VERSION} aarch64 out/target/sponge256sum-$${PKG_VERSION}-linux-aarch64.AppImage out/target/release/sponge256sum-aarch64
 	chmod 444 out/target/sponge256sum-$${PKG_VERSION}-linux.*
 
 clean:
