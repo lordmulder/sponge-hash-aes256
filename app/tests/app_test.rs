@@ -6,7 +6,7 @@ use hex::decode_to_slice;
 use hex_literal::hex;
 use num::Integer;
 use rand_pcg::{
-    rand_core::{RngCore, SeedableRng},
+    rand_core::{Rng, SeedableRng},
     Pcg64,
 };
 use regex::Regex;

@@ -5,7 +5,7 @@
 use hex::encode_to_slice;
 use hex_literal::hex;
 use rand_pcg::{
-    rand_core::{RngCore, SeedableRng},
+    rand_core::{Rng, SeedableRng},
     Pcg64Mcg,
 };
 use rolling_median::Median;

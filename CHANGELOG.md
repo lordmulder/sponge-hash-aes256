@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 1.8.5
+
+### Added
+
+- Added generation of `.AppImage` packages to the Linux build script.
+
+### Removed
+
+- Removed generation of `.deb` packages from the Linux build script.
+
 ## Version 1.8.4
 
 ### Changed

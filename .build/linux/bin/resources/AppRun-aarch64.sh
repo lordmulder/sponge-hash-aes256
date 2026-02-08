@@ -2,8 +2,15 @@
 set -eu
 APP_BASEDIR="$(dirname -- "$(readlink -f -- "$0")")"
 
-if [ "${APPIMAGE_SPONGE256SUM_ARCH:=undefined}" = "undefined" ]; then
+if [ "${APPIMAGE_SPONGE256SUM_ARCH:=:undefined}" = ":undefined" ]; then
     APPIMAGE_SPONGE256SUM_ARCH="aarch64"
+    case "$(uname -m)" in
+        aarch64 | arm64)
+            ;;
+        *)
+            echo "[sponge256sum] Warning: Unsupported CPU architecture encountered!" >&2
+            ;;
+    esac
 fi
 
 export PATH="${APP_BASEDIR}/usr/bin:${PATH}"

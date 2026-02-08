@@ -5,7 +5,7 @@
 use clap::builder::OsStr;
 use hex_literal::hex;
 use rand_pcg::{
-    rand_core::{RngCore, SeedableRng},
+    rand_core::{Rng, SeedableRng},
     Pcg64,
 };
 use regex::Regex;

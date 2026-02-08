@@ -14,8 +14,8 @@ cpu_features() {
     done
 }
 
-if [ "${APPIMAGE_SPONGE256SUM_ARCH:=undefined}" = "undefined" ]; then
-    APPIMAGE_SPONGE256SUM_ARCH="i586"
+if [ "${APPIMAGE_SPONGE256SUM_ARCH:=:undefined}" = ":undefined" ]; then
+    APPIMAGE_SPONGE256SUM_ARCH="x86_64"
     case "$(uname -m)" in
         i?86 | x86)
             if cpu_features cmov fxsr mmx sse sse2; then
@@ -30,6 +30,9 @@ if [ "${APPIMAGE_SPONGE256SUM_ARCH:=undefined}" = "undefined" ]; then
             if cpu_features aes; then
                 APPIMAGE_SPONGE256SUM_ARCH="${APPIMAGE_SPONGE256SUM_ARCH}-aes"
             fi
+            ;;
+        *)
+            echo "[sponge256sum] Warning: Unsupported CPU architecture encountered!" >&2
             ;;
     esac
 fi
