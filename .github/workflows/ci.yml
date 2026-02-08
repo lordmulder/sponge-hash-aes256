@@ -8,7 +8,7 @@ on:
   schedule:
     - cron: '49 23 * * *'
   release:
-    types: [published]
+    types: [created]
 
 jobs:
   # --------------------------------------------------------------------------
