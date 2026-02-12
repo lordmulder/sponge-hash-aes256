@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=sponge256sum
+Exec=sponge256sum
+Comment=A sponge-based secure hash function that uses AES-256 as its internal PRF
+Icon=sponge256sum
+Categories=Utility;
+Terminal=true
+X-AppImage-Payload-License=BSD-0-Clause

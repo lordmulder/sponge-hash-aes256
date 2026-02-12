@@ -102,7 +102,7 @@ REM --------------------------------------------------------------------------
 
 set RUSTC_BOOTSTRAP=
 
-set "DEFAULT_RUSTFLAGS=-Dwarnings -Ctarget-feature=+crt-static -Copt-level=3 -Ccodegen-units=1 -Clto=fat -Cdebuginfo=none -Cpanic=abort -Clink-arg=/DEBUG:NONE -Clink-arg=.build\windows\res\app-icon.res"
+set "DEFAULT_RUSTFLAGS=-Dwarnings -Ctarget-feature=+crt-static -Copt-level=3 -Ccodegen-units=1 -Clto=fat -Cdebuginfo=none -Cpanic=abort -Clink-arg=/DEBUG:NONE -Clink-arg=.build\windows\resources\app-icon.res"
 set "RUSTFLAGS=%DEFAULT_RUSTFLAGS%"
 
 for %%t in (x86_64 i686 aarch64) do (
@@ -211,7 +211,7 @@ pushd "out\target\release"
 popd
 attrib +R "out\target\*.7z" || goto:error
 
-makensis -NOCD -WX "-DOUTPUT_FILE=out\target\sponge256sum-%PKG_VERSION%-windows.exe" "-DSOURCE_PATH=out\target\release" "-DPKG_VERSION=%PKG_VERSION%" "-DPKG_REGUUID=%PKG_REGUUID%" "installer\installer.nsi" || goto:error
+makensis -NOCD -WX "-DOUTPUT_FILE=out\target\sponge256sum-%PKG_VERSION%-windows.exe" "-DSOURCE_PATH=out\target\release" "-DPKG_VERSION=%PKG_VERSION%" "-DPKG_REGUUID=%PKG_REGUUID%" "resources\build.nsi" || goto:error
 attrib +R "out\target\*.exe" || goto:error
 
 REM --------------------------------------------------------------------------

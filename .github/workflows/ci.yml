@@ -147,7 +147,7 @@ jobs:
           fail_ci_if_error: true
 
   # --------------------------------------------------------------------------
-  # Build (native)
+  # Build
   # --------------------------------------------------------------------------
 
   build-linux:
@@ -220,9 +220,9 @@ jobs:
           name: sponge256sum-macos
           path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.*
 
-  # --------------------------------------------------------------------------
-  # Build (cross-platform)
-  # --------------------------------------------------------------------------
+  # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  # Cross-platform
+  # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   build-freebsd:
     runs-on: ubuntu-latest
@@ -337,9 +337,9 @@ jobs:
           name: sponge256sum-haiku
           path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
 
-  # --------------------------------------------------------------------------
-  # Build (vmactions)
-  # --------------------------------------------------------------------------
+  # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  # vmactions
+  # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   build-dragonfly:
     runs-on: ubuntu-latest
@@ -393,12 +393,37 @@ jobs:
           path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
 
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  # Deploy pages
+  # Verify
+  # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+  verify:
+    runs-on: ubuntu-22.04${{ matrix.arch == 'aarch64' && '-arm' || '' }}
+    needs: [build-linux, build-windows, build-macos, build-freebsd, build-netbsd, build-openbsd, build-dragonfly, build-solaris, build-illumos, build-haikuos]
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        arch: [x86_64, i686, aarch64]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sponge256sum-*
+          path: artifacts
+          merge-multiple: true
+      - run: chmod +x ./artifacts/*.AppImage
+      - run: |
+          EXE_FILE="$(find ./artifacts -type f -name 'sponge256sum-*-linux-${{ matrix.arch }}.AppImage' -printf '%f' -quit)"
+          [ ! -z "${EXE_FILE}" ]
+          [ ! -z "$(./artifacts/${EXE_FILE} --version 2>&1 | head -n1 | grep -w 'SpongeHash-AES256')" ]
+        shell: bash -exo pipefail {0}
+
+  # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  # Deploy
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   pages:
     runs-on: ubuntu-latest
-    needs: [build-linux, build-windows, build-macos, build-freebsd, build-netbsd, build-openbsd, build-dragonfly, build-solaris, build-illumos, build-haikuos]
+    needs: verify
     permissions:
       pages: write
       id-token: write
@@ -409,14 +434,10 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@v4
 
-  # --------------------------------------------------------------------------
-  # Release
-  # --------------------------------------------------------------------------
-
   release:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'release' }}
-    needs: [build-linux, build-windows, build-macos, build-freebsd, build-netbsd, build-openbsd, build-dragonfly, build-solaris, build-illumos, build-haikuos]
+    needs: verify
     permissions:
       contents: write
     steps:
@@ -434,7 +455,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'release' }}
-    needs: [build-linux, build-windows, build-macos, build-freebsd, build-netbsd, build-openbsd, build-dragonfly, build-solaris, build-illumos, build-haikuos]
+    needs: verify
     permissions:
       contents: read
     steps:
