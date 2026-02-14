@@ -410,12 +410,14 @@ jobs:
           pattern: sponge256sum-*
           path: artifacts
           merge-multiple: true
-      - run: chmod +x ./artifacts/*.AppImage
       - run: |
-          EXE_FILE="$(find ./artifacts -type f -name 'sponge256sum-*-linux-${{ matrix.arch }}.AppImage' -printf '%f' -quit)"
-          [ ! -z "${EXE_FILE}" ]
-          [ ! -z "$(./artifacts/${EXE_FILE} --version 2>&1 | head -n1 | grep -w 'SpongeHash-AES256')" ]
-        shell: bash -exo pipefail {0}
+          chmod +x ./artifacts/*.AppImage
+          unset VERSION_STRING
+          for exe_file in ./artifacts/sponge256sum-*-linux-${{ matrix.arch }}.AppImage; do
+            VERSION_STRING="$(${exe_file} --version 2>&1 | grep -wm1 'SpongeHash-AES256' | sed 's/^[[:space:]]*//')"
+          done
+          [[ "${VERSION_STRING}" =~ ^sponge256sum ]]
+        shell: bash -exuo pipefail {0}
 
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   # Deploy

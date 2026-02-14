@@ -137,7 +137,7 @@ The following targets are officially supported, other platforms may function but
 - Haiku OS
 - Solaris / Illumos (OmniOS, OpenIndiana)
 
-## Git repository
+## See also
 
 Official Git mirrors are available here:
 
@@ -147,21 +147,12 @@ Official Git mirrors are available here:
 - <https://repo.or.cz/sponge-hash-aes256.git>
 - <https://git.launchpad.net/sponge-hash-aes256>
 
-## See also
-
 Additional resources you may find helpful:
 
-- **AppImageHub:**  
-  <https://www.appimagehub.com/p/2347075>
-
-- **SourceForge:**  
-  <https://sourceforge.net/projects/muldersoft/files/SpongeHash-AES256/>
-
-- **Lib.rs:**  
-  <https://lib.rs/crates/sponge-hash-aes256>
-
-- **Crates.io:**  
-  <https://crates.io/crates/sponge-hash-aes256>
+- <https://www.appimagehub.com/p/2347075>
+- <https://sourceforge.net/projects/muldersoft/files/SpongeHash-AES256/>
+- <https://lib.rs/crates/sponge-hash-aes256>
+- <https://crates.io/crates/sponge-hash-aes256>
 
 ## License
 
