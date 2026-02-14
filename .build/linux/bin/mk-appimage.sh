@@ -43,11 +43,14 @@ fi
 
 trap "rm -rf \"${BUILD_DIR}\"" EXIT
 readonly MY_APP_DIR="${BUILD_DIR}/sponge256sum.AppDir"
+
 mkdir -p "${MY_APP_DIR}/usr/bin"
+mkdir -p "${MY_APP_DIR}/usr/share/metainfo"
 
 install -v --mode 555 "${SCRIPT_PATH}/../resources/AppRun-${MY_APP_ARCH}.sh" "${MY_APP_DIR}/AppRun"
 install -v --mode 444 "${SCRIPT_PATH}/../resources/sponge256sum.desktop" "${MY_APP_DIR}/sponge256sum.desktop"
 install -v --mode 444 "${SCRIPT_PATH}/../resources/sponge256sum.png" "${MY_APP_DIR}/sponge256sum.png"
+install -v --mode 444 "${SCRIPT_PATH}/../resources/sponge256sum.xml" "${MY_APP_DIR}/usr/share/metainfo/sponge256sum.appdata.xml"
 install -v --mode 444 "${SCRIPT_PATH}/../../../LICENSE" "${MY_APP_DIR}/LICENSE"
 install -v --mode 444 "${SCRIPT_PATH}/../../../README.md" "${MY_APP_DIR}/README.md"
 
@@ -57,7 +60,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ "${RUNTIME_FILE}" != ":undefined" ]; then
-    ( set -x; ARCH="${MY_APP_ARCH}" VERSION="${MY_APP_VERS}" "${APPIMAGETOOL_BIN}" --no-appstream --runtime-file "${RUNTIME_FILE}" "${MY_APP_DIR}" "${OUTPUT_FILE}" )
+    ( set -x; ARCH="${MY_APP_ARCH}" VERSION="${MY_APP_VERS}" "${APPIMAGETOOL_BIN}" --runtime-file "${RUNTIME_FILE}" "${MY_APP_DIR}" "${OUTPUT_FILE}" )
 else
-    ( set -x; ARCH="${MY_APP_ARCH}" VERSION="${MY_APP_VERS}" "${APPIMAGETOOL_BIN}" --no-appstream "${MY_APP_DIR}" "${OUTPUT_FILE}" )
+    ( set -x; ARCH="${MY_APP_ARCH}" VERSION="${MY_APP_VERS}" "${APPIMAGETOOL_BIN}" "${MY_APP_DIR}" "${OUTPUT_FILE}" )
 fi

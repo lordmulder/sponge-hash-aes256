@@ -237,7 +237,7 @@ jobs:
           operating_system: freebsd
           version: '15.0'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-freebsd-builder/releases/download/v5/freebsd-15.0-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-freebsd-builder/releases/download/v6/freebsd-15.0-x86-64.qcow2'
           run: |
             git config --global --add safe.directory '*'
             . /opt/rust/cargo/env
@@ -260,7 +260,7 @@ jobs:
           operating_system: netbsd
           version: '10.1'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-netbsd-builder/releases/download/v3/netbsd-10.1-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-netbsd-builder/releases/download/v4/netbsd-10.1-x86-64.qcow2'
           run: |
             git config --global --add safe.directory '*'
             . /opt/rust/cargo/env
@@ -305,7 +305,7 @@ jobs:
           operating_system: omnios
           version: 'r151056'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-omnios-builder/releases/download/v4/omnios-r151056-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-omnios-builder/releases/download/v5/omnios-r151056-x86-64.qcow2'
           run: |
             git config --global --add safe.directory '*'
             . /opt/rust/cargo/env
