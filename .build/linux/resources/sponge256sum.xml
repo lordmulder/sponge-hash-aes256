@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
 	<id>io.github.lordmulder.sponge_hash_aes256.sponge256sum</id>
+	<developer id="io.github.lordmulder">
+		<name>LoRd_MuldeR</name>
+	</developer>
 	<metadata_license>0BSD</metadata_license>
 	<project_license>0BSD</project_license>
 	<name>sponge256sum</name>
@@ -13,10 +16,15 @@
 	<url type="homepage">https://lordmulder.github.io/sponge-hash-aes256/sponge256sum/</url>
 	<screenshots>
 		<screenshot type="default">
-			<image>https://raw.githubusercontent.com/lordmulder/sponge-hash-aes256/refs/heads/main/.assets/images/sponge256sum.png</image>
+			<image>
+				https://raw.githubusercontent.com/lordmulder/sponge-hash-aes256/refs/heads/main/.assets/images/sponge256sum.png</image>
 		</screenshot>
 	</screenshots>
 	<provides>
 		<id>sponge256sum.desktop</id>
 	</provides>
+	<content_rating type="oars-1.0" />
+	<releases>
+		<release version="{{REL_VERSION}}" date="{{REL_ISODATE}}" />
+	</releases>
 </component>

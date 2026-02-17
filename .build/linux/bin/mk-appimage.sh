@@ -50,9 +50,14 @@ mkdir -p "${MY_APP_DIR}/usr/share/metainfo"
 install -v --mode 555 "${SCRIPT_PATH}/../resources/AppRun-${MY_APP_ARCH}.sh" "${MY_APP_DIR}/AppRun"
 install -v --mode 444 "${SCRIPT_PATH}/../resources/sponge256sum.desktop" "${MY_APP_DIR}/sponge256sum.desktop"
 install -v --mode 444 "${SCRIPT_PATH}/../resources/sponge256sum.png" "${MY_APP_DIR}/sponge256sum.png"
-install -v --mode 444 "${SCRIPT_PATH}/../resources/sponge256sum.xml" "${MY_APP_DIR}/usr/share/metainfo/sponge256sum.appdata.xml"
+install -v --mode 644 "${SCRIPT_PATH}/../resources/sponge256sum.xml" "${MY_APP_DIR}/usr/share/metainfo/sponge256sum.appdata.xml"
 install -v --mode 444 "${SCRIPT_PATH}/../../../LICENSE" "${MY_APP_DIR}/LICENSE"
 install -v --mode 444 "${SCRIPT_PATH}/../../../README.md" "${MY_APP_DIR}/README.md"
+
+sed -i "s/{{REL_VERSION}}/${MY_APP_VERS}/g" "${MY_APP_DIR}/usr/share/metainfo/sponge256sum.appdata.xml"
+sed -i "s/{{REL_ISODATE}}/$(date -Idate)/g" "${MY_APP_DIR}/usr/share/metainfo/sponge256sum.appdata.xml"
+
+chmod 444 "${MY_APP_DIR}/usr/share/metainfo/sponge256sum.appdata.xml"
 
 while [ $# -gt 0 ]; do
     install -v --mode 555 "${1}" "${MY_APP_DIR}/usr/bin/$(basename -- "${1}")"
