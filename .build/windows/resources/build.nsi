@@ -46,10 +46,13 @@ LicenseForceSelection checkbox
 
 VIProductVersion "${PKG_VERSION}.0"
 VIFileVersion "${PKG_VERSION}.0"
+VIAddVersionKey /LANG=1033 "Comments" "SPDX-License-Identifier: 0BSD"
 VIAddVersionKey /LANG=1033 "CompanyName" "LoRd_MuldeR <mulder2@gmx.de>"
-VIAddVersionKey /LANG=1033 "FileDescription" "sponge256hash"
+VIAddVersionKey /LANG=1033 "FileDescription" "SpongeHash-AES256 command-line application (Setup)"
 VIAddVersionKey /LANG=1033 "FileVersion" "${PKG_VERSION}"
-VIAddVersionKey /LANG=1033 "LegalCopyright" "Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>"
+VIAddVersionKey /LANG=1033 "InternalName" "sponge256sum-setup"
+VIAddVersionKey /LANG=1033 "LegalCopyright" "Copyright © 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>"
+VIAddVersionKey /LANG=1033 "OriginalFilename" "sponge256sum-setup.exe"
 VIAddVersionKey /LANG=1033 "ProductName" "SpongeHash-AES256"
 VIAddVersionKey /LANG=1033 "ProductVersion" "${PKG_VERSION}"
 
@@ -74,8 +77,8 @@ Section "Program files (required)"
 SectionEnd
 
 Section "Program files for old Windows versions"
-  !insertmacro _SetOutPath "$INSTDIR\extra"
-  File "${SOURCE_PATH}\extra\*.*"
+  !insertmacro _SetOutPath "$INSTDIR\legacy-compat"
+  File "${SOURCE_PATH}\legacy-compat\*.*"
 SectionEnd
 
 Section "Documentation"

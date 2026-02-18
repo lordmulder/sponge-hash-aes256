@@ -36,17 +36,49 @@ if not exist "%GIT_INSTALL_DIR%\cmd\git.exe" (
 	goto:error
 )
 
-if not exist "%SEVENZIP_INSTALL_DIR%\7z.exe" (
-	echo File "%SEVENZIP_INSTALL_DIR%\7z.exe" not found. Please check SEVENZIP_INSTALL_DIR and try again^^!
-	goto:error
-)
-
 if not exist "%NSIS_INSTALL_DIR%\makensis.exe" (
 	echo File "%NSIS_INSTALL_DIR%\makensis.exe" not found. Please check NSIS_INSTALL_DIR and try again^^!
 	goto:error
 )
 
+if exist "%SEVENZIP_INSTALL_DIR%\7za.exe" (
+	set SEVENZIP=7za.exe
+) else (
+	if exist "%SEVENZIP_INSTALL_DIR%\7z.exe" (
+		set SEVENZIP=7z.exe
+	) else (
+		echo File "%SEVENZIP_INSTALL_DIR%\7z[a].exe" not found. Please check SEVENZIP_INSTALL_DIR and try again^^!
+		goto:error
+	)
+)
+
 set "PATH=%CD%\bin;%CARGO_INSTALL_DIR%;%GIT_INSTALL_DIR%\cmd;%SEVENZIP_INSTALL_DIR%;%NSIS_INSTALL_DIR%;%SystemRoot%\System32;%SystemRoot%"
+
+REM --------------------------------------------------------------------------
+REM Check the Rust version
+REM --------------------------------------------------------------------------
+
+set VER_CARGO_MAJOR=0
+set VER_CARGO_MINOR=0
+
+for /F "usebackq tokens=1,2" %%a in (`cargo version`) do (
+	if "%%~a" == "cargo" (
+		for /F "tokens=1,2 delims=." %%i in ("%%~b") do (
+			set "VER_CARGO_MAJOR=%%~i"
+			set "VER_CARGO_MINOR=%%~j"
+		)
+	)
+)
+
+if %VER_CARGO_MAJOR% neq 1 (
+	echo Rust toolchain version could not be detected or is too old^^!
+	goto:error
+)
+
+if %VER_CARGO_MINOR% lss 89 (
+	echo Rust toolchain version could not be detected or is too old^^!
+	goto:error
+)
 
 REM --------------------------------------------------------------------------
 REM Check for uncommitted changes
@@ -54,7 +86,7 @@ REM --------------------------------------------------------------------------
 
 git describe --long --tags --always --dirty || goto:error
 
-for /F "usebackq" %%a in (`git status --porcelain`) do (
+for /F "usebackq delims=" %%a in (`git status --porcelain`) do (
 	echo Git: Uncommitted changes detected. Cowardly refusing to create an empty archive^^!
 	goto:error
 )
@@ -102,7 +134,7 @@ REM --------------------------------------------------------------------------
 
 set RUSTC_BOOTSTRAP=
 
-set "DEFAULT_RUSTFLAGS=-Dwarnings -Ctarget-feature=+crt-static -Copt-level=3 -Ccodegen-units=1 -Clto=fat -Cdebuginfo=none -Cpanic=abort -Clink-arg=/DEBUG:NONE -Clink-arg=.build\windows\resources\app-icon.res"
+set "DEFAULT_RUSTFLAGS=-Dwarnings -Ctarget-feature=+crt-static -Copt-level=3 -Ccodegen-units=1 -Clto=fat -Cdebuginfo=none -Cpanic=abort -Clink-arg=/DEBUG:NONE"
 set "RUSTFLAGS=%DEFAULT_RUSTFLAGS%"
 
 for %%t in (x86_64 i686 aarch64) do (
@@ -145,7 +177,7 @@ REM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 REM Windows 7
 REM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-mkdir "out\target\release\extra" || goto:error
+mkdir "out\target\release\legacy-compat" || goto:error
 
 set RUSTC_BOOTSTRAP=1
 set "RUSTFLAGS=%DEFAULT_RUSTFLAGS%"
@@ -154,9 +186,9 @@ for %%t in (x86_64 i686) do (
 	cargo clean || goto:error
 	cargo build -Zbuild-std=std,panic_abort --release --target %%~t-win7-windows-msvc --verbose || goto:error
 	if "%%~t" == "i686" (
-		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\extra\sponge256sum-win7-i686-sse2.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\legacy-compat\sponge256sum-win7-i686-sse2.exe" || goto:error
 	) else (
-		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\extra\sponge256sum-win7-%%~t.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\legacy-compat\sponge256sum-win7-%%~t.exe" || goto:error
 	)
 )
 
@@ -165,9 +197,9 @@ for %%t in (x86_64 i686) do (
 	cargo clean || goto:error
 	cargo build -Zbuild-std=std,panic_abort --release --target %%~t-win7-windows-msvc --verbose || goto:error
 	if "%%~t" == "i686" (
-		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\extra\sponge256sum-win7-i686-sse2-aes.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\legacy-compat\sponge256sum-win7-i686-sse2-aes.exe" || goto:error
 	) else (
-		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\extra\sponge256sum-win7-%%~t-aes.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\legacy-compat\sponge256sum-win7-%%~t-aes.exe" || goto:error
 	)
 )
 
@@ -207,11 +239,11 @@ copy /B /Y "..\..\.assets\html\index.html" "out\target\release\doc\index.html" |
 attrib +R "out\target\release\*.*" /S || goto:error
 
 pushd "out\target\release"
-7z a -t7z -mx=9 "..\sponge256sum-%PKG_VERSION%-windows.7z" * || goto:error
+%SEVENZIP% a -t7z -mx=9 "..\sponge256sum-%PKG_VERSION%-windows.7z" * || goto:error
 popd
 attrib +R "out\target\*.7z" || goto:error
 
-makensis -NOCD -WX "-DOUTPUT_FILE=out\target\sponge256sum-%PKG_VERSION%-windows.exe" "-DSOURCE_PATH=out\target\release" "-DPKG_VERSION=%PKG_VERSION%" "-DPKG_REGUUID=%PKG_REGUUID%" "resources\build.nsi" || goto:error
+makensis.exe -NOCD -WX -INPUTCHARSET UTF8 "-DOUTPUT_FILE=out\target\sponge256sum-%PKG_VERSION%-windows.exe" "-DSOURCE_PATH=out\target\release" "-DPKG_VERSION=%PKG_VERSION%" "-DPKG_REGUUID=%PKG_REGUUID%" "resources\build.nsi" || goto:error
 attrib +R "out\target\*.exe" || goto:error
 
 REM --------------------------------------------------------------------------
