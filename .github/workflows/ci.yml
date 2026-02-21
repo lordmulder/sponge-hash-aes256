@@ -399,7 +399,7 @@ jobs:
   # Verify
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-  verify:
+  verify-linux:
     runs-on: ubuntu-22.04${{ matrix.arch == 'aarch64' && '-arm' || '' }}
     needs: [build-linux, build-windows, build-macos, build-freebsd, build-netbsd, build-openbsd, build-dragonfly, build-solaris, build-illumos, build-haikuos]
     strategy:
@@ -420,13 +420,40 @@ jobs:
           [[ "${VERSION_STRING}" =~ ^sponge256sum ]]
         shell: bash -exuo pipefail {0}
 
+  verify-windows:
+    runs-on: windows-${{ matrix.arch == 'aarch64' && '11-arm' || 'latest' }}
+    needs: [build-linux, build-windows, build-macos, build-freebsd, build-netbsd, build-openbsd, build-dragonfly, build-solaris, build-illumos, build-haikuos]
+    strategy:
+      matrix:
+        arch: [x86_64, i686, aarch64]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sponge256sum-*
+          path: artifacts
+          merge-multiple: true
+      - run: |
+          $env:Path = "C:\Program Files\7-Zip;$env:Path"
+          foreach ($file in Get-ChildItem -Path .\artifacts -File -Filter 'sponge256sum-*-windows.7z') {
+            & 7z x "$($file.FullName)" -o"bin\$($file.BaseName)" -bb1 -y
+          }
+      - run: |
+          $ck_counter = @(0, 0)
+          foreach ($file in Get-ChildItem -Path ".\bin" -Recurse -File -Filter '*${{ matrix.arch }}*.exe') {
+            echo "Processing file: $($file.FullName)"
+            $ck_counter[0] += 1
+            if ([regex]::Matches((& "$($file.FullName)" --version 2>&1 | Out-String), '\[SpongeHash-AES256')) { $ck_counter[1] += 1 }
+          }
+          echo "$($ck_counter[0]) file(s) have been tested, $($ck_counter[1]) files have succeeded."
+          exit(-not ($ck_counter[0] -ge 1 -and $ck_counter[0] -eq $ck_counter[1]))
+
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   # Deploy
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
   pages:
     runs-on: ubuntu-latest
-    needs: verify
+    needs: [verify-linux, verify-windows]
     permissions:
       pages: write
       id-token: write
@@ -438,9 +465,9 @@ jobs:
         uses: actions/deploy-pages@v4
 
   release:
-    runs-on: ubuntu-latest
     if: ${{ github.event_name == 'release' }}
-    needs: verify
+    runs-on: ubuntu-latest
+    needs: [verify-linux, verify-windows]
     permissions:
       contents: write
     steps:
@@ -456,9 +483,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish:
-    runs-on: ubuntu-latest
     if: ${{ github.event_name == 'release' }}
-    needs: verify
+    runs-on: ubuntu-latest
+    needs: [verify-linux, verify-windows]
     steps:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
