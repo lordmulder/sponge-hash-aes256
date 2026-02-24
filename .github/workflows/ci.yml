@@ -187,6 +187,9 @@ jobs:
           components: rust-src
           cache: false
           rustflags: "-Dwarnings -Ctarget-feature=+crt-static"
+      - uses: egor-tensin/setup-cygwin@v4
+        with:
+          packages: mkisofs
       - run: |
           git config --global core.symlinks false
           git config --global --add safe.directory '*'
@@ -435,7 +438,7 @@ jobs:
           merge-multiple: true
       - run: |
           $env:Path = "C:\Program Files\7-Zip;$env:Path"
-          foreach ($file in Get-ChildItem -Path .\artifacts -File -Filter 'sponge256sum-*-windows.7z') {
+          foreach ($file in Get-ChildItem -Path .\artifacts -File -Filter 'sponge256sum-*-windows.zip') {
             & 7z x "$($file.FullName)" -o"bin\$($file.BaseName)" -bb1 -y
           }
       - run: |
@@ -445,6 +448,7 @@ jobs:
             $ck_counter[0] += 1
             if ([regex]::Matches((& "$($file.FullName)" --version 2>&1 | Out-String), '\[SpongeHash-AES256')) { $ck_counter[1] += 1 }
           }
+          echo "$($ck_counter[0]) file(s) have been tested, $($ck_counter[1]) files have succeeded."
           exit(-not ($ck_counter[0] -ge 1 -and $ck_counter[0] -eq $ck_counter[1]))
 
   verify-macos:
