@@ -8,15 +8,9 @@
 
 #[cfg(windows)]
 fn main() {
-    let target_arch = match std::env::var("CARGO_CFG_TARGET_ARCH") {
-        Ok(arch) if arch.eq("x86") => "i686".to_string(),
-        Ok(arch) => arch,
-        Err(_) => panic!("TARGET_ARCH is *not* specified!"),
-    };
-
     let mut winres = winres::WindowsResource::new();
     winres.set_icon(r"resources\app.ico");
-    winres.set_manifest_file(&format!(r"resources\app-{target_arch}.manifest"));
+    winres.set_manifest_file(&format!(r"resources\app-{}.manifest", std::env::var("CARGO_CFG_TARGET_ARCH").unwrap()));
     winres.compile().expect("Windows resource compiler has failed!");
 }
 

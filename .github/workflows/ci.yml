@@ -414,10 +414,11 @@ jobs:
       - run: |
           chmod +x ./artifacts/*.AppImage
           unset VERSION_STRING
-          for exe_file in ./artifacts/sponge256sum-*-linux-${{ matrix.arch }}.AppImage; do
-            VERSION_STRING="$(${exe_file} --version 2>&1 | grep -wm1 'SpongeHash-AES256' | sed 's/^[[:space:]]*//')"
-          done
-          [[ "${VERSION_STRING}" =~ ^sponge256sum ]]
+          while IFS='' read -r file_name; do
+            VERSION_STRING="$(${file_name} --version 2>&1 | grep -wm1 'SpongeHash-AES256' | sed 's/^[[:space:]]*//')"
+            [[ "${VERSION_STRING}" =~ ^sponge256sum ]]
+          done < <(find ./artifacts -maxdepth 1 -type f -name "*-linux-${{ matrix.arch }}.AppImage")
+          [[ -v VERSION_STRING ]]
         shell: bash -exuo pipefail {0}
 
   verify-windows:
@@ -438,14 +439,40 @@ jobs:
             & 7z x "$($file.FullName)" -o"bin\$($file.BaseName)" -bb1 -y
           }
       - run: |
+          $PSNativeCommandUseErrorActionPreference = $true
           $ck_counter = @(0, 0)
           foreach ($file in Get-ChildItem -Path ".\bin" -Recurse -File -Filter '*${{ matrix.arch }}*.exe') {
-            echo "Processing file: $($file.FullName)"
             $ck_counter[0] += 1
             if ([regex]::Matches((& "$($file.FullName)" --version 2>&1 | Out-String), '\[SpongeHash-AES256')) { $ck_counter[1] += 1 }
           }
-          echo "$($ck_counter[0]) file(s) have been tested, $($ck_counter[1]) files have succeeded."
           exit(-not ($ck_counter[0] -ge 1 -and $ck_counter[0] -eq $ck_counter[1]))
+
+  verify-macos:
+    runs-on: macos-${{ matrix.arch == 'x86_64' && '15-intel' || 'latest' }}
+    needs: [build-linux, build-windows, build-macos, build-freebsd, build-netbsd, build-openbsd, build-dragonfly, build-solaris, build-illumos, build-haikuos]
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: sponge256sum-*
+          path: artifacts
+          merge-multiple: true
+      - run: |
+          for file in ./artifacts/sponge256sum-*-macos.dmg; do
+            mkdir -p bin
+            hdiutil attach "${file}" -mountpoint "bin/$(basename -- "${file}" .dmg)"
+          done
+        shell: zsh -exuo pipefail {0}
+      - run: |
+          unset VERSION_STRING
+          while IFS='' read -r file_name; do
+            VERSION_STRING="$(${file_name} --version 2>&1 | grep -wm1 'SpongeHash-AES256' | sed 's/^[[:space:]]*//')"
+            [[ "${VERSION_STRING}" =~ ^sponge256sum ]]
+          done < <(find ./bin -maxdepth 2 -type f -name "*-${{ matrix.arch }}")
+          [[ -v VERSION_STRING ]]
+        shell: zsh -exuo pipefail {0}
 
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   # Deploy
@@ -453,7 +480,7 @@ jobs:
 
   pages:
     runs-on: ubuntu-latest
-    needs: [verify-linux, verify-windows]
+    needs: [verify-linux, verify-windows, verify-macos]
     permissions:
       pages: write
       id-token: write
@@ -467,7 +494,7 @@ jobs:
   release:
     if: ${{ github.event_name == 'release' }}
     runs-on: ubuntu-latest
-    needs: [verify-linux, verify-windows]
+    needs: [verify-linux, verify-windows, verify-macos]
     permissions:
       contents: write
     steps:
@@ -485,7 +512,7 @@ jobs:
   publish:
     if: ${{ github.event_name == 'release' }}
     runs-on: ubuntu-latest
-    needs: [verify-linux, verify-windows]
+    needs: [verify-linux, verify-windows, verify-macos]
     steps:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
