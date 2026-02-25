@@ -22,8 +22,8 @@ if "%NSIS_INSTALL_DIR%" == "" (
 	set "NSIS_INSTALL_DIR=%ProgramFiles(x86)%\NSIS"
 )
 
-if "%CYGWIN_INSTALL_DIR%" == "" (
-	set "CYGWIN_INSTALL_DIR=C:\tools\cygwin"
+if "%XORRISO_INSTALL_DIR%" == "" (
+	set "XORRISO_INSTALL_DIR=C:\msys64\usr\bin"
 )
 
 REM --------------------------------------------------------------------------
@@ -45,8 +45,8 @@ if not exist "%NSIS_INSTALL_DIR%\makensis.exe" (
 	goto:error
 )
 
-if not exist "%CYGWIN_INSTALL_DIR%\bin\genisoimage.exe" (
-	echo File "%CYGWIN_INSTALL_DIR%\bin\genisoimage.exe" not found. Please check CYGWIN_INSTALL_DIR and try again^^!
+if not exist "%XORRISO_INSTALL_DIR%\xorriso.exe" (
+	echo File "%XORRISO_INSTALL_DIR%\xorriso.exe" not found. Please check XORRISO_INSTALL_DIR and try again^^!
 	goto:error
 )
 
@@ -61,7 +61,7 @@ if exist "%SEVENZIP_INSTALL_DIR%\7za.exe" (
 	)
 )
 
-set "PATH=%CD%\bin;%CARGO_INSTALL_DIR%;%GIT_INSTALL_DIR%\cmd;%SEVENZIP_INSTALL_DIR%;%NSIS_INSTALL_DIR%;%CYGWIN_INSTALL_DIR%\bin;%SystemRoot%\System32;%SystemRoot%"
+set "PATH=%CD%\bin;%CARGO_INSTALL_DIR%;%GIT_INSTALL_DIR%\cmd;%SEVENZIP_INSTALL_DIR%;%NSIS_INSTALL_DIR%;%XORRISO_INSTALL_DIR%;%SystemRoot%\System32;%SystemRoot%"
 
 REM --------------------------------------------------------------------------
 REM Check the Rust version
@@ -250,12 +250,12 @@ attrib +R "out\target\release\*.*" /S || goto:error
 pushd "out\target\release"
 %SEVENZIP% a -tzip -mx=9 -mfb=258 -mpass=15 "..\sponge256sum-%PKG_VERSION%-windows.zip" * || goto:error
 popd
-attrib +R "out\target\*.7z" || goto:error
+attrib +R "out\target\*.zip" || goto:error
 
 makensis.exe -NOCD -WX -INPUTCHARSET UTF8 "-DOUTPUT_FILE=out\target\sponge256sum-%PKG_VERSION%-windows.exe" "-DSOURCE_PATH=out\target\release" "-DPKG_VERSION=%PKG_VERSION%" "-DPKG_REGUUID=%PKG_REGUUID%" "resources\build.nsi" || goto:error
 attrib +R "out\target\*.exe" || goto:error
 
-genisoimage.exe -iso-level 3 -udf -J -R -V "sponge256sum %PKG_VERSION%" -o "out\target\sponge256sum-%PKG_VERSION%-windows.iso" "out\target\release" || goto:error
+xorriso.exe -as mkisofs -iso-level 3 -R -J -V "sponge256sum" -o "out\target\sponge256sum-%PKG_VERSION%-windows.iso" "out/target/release" "resources/autorun.inf" || goto:error
 attrib +R "out\target\*.iso" || goto:error
 
 REM --------------------------------------------------------------------------

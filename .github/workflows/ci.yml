@@ -187,9 +187,11 @@ jobs:
           components: rust-src
           cache: false
           rustflags: "-Dwarnings -Ctarget-feature=+crt-static"
-      - uses: egor-tensin/setup-cygwin@v4
+      - id: msys2
+        uses: msys2/setup-msys2@v2
         with:
-          packages: mkisofs
+          install: xorriso
+          update: true
       - run: |
           git config --global core.symlinks false
           git config --global --add safe.directory '*'
@@ -199,6 +201,8 @@ jobs:
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
       - working-directory: ${{ github.workspace }}/.build/windows
         run: cmd.exe /c make.cmd
+        env:
+          XORRISO_INSTALL_DIR: ${{ steps.msys2.outputs.msys2-location }}\usr\bin
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-windows
