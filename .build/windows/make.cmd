@@ -252,10 +252,10 @@ pushd "out\target\release"
 popd
 attrib +R "out\target\*.zip" || goto:error
 
-makensis.exe -NOCD -WX -INPUTCHARSET UTF8 "-DOUTPUT_FILE=out\target\sponge256sum-%PKG_VERSION%-windows.exe" "-DSOURCE_PATH=out\target\release" "-DPKG_VERSION=%PKG_VERSION%" "-DPKG_REGUUID=%PKG_REGUUID%" "resources\build.nsi" || goto:error
+makensis.exe -NOCD -WX -INPUTCHARSET UTF8 "-DOUTPUT_FILE=out\target\sponge256sum-%PKG_VERSION%-windows.exe" "-DSOURCE_PATH=out\target\release" "-DPKG_VERSION=%PKG_VERSION%" "-DPKG_REGUUID=%PKG_REGUUID%" "resources\setup.nsi" || goto:error
 attrib +R "out\target\*.exe" || goto:error
 
-xorriso.exe -as mkisofs -iso-level 3 -R -J -V "sponge256sum" -o "out\target\sponge256sum-%PKG_VERSION%-windows.iso" "out/target/release" "resources/autorun.inf" || goto:error
+xorriso.exe -as mkisofs -iso-level 3 --norock -joliet -volid SPONGE256SUM -o "out\target\sponge256sum-%PKG_VERSION%-windows.iso" "out/target/release" "resources/autorun.inf" || goto:error
 attrib +R "out\target\*.iso" || goto:error
 
 REM --------------------------------------------------------------------------

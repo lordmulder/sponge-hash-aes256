@@ -4,6 +4,8 @@
 
 #![doc(hidden)]
 
+//! ![sponge256sum](https://raw.githubusercontent.com/lordmulder/sponge-hash-aes256/refs/heads/main/.assets/images/sponge256sum-512px.png)
+//!
 //! # sponge256sum
 //!
 //! A command-line tool for computing [**SpongeHash-AES256**](https://github.com/lordmulder/sponge-hash-aes256/) message digest.

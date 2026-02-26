@@ -5,6 +5,8 @@
 #![no_std]
 #![allow(clippy::needless_doctest_main)]
 
+//! ![SpongeHash-AES256](https://raw.githubusercontent.com/lordmulder/sponge-hash-aes256/master/.assets/images/sponge-hash-aes256.png)
+//!
 //! # SpongeHash-AES256
 //!
 //! A [**sponge**](https://en.wikipedia.org/wiki/Sponge_function)-based secure hash function that uses [AES-256](https://docs.rs/aes/latest/aes/index.html) as its internal [PRF](https://en.wikipedia.org/wiki/Pseudorandom_permutation).

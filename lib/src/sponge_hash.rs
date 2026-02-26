@@ -134,13 +134,13 @@ impl Default for Scratch {
 ///
 /// The “update” function, which *absorbs* input blocks into the state and *squeezes* the corresponding output from it, is defined as follows, where `input[i]` denotes the *i*-th input block and `output[k]` the *k*-th output block:
 ///
-/// ![Update](https://github.com/lordmulder/sponge-hash-aes256/raw/master/.assets/images/function-update.png)
+/// ![Update](https://raw.githubusercontent.com/lordmulder/sponge-hash-aes256/refs/heads/main/.assets/images/function-update.png)
 ///
 /// #### Permutation function
 ///
 /// The “permutation” function, applied to scramble the state after each absorbing or squeezing step, is defined as follows, where `AES-256` denotes the ordinary [AES](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard) block cipher with a key size of 256 bits and a block size of 128 bits.
 ///
-/// ![Permutation](https://github.com/lordmulder/sponge-hash-aes256/raw/master/.assets/images/function-permutation.png)
+/// ![Permutation](https://raw.githubusercontent.com/lordmulder/sponge-hash-aes256/refs/heads/main/.assets/images/function-permutation.png)
 ///
 /// The constants `const_0` and `const_1` are defined as full blocks filled with `0x5C` and `0x36`, respectively.
 ///
