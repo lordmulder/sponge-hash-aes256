@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 1.8.8
+
+### Added
+
+- Added generation of `.iso` (ISO-9660/Joliet) images to the Windows build script.
+
+### Changed
+
+- Updated GitHub workflow (CI) to create builds with Rust version 1.93.1 (2026-02-27).
+- Improved GitHub workflow (CI) to verify the generated Linux, Windows and MacOS binaries.
+- Various improvements to the generation of the Windows resources (manifest).
+
 ## Version 1.8.7
 
 ### Changed
