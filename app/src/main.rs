@@ -160,6 +160,15 @@
 //! - **`SPONGE256SUM_SELFTEST_PASSES`**:  
 //!   Specifies the number of passes to be executed in `--self-test` mode. Default is **3**.
 //!
+//! ## Exit status
+//!
+//! The process returns one of the following exit status codes:
+//!
+//! - **0** &ndash; The process completed successfully.
+//! - **1** &ndash; The process completed, but one or more files were skipped due to errors (only when `--keep-going` is used).
+//! - **2** &ndash; The process failed due to an error (for example, an I/O error).
+//! - **3** &ndash; The process has been interrupted by the user; generated output may be incomplete.
+//!
 //! ## Platform support
 //!
 //! This crate uses Rust edition 2021, and requires `rustc` version 1.89.0 or newer.
@@ -198,12 +207,15 @@ mod verify;
 
 use num::Integer;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
-use std::process::abort;
-use std::thread;
-use std::time::Duration;
-use std::{io::stdout, process::ExitCode, sync::Arc};
+use std::{
+    io::stdout,
+    process::{abort, ExitCode},
+    sync::Arc,
+    thread,
+    time::Duration,
+};
 
-use crate::common::{Aborted, Flag};
+use crate::common::{Aborted, ExitStatus, Flag};
 use crate::environment::Env;
 use crate::verify::verify_files;
 use crate::{
@@ -223,7 +235,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 // ---------------------------------------------------------------------------
 
 /// The actual "main" function
-fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
+fn sponge256sum_main(args: Arc<Args>) -> Result<ExitStatus, Aborted> {
     // Initialize the SimpleLogger, if the "with-logging" feature is enabled
     #[cfg(feature = "with-logging")]
     simple_logger::SimpleLogger::new().init().unwrap();
@@ -237,25 +249,25 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
     // Make sure that the digest size is divisble by eight
     if digest_rem != 0usize {
         print_error!(args, "Error: Digest output size must be divisible by eight! (given value: {}, remainder: {})", args.length.unwrap().get(), digest_rem);
-        return Ok(false);
+        return Ok(ExitStatus::Failure);
     }
 
     // Make sure that the digest size doesn't exceed the allowable maximum
     if digest_size > MAX_DIGEST_SIZE {
         print_error!(args, "Error: Digest output size exceeds the allowable maximum! (given value: {})", digest_size * 8usize);
-        return Ok(false);
+        return Ok(ExitStatus::Failure);
     }
 
     // Check for snail level being out of bounds
     if args.snail > MAX_SNAIL_LEVEL {
         print_error!(args, "\n{}", include_str!("../../.assets/text/goat.txt"));
-        return Ok(false);
+        return Ok(ExitStatus::Failure);
     }
 
     // Check the maximum allowable info length
     if args.info.as_ref().is_some_and(|str| str.len() > u8::MAX as usize) {
         print_error!(args, "Error: Length of context info must not exceed 255 characters! (given length: {})", args.info.as_ref().unwrap().len());
-        return Ok(false);
+        return Ok(ExitStatus::Failure);
     }
 
     // Parse additional options from environment variables
@@ -263,7 +275,7 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<bool, Aborted> {
         Ok(options) => options,
         Err(error) => {
             print_error!(args, "Error: Environment variable {}={:?} is invalid!", error.name, error.value);
-            return Ok(false);
+            return Ok(ExitStatus::Failure);
         }
     };
 
@@ -314,11 +326,10 @@ fn main() -> ExitCode {
 
     // Call the actual "main" function
     match sponge256sum_main(Arc::clone(&args)) {
-        Ok(true) => ExitCode::SUCCESS,
-        Ok(false) => ExitCode::FAILURE,
+        Ok(status) => status.into(),
         Err(Aborted) => {
             print_error!(args, "Aborted: The process has been interrupted by the user!");
-            ExitCode::from(130u8)
+            Aborted.into()
         }
     }
 }

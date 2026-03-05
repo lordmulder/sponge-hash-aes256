@@ -14,8 +14,6 @@ A [**sponge**](https://en.wikipedia.org/wiki/Sponge_function)-based secure hash 
 
 This hash function has a *variable* output size and can produce outputs of *any* non-zero size.
 
-Please see the [**documentation**](https://lordmulder.github.io/sponge-hash-aes256/) for details! &#x1F4A1;
-
 ## Library
 
 The “core” hash algorithm is implemented in the **`sponge-hash-aes256`** crate.
@@ -26,7 +24,7 @@ In order to use this crate, add it under `[dependencies]` to your **`Cargo.toml`
 
 ```
 [dependencies]
-sponge-hash-aes256 = "1.8.8"
+sponge-hash-aes256 = "1.9.0"
 ```
 
 ### Usage
@@ -55,6 +53,10 @@ fn main() {
     println!("0x{}", str::from_utf8(&hex_buffer).unwrap());
 }
 ```
+
+### Documentation
+
+Please refer to the [**`sponge-hash-aes256` documentation**](https://lordmulder.github.io/sponge-hash-aes256/sponge_hash_aes256/) for more details! &#x1F4A1;
 
 ## Command-line tool
 
@@ -95,6 +97,10 @@ Options:
 If no input files are specified, reads input data from the 'stdin' stream.
 Returns a non-zero exit code if any errors occurred; otherwise, zero.
 ```
+
+### Documentation
+
+Please refer to the [**`sponge256sum` documentation**](https://lordmulder.github.io/sponge-hash-aes256/) for more details! &#x1F4A1;
 
 ## Algorithm
 

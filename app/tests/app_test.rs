@@ -2,15 +2,14 @@
 // sponge256sum
 // Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>
 
-use hex::decode_to_slice;
-use hex_literal::hex;
-use num::Integer;
-use rand_pcg::{
-    rand_core::{Rng, SeedableRng},
-    Pcg64,
+mod common;
+
+use crate::common::{
+    random::random_u64,
+    utils::{digest_eq, get_file_name, run_binary, run_binary_and_exit, run_binary_to_file, run_binary_with_data, run_binary_with_env},
 };
+
 use regex::Regex;
-use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
 use std::{
     collections::{HashMap, HashSet},
     ffi::{OsStr, OsString},
@@ -20,31 +19,99 @@ use std::{
     iter,
     num::NonZeroUsize,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
-    sync::{LazyLock, Mutex},
-    time::{SystemTime, UNIX_EPOCH},
+    sync::LazyLock,
 };
-use tinyvec::TinyVec;
 
 #[cfg(unix)]
 use std::{
     fs::{set_permissions, Permissions},
     os::unix::fs::PermissionsExt,
-    thread,
-    time::Duration,
 };
 
 #[cfg(unix)]
-use nix::{
-    sys::signal::{kill, Signal},
-    unistd::Pid,
-};
+use crate::common::utils::run_binary_with_signal;
 
 #[cfg(windows)]
 use std::os::windows::ffi::OsStringExt;
 
 #[used]
 static DROP_ROOT_CAPS: () = drop_root_caps::set_up();
+
+// ---------------------------------------------------------------------------
+// Test vectors
+// ---------------------------------------------------------------------------
+
+// Input data to be hashed
+static INPUT_MESSAGE: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
+
+// Expected digest values
+static EXPECTED: [&str; 47usize] = [
+    "68c0656ee81830fd73031bd53af43c4a793a353c4e086ba27b9851206c17398d",
+    "0d74c2e49bc2458915d78321ceddd9566bfee73b5bdf63ea0326cdbd78603afc",
+    "a32cd2879cb337568324f064921072ce131d2ad981d84263731a3328c474187f",
+    "06201c3a68c7b8812ef8c492c61d955972031273582a73f86085479173e11526",
+    "d0075cf3e68f6c492d5f5527694ecb8ef4df9ca241c7eafd26d8c8435dfdef5b",
+    "0f0309b4b5e00bbf5492efcb6a6fdfc890d5e1d695fd6f4a8fbe372506a2add4",
+    "bcfe521448677a659e765acc9d0ee4aa005531518a4279539e7793d2ba9c26db",
+    "f555e89024343d383438be0a278a6ea7f8783335f9a795981fdd8a929f619616",
+    "1d17d61280be5c77902f380608b1eea7327a90dadabb96b83122a1f27934fc9c",
+    "f1792a0de1f8ed2747e9635a0f434e8aae920d4b5d17c3642a05f947c54a8876",
+    "68c0656ee81830fd73031bd53af43c4a793a353c4e086ba27b9851206c17398d09387f3d5802f59869856d349b5e41b688ecf8b97358b414a18e3a946f011188",
+    "68c0656ee81830fd73031bd53af43c4a793a353c4e086ba2",
+    "0f0309b4b5e00bbf5492efcb6a6fdfc890d5e1d695fd6f4a8fbe372506a2add4830545482c7142793861425a5e3d15811edf833008379b9ec2767aa204ae738d",
+    "0f0309b4b5e00bbf5492efcb6a6fdfc890d5e1d695fd6f4a",
+    "5525347e60fcf0c36a6939d2900388ca9562fb320b3d62fb82b5c496ada9010e",
+    "690bfc8cce39ac385a3c16521d6f212a40e5447f358bb0d3cf7e282298b21ace",
+    "cae29bda6c724974a27f45c7a993fe00c3f084f31d40d8491063adbec31f8594",
+    "183b74b858525bd3827983cbce01ba6716adf98aa95d2723ef9f17f3a6db57f3",
+    "27fab5a0bf44a2fe7e31a19eccc4ad17233498f20a488f6fa04781fc4bb45204",
+    "38e0b15a62761581544bf4317babb2e89e1eb578a4b5b341267522c494554185",
+    "d957410edab00e29dfc181cc941a067ec4105726bdf8a00bdeecc813ea860928",
+    "8ba7c6f2a544bea08f90833ef8e9faaeb36dbbe516610fcee7295e81c709036c",
+    "23f5fea30132ee640f1780516cc374c3042507c57cf540b5293cc50eac2fad4f",
+    "19ee2d21b6bdb04feb8ac34c9036d502e1d43e1641d963e0c285c69bbda043da",
+    "e5aaf13e4ac36cd35c331ed89c0c451b6d07163d1fabba9bbda9183486a55645",
+    "34f3f9fd10aa864bd03631ed2142e29095210edf56ce8efd319154bab4a73eda",
+    "1d0285d2ce3fa1ca745555daa301dc43569318f87d8d958d7aa841ba9b72c462",
+    "6a7973490c36b46548aeeab412a3627eb896389662f366c5baf617e3b1446dbe",
+    "cbca17a3893291669566f13ee10e20dcf58c8f77556048c6a5b0365ade0ff73c",
+    "069047fb68beea4baf6f054ec0322621ae4e32cdeff3354d9b674318428db103",
+    "e2755eb2eb3353b28249b1bb6d38390b0acb677a2e4cee1ade17802fc018ff4a",
+    "e0c9b9ef955cb50354f5236ea5956cb30de1d6f78cc1d8b7586f277db177a4cc",
+    "b38ee7d783ef9bd381003e96afce959829f64e1dbe6f5a3770f20080efc357ae",
+    "aef5a52668dbe29365a1efe8863ece9d77058838e17449e80ed089947c1ae0b7",
+    "a06aa9dc1c300910592b5f91dcaa77d51c88f495176a5f3bbce3c524e2c018c5",
+    "568dec19bb459f51651caa5fa28a201e1c1557d817c1e6a4344b89c7d787c120",
+    "ac412f4791b0823bc8e9527dfe70bbee3e1c1f4ad286c60184e263573451271b",
+    "0fcb324f81264fde86df8b25df92b1f1c08051cc9b92414843c5044d90ff5759",
+    "756349dfdfd63fb82bb4fa417b30c7695f86120f2a2d0c1dc2fa29a820c68442",
+    "76d0b2b94003c069172a228866436925e43cda64e9a7f6f0c0bc92e9f282ef26",
+    "658c2632fa26de9b7410bbe7a9a94b513875cc60ef499d2bd81f3aa159599c99",
+    "3ccc937a835d8cd4af63007c741d75f1a55efcac8ef9da4503a7c0cf4f1cc05e",
+    "a9f85f6c13049df99066ce72ca681ae0fa2d23cac7afff7da570c05638c856f2",
+    "cfc9bca044ff820959a5fcd08d3096c2ef637e3fd68091118c83d9fc52e3e784",
+    "2e6a8ce4c04f6ca518f06d109cb82514285b2e614584e2c65f874cf94ca074e5",
+    "c75a794e49090b7a9a7144c0acb984e20f4534b4e11e5bbacbe2ec05d44fe85a",
+    "3e948059e44ebe75efd4c4359853ecff5f337c96c23e9bc72f346eae8d05b8f2",
+];
+
+// Path to a non-existing file
+#[cfg(windows)]
+const FILE_PATH: &str = r#"C:\this\file\does\not\exist"#;
+#[cfg(not(windows))]
+const FILE_PATH: &str = "/this/file/does/not/exist";
+
+// Path to a directory (not a file)
+#[cfg(windows)]
+const DIRECTORY_PATH: &str = r#"C:\Windows"#;
+#[cfg(not(windows))]
+const DIRECTORY_PATH: &str = "/usr";
+
+// The standard input stream device file path
+#[cfg(windows)]
+const STDIN_DEV_FILE: &str = "CONIN$";
+#[cfg(not(windows))]
+const STDIN_DEV_FILE: &str = "/dev/stdin";
 
 // ---------------------------------------------------------------------------
 // Regular expressions
@@ -88,187 +155,37 @@ static REGEX_CHECK_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Check
 static REGEX_TARGET_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Target file is a directory: "([^"]+)"#).unwrap());
 
 // ---------------------------------------------------------------------------
-// Randomness
+// Miscellaneous functions
 // ---------------------------------------------------------------------------
 
-struct RandContext {
-    burned: HashSet<u64>,
-    random: Pcg64,
-}
-
-impl RandContext {
-    pub fn new() -> Self {
-        let mut seed = hex!("2ca33785d2ae0c7fc0cf4c5267bf10f0854053c52428b24d3903a62c145a7f8b");
-        for (index, value) in SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos().to_be_bytes().iter().enumerate() {
-            seed[16usize + index] ^= value;
-        }
-        Self { burned: HashSet::new(), random: Pcg64::from_seed(seed) }
-    }
-}
-
-static RANDOM: LazyLock<Mutex<RandContext>> = LazyLock::new(|| Mutex::new(RandContext::new()));
-
-fn random_u64() -> u64 {
-    let mut context = RANDOM.lock().unwrap();
-
-    loop {
-        let value = context.random.next_u64();
-        if context.burned.insert(value) {
-            return value;
+fn modify_checksum_file(original_file: &Path, modified_file: PathBuf, first_only: bool) -> PathBuf {
+    fn modify_hex_char(character: &char) -> char {
+        match *character {
+            value if ('0'..='8').contains(&value) => char::from_u32(value as u32 + 1u32).unwrap(),
+            '9' => 'a',
+            value if ('a'..='e').contains(&value) => char::from_u32(value as u32 + 1u32).unwrap(),
+            'f' => '0',
+            _ => panic!("Invalid hex character: '{}'", *character),
         }
     }
-}
 
-// ---------------------------------------------------------------------------
-// Utility functions
-// ---------------------------------------------------------------------------
-
-fn run_binary<I, S>(args: I, expected_success: bool, force_stderr: bool) -> String
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let output = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
-        .args(args)
-        .stdout(if force_stderr { Stdio::null() } else { Stdio::piped() })
-        .stderr(if force_stderr { Stdio::piped() } else { Stdio::null() })
-        .stdin(Stdio::null())
-        .output()
-        .expect("Failed to run binary!");
-
-    assert_eq!(output.status.success(), expected_success);
-    String::from_utf8(if force_stderr { output.stderr } else { output.stdout }).unwrap()
-}
-
-fn run_binary_with_data<I, S>(args: I, data: &[u8]) -> String
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let child = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .stdin(Stdio::piped())
-        .spawn()
-        .expect("Failed to run binary!");
-
-    child.stdin.as_ref().unwrap().write_all(data).expect("Failed to write data!");
-    let output = child.wait_with_output().unwrap();
-    assert!(output.status.success());
-    String::from_utf8(output.stdout).unwrap()
-}
-
-fn run_binary_to_file<I, S>(args: I, dest_file: &Path)
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let dest_file = File::create_new(dest_file).expect("Failed to create output file!");
-    let child = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
-        .args(args)
-        .stdout(Stdio::from(dest_file))
-        .stderr(Stdio::null())
-        .stdin(Stdio::null())
-        .spawn()
-        .expect("Failed to run binary!");
-
-    assert!(child.wait_with_output().unwrap().status.success());
-}
-
-fn run_binary_with_env<I, S>(args: I, env: HashMap<&str, String>, expected_success: bool, force_stderr: bool) -> String
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let output = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
-        .args(args)
-        .stdout(if force_stderr { Stdio::null() } else { Stdio::piped() })
-        .stderr(if force_stderr { Stdio::piped() } else { Stdio::null() })
-        .stdin(Stdio::null())
-        .envs(env)
-        .output()
-        .expect("Failed to run binary!");
-
-    assert_eq!(output.status.success(), expected_success);
-    String::from_utf8(if force_stderr { output.stderr } else { output.stdout }).unwrap()
-}
-
-#[cfg(unix)]
-fn run_binary_with_signal<I, S>(args: I, delay: u64, signal: i32, expected_status: i32, force_stderr: bool) -> String
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let child = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
-        .args(args)
-        .stdout(if force_stderr { Stdio::null() } else { Stdio::piped() })
-        .stderr(if force_stderr { Stdio::piped() } else { Stdio::null() })
-        .stdin(Stdio::null())
-        .spawn()
-        .expect("Failed to run binary!");
-
-    thread::sleep(Duration::from_secs(delay));
-    kill(Pid::from_raw(child.id() as i32), Signal::try_from(signal).unwrap()).expect("Failed to send signal!");
-
-    let output = child.wait_with_output().expect("Failed to wait for process!");
-    assert_eq!(output.status.code().unwrap_or(-1i32), expected_status);
-    String::from_utf8(if force_stderr { output.stderr } else { output.stdout }).unwrap()
-}
-
-fn get_file_name(path: &str) -> &str {
-    path.split(['/', '\\']).next_back().unwrap_or(path)
-}
-
-fn modify_checksum_file(original_file: &Path, modified_file: PathBuf) -> PathBuf {
     let reader = BufReader::new(File::open(original_file).unwrap());
+    let mut first_line = true;
     let mut writer = BufWriter::new(File::create_new(&modified_file).unwrap());
 
     for line in reader.lines() {
         let mut line_modified: Vec<char> = line.unwrap().trim_start().chars().collect();
         if !line_modified.is_empty() {
-            let first_char = line_modified.first_mut().unwrap();
-            *first_char = modify_hex_char(first_char);
+            if first_line || (!first_only) {
+                let first_char = line_modified.first_mut().unwrap();
+                *first_char = modify_hex_char(first_char);
+            }
+            first_line = false;
             writeln!(&mut writer, "{}", String::from_iter(line_modified.into_iter())).unwrap();
         }
     }
 
     modified_file
-}
-
-fn modify_hex_char(character: &char) -> char {
-    match *character {
-        value if ('0'..='8').contains(&value) => char::from_u32(value as u32 + 1u32).unwrap(),
-        '9' => 'a',
-        value if ('a'..='e').contains(&value) => char::from_u32(value as u32 + 1u32).unwrap(),
-        'f' => '0',
-        _ => panic!("Invalid hex character: '{}'", *character),
-    }
-}
-
-fn decode_digest(digest_hex: &str) -> Option<TinyVec<[u8; DEFAULT_DIGEST_SIZE]>> {
-    let (length, remainder) = digest_hex.len().div_rem(&2usize);
-    if (remainder != 0usize) || (length < 1usize) {
-        return None;
-    }
-
-    let mut decoded: TinyVec<[u8; DEFAULT_DIGEST_SIZE]> = TinyVec::with_capacity(length);
-    decoded.resize(length, 0u8);
-    decode_to_slice(digest_hex, &mut decoded).ok().map(|_| decoded)
-}
-
-fn digest_eq(hexstr_1: &str, hexstr_2: &str) -> bool {
-    if let (Some(digest_1), Some(digest_2)) = (decode_digest(hexstr_1), decode_digest(hexstr_2)) {
-        if digest_1.len() == digest_2.len() {
-            let mut diff_mask = 0u8;
-            for (byte_1, byte_2) in digest_1.iter().zip(digest_2.iter()) {
-                diff_mask |= byte_1 ^ byte_2;
-            }
-            return diff_mask == 0u8;
-        }
-    }
-
-    false /* mismatch! */
 }
 
 // ---------------------------------------------------------------------------
@@ -432,7 +349,7 @@ fn do_verify_files(modify: bool, file_count: usize, multi_threading: bool, force
 
     let input_file = if modify {
         let modified_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("modified_{:016X}.txt", random_u64()));
-        modify_checksum_file(&check_file, modified_file)
+        modify_checksum_file(&check_file, modified_file, false)
     } else {
         check_file.clone()
     };
@@ -465,81 +382,43 @@ fn do_verify_files(modify: bool, file_count: usize, multi_threading: bool, force
     assert_eq!(result_set.len(), file_count);
 }
 
+fn do_test_exit_code(files: &[&str], verify_mode: bool, modify: bool, keep_going: bool, expected_code: i32) {
+    assert!(verify_mode || (!modify));
+    let base_directory = Path::new(env!("CARGO_MANIFEST_DIR"));
+    let paths: Vec<PathBuf> = files.iter().map(|file_name| base_directory.join("tests").join("data").join("binary").join(file_name)).collect();
+
+    if !verify_mode {
+        let mut parameters = Vec::with_capacity(paths.len() + 1usize);
+        if keep_going {
+            parameters.push(OsStr::new("--keep-going"));
+        }
+        paths.iter().for_each(|path| parameters.push(path.as_os_str()));
+        assert_eq!(run_binary_and_exit(parameters), expected_code);
+    } else {
+        let parameters: Vec<&OsStr> = paths.iter().map(|path| path.as_os_str()).collect();
+        let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
+        run_binary_to_file(parameters, &check_file);
+
+        let input_file = if modify {
+            let modified_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
+            modify_checksum_file(&check_file, modified_file, true)
+        } else {
+            check_file.clone()
+        };
+
+        let mut parameters = Vec::with_capacity(3usize);
+        parameters.push(OsStr::new("--check"));
+        if keep_going {
+            parameters.push(OsStr::new("--keep-going"));
+        }
+        parameters.push(input_file.as_os_str());
+        assert_eq!(run_binary_and_exit(parameters), expected_code);
+    }
+}
+
 // ---------------------------------------------------------------------------
-// Test vectors
+// Test cases
 // ---------------------------------------------------------------------------
-
-// Input data to be hashed
-static INPUT_MESSAGE: &[u8] = b"abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq";
-
-// Expected digest values
-static EXPECTED: [&str; 47usize] = [
-    "68c0656ee81830fd73031bd53af43c4a793a353c4e086ba27b9851206c17398d",
-    "0d74c2e49bc2458915d78321ceddd9566bfee73b5bdf63ea0326cdbd78603afc",
-    "a32cd2879cb337568324f064921072ce131d2ad981d84263731a3328c474187f",
-    "06201c3a68c7b8812ef8c492c61d955972031273582a73f86085479173e11526",
-    "d0075cf3e68f6c492d5f5527694ecb8ef4df9ca241c7eafd26d8c8435dfdef5b",
-    "0f0309b4b5e00bbf5492efcb6a6fdfc890d5e1d695fd6f4a8fbe372506a2add4",
-    "bcfe521448677a659e765acc9d0ee4aa005531518a4279539e7793d2ba9c26db",
-    "f555e89024343d383438be0a278a6ea7f8783335f9a795981fdd8a929f619616",
-    "1d17d61280be5c77902f380608b1eea7327a90dadabb96b83122a1f27934fc9c",
-    "f1792a0de1f8ed2747e9635a0f434e8aae920d4b5d17c3642a05f947c54a8876",
-    "68c0656ee81830fd73031bd53af43c4a793a353c4e086ba27b9851206c17398d09387f3d5802f59869856d349b5e41b688ecf8b97358b414a18e3a946f011188",
-    "68c0656ee81830fd73031bd53af43c4a793a353c4e086ba2",
-    "0f0309b4b5e00bbf5492efcb6a6fdfc890d5e1d695fd6f4a8fbe372506a2add4830545482c7142793861425a5e3d15811edf833008379b9ec2767aa204ae738d",
-    "0f0309b4b5e00bbf5492efcb6a6fdfc890d5e1d695fd6f4a",
-    "5525347e60fcf0c36a6939d2900388ca9562fb320b3d62fb82b5c496ada9010e",
-    "690bfc8cce39ac385a3c16521d6f212a40e5447f358bb0d3cf7e282298b21ace",
-    "cae29bda6c724974a27f45c7a993fe00c3f084f31d40d8491063adbec31f8594",
-    "183b74b858525bd3827983cbce01ba6716adf98aa95d2723ef9f17f3a6db57f3",
-    "27fab5a0bf44a2fe7e31a19eccc4ad17233498f20a488f6fa04781fc4bb45204",
-    "38e0b15a62761581544bf4317babb2e89e1eb578a4b5b341267522c494554185",
-    "d957410edab00e29dfc181cc941a067ec4105726bdf8a00bdeecc813ea860928",
-    "8ba7c6f2a544bea08f90833ef8e9faaeb36dbbe516610fcee7295e81c709036c",
-    "23f5fea30132ee640f1780516cc374c3042507c57cf540b5293cc50eac2fad4f",
-    "19ee2d21b6bdb04feb8ac34c9036d502e1d43e1641d963e0c285c69bbda043da",
-    "e5aaf13e4ac36cd35c331ed89c0c451b6d07163d1fabba9bbda9183486a55645",
-    "34f3f9fd10aa864bd03631ed2142e29095210edf56ce8efd319154bab4a73eda",
-    "1d0285d2ce3fa1ca745555daa301dc43569318f87d8d958d7aa841ba9b72c462",
-    "6a7973490c36b46548aeeab412a3627eb896389662f366c5baf617e3b1446dbe",
-    "cbca17a3893291669566f13ee10e20dcf58c8f77556048c6a5b0365ade0ff73c",
-    "069047fb68beea4baf6f054ec0322621ae4e32cdeff3354d9b674318428db103",
-    "e2755eb2eb3353b28249b1bb6d38390b0acb677a2e4cee1ade17802fc018ff4a",
-    "e0c9b9ef955cb50354f5236ea5956cb30de1d6f78cc1d8b7586f277db177a4cc",
-    "b38ee7d783ef9bd381003e96afce959829f64e1dbe6f5a3770f20080efc357ae",
-    "aef5a52668dbe29365a1efe8863ece9d77058838e17449e80ed089947c1ae0b7",
-    "a06aa9dc1c300910592b5f91dcaa77d51c88f495176a5f3bbce3c524e2c018c5",
-    "568dec19bb459f51651caa5fa28a201e1c1557d817c1e6a4344b89c7d787c120",
-    "ac412f4791b0823bc8e9527dfe70bbee3e1c1f4ad286c60184e263573451271b",
-    "0fcb324f81264fde86df8b25df92b1f1c08051cc9b92414843c5044d90ff5759",
-    "756349dfdfd63fb82bb4fa417b30c7695f86120f2a2d0c1dc2fa29a820c68442",
-    "76d0b2b94003c069172a228866436925e43cda64e9a7f6f0c0bc92e9f282ef26",
-    "658c2632fa26de9b7410bbe7a9a94b513875cc60ef499d2bd81f3aa159599c99",
-    "3ccc937a835d8cd4af63007c741d75f1a55efcac8ef9da4503a7c0cf4f1cc05e",
-    "a9f85f6c13049df99066ce72ca681ae0fa2d23cac7afff7da570c05638c856f2",
-    "cfc9bca044ff820959a5fcd08d3096c2ef637e3fd68091118c83d9fc52e3e784",
-    "2e6a8ce4c04f6ca518f06d109cb82514285b2e614584e2c65f874cf94ca074e5",
-    "c75a794e49090b7a9a7144c0acb984e20f4534b4e11e5bbacbe2ec05d44fe85a",
-    "3e948059e44ebe75efd4c4359853ecff5f337c96c23e9bc72f346eae8d05b8f2",
-];
-
-// Path to a non-existing file
-#[cfg(windows)]
-const FILE_PATH: &str = r#"C:\this\file\does\not\exist"#;
-#[cfg(not(windows))]
-const FILE_PATH: &str = "/this/file/does/not/exist";
-
-// Path to a directory (not a file)
-#[cfg(windows)]
-const DIRECTORY_PATH: &str = r#"C:\Windows"#;
-#[cfg(not(windows))]
-const DIRECTORY_PATH: &str = "/usr";
-
-// The standard input stream device file path
-#[cfg(windows)]
-const STDIN_DEV_FILE: &str = "CONIN$";
-#[cfg(not(windows))]
-const STDIN_DEV_FILE: &str = "/dev/stdin";
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // File tests
@@ -990,13 +869,57 @@ fn test_verify_3b() {
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Exit code tests
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#[test]
+fn test_exit_code_1a() {
+    do_test_exit_code(&["frank.pdf", "dracula.pdf"], false, false, false, 0i32);
+}
+
+#[test]
+fn test_exit_code_1b() {
+    do_test_exit_code(&["frank.pdf", "dracula.pdf"], false, false, true, 0i32);
+}
+
+#[test]
+fn test_exit_code_1c() {
+    do_test_exit_code(&["fr0nk.pdf", "dracula.pdf"], false, false, false, 2i32);
+}
+
+#[test]
+fn test_exit_code_1d() {
+    do_test_exit_code(&["fr0nk.pdf", "dracula.pdf"], false, false, true, 1i32);
+}
+
+#[test]
+fn test_exit_code_2a() {
+    do_test_exit_code(&["frank.pdf", "dracula.pdf"], true, false, false, 0i32);
+}
+
+#[test]
+fn test_exit_code_2b() {
+    do_test_exit_code(&["frank.pdf", "dracula.pdf"], true, false, true, 0i32);
+}
+
+#[test]
+fn test_exit_code_2c() {
+    do_test_exit_code(&["frank.pdf", "dracula.pdf"], true, true, false, 2i32);
+}
+
+#[test]
+fn test_exit_code_2d() {
+    do_test_exit_code(&["frank.pdf", "dracula.pdf"], true, true, true, 1i32);
+}
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Error tests
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 #[cfg(unix)]
 #[test]
 fn test_interrupt() {
-    let output = run_binary_with_signal([OsStr::new("/dev/zero")], 1u64, 2i32, 130i32, true);
+    let output = run_binary_with_signal([OsStr::new("/dev/zero")], 1u64, 2i32, 3i32, true);
     assert!(REGEX_ABORTED.is_match(&output))
 }
 

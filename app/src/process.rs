@@ -22,7 +22,7 @@ use tinyvec::TinyVec;
 
 use crate::{
     arguments::Args,
-    common::{get_capacity, increment, Aborted, Digest, Flag, TinyVecEx},
+    common::{get_capacity, increment, Aborted, Digest, ExitStatus, Flag, TinyVecEx},
     digest::{compute_digest, Error as DigestError},
     environment::Env,
     io::{DataSource, Error as IoError, STDIN_NAME},
@@ -129,6 +129,18 @@ macro_rules! break_cancelled {
     };
 }
 
+/// Compute the exit status
+#[inline]
+fn exit_status(write_errors: bool, file_errors: u64, args: &Args) -> ExitStatus {
+    if (!write_errors) && (file_errors == u64::MIN) {
+        ExitStatus::Success
+    } else if (!write_errors) && ((file_errors == u64::MIN) || args.keep_going) {
+        ExitStatus::Warning
+    } else {
+        ExitStatus::Failure
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Print results
 // ---------------------------------------------------------------------------
@@ -185,9 +197,9 @@ fn print_result(output: &mut impl Write, digest_result: &DigestResult, args: &Ar
 fn print_summary(file_errors: u64, args: &Args) {
     if file_errors > u64::MIN {
         if args.keep_going {
-            print_error!(args, "WARNING: {} file(s) were skipped due to errors!", file_errors);
+            print_error!(args, "Warning: {} file(s) were skipped due to errors!", file_errors);
         } else {
-            print_error!(args, "WARNING: The process failed with an error!");
+            print_error!(args, "Error: The checksum computation has failed!");
         }
     }
 }
@@ -323,16 +335,16 @@ fn start_iteration(bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> (Receiver<P
     }
 }
 
-fn process_mt(output: &mut impl Write, thread_count: NonZeroUsize, digest_size: usize, bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
+fn process_mt(output: &mut impl Write, n_threads: NonZeroUsize, out_size: usize, bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<ExitStatus, Aborted> {
     // Initialize channel
-    let (digest_tx, digest_rx) = bounded::<DigestResult>(get_capacity(&thread_count));
+    let (digest_tx, digest_rx) = bounded::<DigestResult>(get_capacity(&n_threads));
 
     // Start the file iteration thread
     let (path_rx, thread_handle) = start_iteration(bfs, args, halt);
 
     // Start the worker threads
     let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
-    let thread_pool = ThreadPool::new(thread_count, move || compute_thread(&path_rx, &digest_tx, digest_size, &args_cloned, &halt_cloned));
+    let thread_pool = ThreadPool::new(n_threads, move || compute_thread(&path_rx, &digest_tx, out_size, &args_cloned, &halt_cloned));
 
     // Initialize counters
     let (mut file_errors, mut write_errors) = (u64::MIN, false);
@@ -375,10 +387,10 @@ fn process_mt(output: &mut impl Write, thread_count: NonZeroUsize, digest_size: 
     print_summary(file_errors, args);
 
     // Check for errors
-    Ok((file_errors == u64::MIN) && (!write_errors))
+    Ok(exit_status(write_errors, file_errors, args))
 }
 
-fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
+fn process_st(output: &mut impl Write, out_size: usize, bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<ExitStatus, Aborted> {
     // Start the file iteration thread
     let (path_rx, thread_handle) = start_iteration(bfs, args, halt);
 
@@ -389,7 +401,7 @@ fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc
     while let Ok(path_result) = path_rx.recv() {
         break_cancelled!(halt);
         let digest_result = match path_result {
-            Ok(path) => match compute_file_digest(path, digest_size, args, halt) {
+            Ok(path) => match compute_file_digest(path, out_size, args, halt) {
                 Ok(result) => result,
                 Err(Cancelled) => break, /* cancelled */
             },
@@ -426,7 +438,7 @@ fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc
     print_summary(file_errors, args);
 
     // Check for errors
-    Ok((file_errors == u64::MIN) && (!write_errors))
+    Ok(exit_status(write_errors, file_errors, args))
 }
 
 // ---------------------------------------------------------------------------
@@ -434,22 +446,25 @@ fn process_st(output: &mut impl Write, digest_size: usize, bfs: bool, args: &Arc
 // ---------------------------------------------------------------------------
 
 /// Process data from 'stdin' stream
-fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args>, halt: Arc<Flag>) -> Result<bool, Cancelled> {
+fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args>, halt: Arc<Flag>) -> Result<ExitStatus, Cancelled> {
     let mut stdin = DataSource::from_stdin();
     let mut digest = TinyVec::with_length(digest_size);
 
     match compute_digest(&mut stdin, digest.as_mut_slice(), &args, &halt) {
-        Ok(_) => Ok(print_digest(output, &STDIN_NAME, &digest, &args).is_ok()),
+        Ok(_) => match print_digest(output, &STDIN_NAME, &digest, &args) {
+            Ok(_) => Ok(ExitStatus::Success),
+            Err(_) => Ok(ExitStatus::Failure),
+        },
         Err(DigestError::IoError) => {
             print_error!(args, "Failed to read data from the standard input stream!");
-            Ok(false)
+            Ok(ExitStatus::Failure)
         }
         Err(DigestError::Cancelled) => Err(Cancelled),
     }
 }
 
 /// Process all input files
-pub fn process_files(output: &mut impl Write, digest_size: usize, args: Arc<Args>, env: &Env, halt: Arc<Flag>) -> Result<bool, Aborted> {
+pub fn process_files(output: &mut impl Write, digest_size: usize, args: Arc<Args>, env: &Env, halt: Arc<Flag>) -> Result<ExitStatus, Aborted> {
     // Read input datat from 'stdin' stream?
     if args.files.is_empty() {
         return process_stdin(output, digest_size, args, halt).map_err(|_| Aborted);

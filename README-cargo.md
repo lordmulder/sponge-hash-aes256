@@ -8,11 +8,11 @@ This hash function has a *variable* output size.
 
 ## Installation
 
-In order to use this crate, add it under `[dependencies]` to your **`Cargo.toml`**:
+In order to use this crate, add it to your **`Cargo.toml`** file:
 
 ```
 [dependencies]
-sponge-hash-aes256 = "1.8.8"
+sponge-hash-aes256 = "1.9.0"
 ```
 
 ## Usage
@@ -44,12 +44,18 @@ fn main() {
 
 ## Command-line application
 
+The **`sponge256sum`** command-line application:
+
 [![sponge256sum](https://raw.githubusercontent.com/lordmulder/sponge-hash-aes256/main/.assets/images/sponge256sum-512px.png)](https://raw.githubusercontent.com/lordmulder/sponge-hash-aes256/main/.assets/images/sponge256sum.png)
 
-Download the **`sponge256sum`** application here:  
+Download the application here:  
 &#128279; <https://github.com/lordmulder/sponge-hash-aes256/releases>  
 &#128279; <https://codeberg.org/MuldeR/sponge-hash-aes256/releases>  
 &#128279; <https://gitlab.com/lord_mulder/sponge-hash-aes256/-/releases>
+
+Mirrors:  
+&#128279; <https://www.appimagehub.com/p/2347075>  
+&#128279; <https://sourceforge.net/projects/muldersoft/files/SpongeHash-AES256/>
 
 ## License
 

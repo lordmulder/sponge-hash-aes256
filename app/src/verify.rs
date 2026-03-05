@@ -17,7 +17,7 @@ use tinyvec::TinyVec;
 
 use crate::{
     arguments::Args,
-    common::{get_capacity, increment, Aborted, Digest, Flag, TinyVecEx, MAX_DIGEST_SIZE},
+    common::{get_capacity, increment, Aborted, Digest, ExitStatus, Flag, TinyVecEx, MAX_DIGEST_SIZE},
     digest::{compute_digest, digest_equal, Error as DigestError},
     environment::Env,
     io::{DataSource, Error as IoError, STDIN_NAME},
@@ -79,6 +79,18 @@ macro_rules! break_cancelled {
     };
 }
 
+/// Compute the exit status
+#[inline]
+fn exit_status(write_errors: bool, chck_errors: u64, file_errors: u64, args: &Args) -> ExitStatus {
+    if (!write_errors) && (file_errors == u64::MIN) && (chck_errors == u64::MIN) {
+        ExitStatus::Success
+    } else if (!write_errors) && (((file_errors == u64::MIN) && (chck_errors == u64::MIN)) || args.keep_going) {
+        ExitStatus::Warning
+    } else {
+        ExitStatus::Failure
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Print results
 // ---------------------------------------------------------------------------
@@ -135,13 +147,13 @@ fn print_summary(chck_errors: u64, file_errors: u64, args: &Args) {
     if (chck_errors > u64::MIN) || (file_errors > u64::MIN) {
         if args.keep_going {
             if chck_errors > u64::MIN {
-                print_error!(args, "WARNING: {} computed checksum(s) did *not* match!", chck_errors);
+                print_error!(args, "Warning: {} computed checksum(s) did *not* match!", chck_errors);
             }
             if file_errors > u64::MIN {
-                print_error!(args, "WARNING: {} file(s) could not be verified due to errors!", file_errors);
+                print_error!(args, "Warning: {} file(s) could not be verified due to errors!", file_errors);
             }
         } else {
-            print_error!(args, "WARNING: The verification failed with an error!");
+            print_error!(args, "Error: The checksum verification has failed!");
         }
     }
 }
@@ -278,10 +290,10 @@ fn reader_thread(checksum_tx: &Sender<ReadResult>, args: &Args, halt: &Flag) -> 
 // Verify implementation
 // ---------------------------------------------------------------------------
 
-fn verify_mt(output: &mut impl Write, thread_count: NonZeroUsize, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
+fn verify_mt(output: &mut impl Write, n_threads: NonZeroUsize, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<ExitStatus, Aborted> {
     // Initialize channels
     let (checksum_tx, checksum_rx) = bounded::<ReadResult>(256usize);
-    let (result_tx, result_rx) = bounded::<VerifyResult>(get_capacity(&thread_count));
+    let (result_tx, result_rx) = bounded::<VerifyResult>(get_capacity(&n_threads));
 
     // Start the checksum reader thread
     let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
@@ -289,7 +301,7 @@ fn verify_mt(output: &mut impl Write, thread_count: NonZeroUsize, args: &Arc<Arg
 
     // Start the worker threads
     let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
-    let thread_pool = ThreadPool::new(thread_count, move || verify_thread(&checksum_rx, &result_tx, &args_cloned, &halt_cloned));
+    let thread_pool = ThreadPool::new(n_threads, move || verify_thread(&checksum_rx, &result_tx, &args_cloned, &halt_cloned));
 
     // Initialize counters
     let (mut chck_errors, mut file_errors, mut write_errors) = (u64::MIN, u64::MIN, false);
@@ -335,10 +347,10 @@ fn verify_mt(output: &mut impl Write, thread_count: NonZeroUsize, args: &Arc<Arg
     print_summary(chck_errors, file_errors, args);
 
     // Check for errors
-    Ok((chck_errors == u64::MIN) && (file_errors == u64::MIN) && (!write_errors))
+    Ok(exit_status(write_errors, chck_errors, file_errors, args))
 }
 
-fn verify_st(output: &mut impl Write, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<bool, Aborted> {
+fn verify_st(output: &mut impl Write, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<ExitStatus, Aborted> {
     // Initialize channel
     let (checksum_tx, checksum_rx) = bounded::<ReadResult>(256usize);
 
@@ -393,7 +405,7 @@ fn verify_st(output: &mut impl Write, args: &Arc<Args>, halt: &Arc<Flag>) -> Res
     print_summary(chck_errors, file_errors, args);
 
     // Check for errors
-    Ok((chck_errors == u64::MIN) && (file_errors == u64::MIN) && (!write_errors))
+    Ok(exit_status(write_errors, chck_errors, file_errors, args))
 }
 
 // ---------------------------------------------------------------------------
@@ -401,7 +413,7 @@ fn verify_st(output: &mut impl Write, args: &Arc<Args>, halt: &Arc<Flag>) -> Res
 // ---------------------------------------------------------------------------
 
 /// Verify all input files
-pub fn verify_files(output: &mut impl Write, args: Arc<Args>, env: &Env, halt: Arc<Flag>) -> Result<bool, Aborted> {
+pub fn verify_files(output: &mut impl Write, args: Arc<Args>, env: &Env, halt: Arc<Flag>) -> Result<ExitStatus, Aborted> {
     // Determine number of threads
     let thread_count = detect_thread_count(&args, env);
 

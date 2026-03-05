@@ -19,7 +19,7 @@ use std::{
 
 use crate::{
     arguments::{Args, HEADER_LINE},
-    common::{Aborted, Flag},
+    common::{Aborted, ExitStatus, Flag},
     digest::digest_equal,
     environment::Env,
     print_error,
@@ -122,9 +122,10 @@ fn do_self_test(output: &mut impl Write, halt: &Flag) -> Result<bool, Error> {
 }
 
 /// Runs the self-test routine for `passes` times
-fn test_runner(output: &mut impl Write, passes: NonZeroUsize, args: &Args, halt: &Flag) -> Result<bool, Error> {
+fn test_runner(output: &mut impl Write, passes: NonZeroUsize, args: &Args, halt: &Flag) -> Result<ExitStatus, Error> {
     writeln!(output, "{}", HEADER_LINE)?;
     let mut median = Median::new();
+    let mut errors_encountered = 0usize;
 
     for pass in 0usize..passes.get() {
         writeln!(output, "\nSelf-test pass {} of {} is running...", (pass as u32) + 1u32, passes)?;
@@ -137,8 +138,11 @@ fn test_runner(output: &mut impl Write, passes: NonZeroUsize, args: &Args, halt:
 
         writeln!(output, "{}", if success { "Successful." } else { "Failure !!!" })?;
 
-        if !(success || args.keep_going) {
-            return Ok(false);
+        if !success {
+            errors_encountered += 1usize;
+            if !args.keep_going {
+                return Ok(ExitStatus::Failure);
+            }
         }
 
         median.push(elapsed.as_secs_f64()).expect("Invalid elapsed time!");
@@ -150,7 +154,11 @@ fn test_runner(output: &mut impl Write, passes: NonZeroUsize, args: &Args, halt:
     writeln!(output, "\n--------\n")?;
     writeln!(output, "Median execution time: {:.1} seconds ({:.2} {}/s)", secs_median, rate_median, rate_unit)?;
 
-    Ok(true)
+    if errors_encountered == usize::MIN {
+        Ok(ExitStatus::Success)
+    } else {
+        Ok(ExitStatus::Warning)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -158,7 +166,7 @@ fn test_runner(output: &mut impl Write, passes: NonZeroUsize, args: &Args, halt:
 // ---------------------------------------------------------------------------
 
 /// The built-in self-test (BIST)
-pub fn self_test(output: &mut impl Write, args: &Args, env: &Env, halt: &Flag) -> Result<bool, Aborted> {
+pub fn self_test(output: &mut impl Write, args: &Args, env: &Env, halt: &Flag) -> Result<ExitStatus, Aborted> {
     let passes = env.sefltest_passes.unwrap_or(NonZeroUsize::new(3usize).unwrap());
 
     match test_runner(output, passes, args, halt) {
@@ -166,7 +174,7 @@ pub fn self_test(output: &mut impl Write, args: &Args, env: &Env, halt: &Flag) -
         Err(Error::Cancelled) => Err(Aborted),
         Err(error) => {
             print_error!(args, "Self-test encountered an error: {:?}", error);
-            Ok(false)
+            Ok(ExitStatus::Failure)
         }
     }
 }

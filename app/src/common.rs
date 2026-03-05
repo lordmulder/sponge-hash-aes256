@@ -6,6 +6,7 @@ use num::traits::SaturatingAdd;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
 use std::{
     num::NonZeroUsize,
+    process::ExitCode,
     sync::atomic::{AtomicUsize, Ordering},
 };
 use tinyvec::{ArrayVec, TinyVec};
@@ -25,6 +26,36 @@ pub type Digest = TinyVec<[u8; DEFAULT_DIGEST_SIZE]>;
 
 /// Error type to indicate that a process was aborted
 pub struct Aborted;
+
+// ---------------------------------------------------------------------------
+// Exit status
+// ---------------------------------------------------------------------------
+
+/// Constants that define the process exit status
+pub enum ExitStatus {
+    /// Everything completed successfully
+    Success,
+    /// One or more warnings have been encountered (but **no** fatal error)
+    Warning,
+    /// A fatal error has been encountered
+    Failure,
+}
+
+impl From<ExitStatus> for ExitCode {
+    fn from(value: ExitStatus) -> Self {
+        match value {
+            ExitStatus::Success => Self::from(0u8),
+            ExitStatus::Warning => Self::from(1u8),
+            ExitStatus::Failure => Self::from(2u8),
+        }
+    }
+}
+
+impl From<Aborted> for ExitCode {
+    fn from(_value: Aborted) -> Self {
+        ExitCode::from(3u8)
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Cancellation flag
