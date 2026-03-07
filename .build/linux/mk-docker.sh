@@ -12,3 +12,4 @@ fi
 
 set -x
 exec docker run --rm -v "${PWD}/../..":/workspace:ro -v "${PWD}/out":/workspace/.build/linux/out --tmpfs /tmp/rust-build:rw,exec -w /workspace "${IMAGE_SPEC}" make -C .build/linux
+
