@@ -539,6 +539,7 @@ jobs:
         working-directory: ./lib
 
   docker:
+    if: ${{ github.event_name == 'release' }}
     runs-on: ubuntu-latest
     needs: [verify-linux, verify-windows, verify-macos]
     steps:

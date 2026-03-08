@@ -7,9 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version 1.9.0
 
+### Added
+
+- Extended GitHub workflow (CI) to generate and push Docker images to the [Docker Hub](https://hub.docker.com/r/lordmulder/sponge256sum).
+
 ### Changed
 
 - Improved the exit codes return by the `sponge256sum` command-line application.
+- Updated GitHub workflow (CI) to create builds with Rust version 1.94.0 (2026-03-05).
 
 ## Version 1.8.8
 
