@@ -247,7 +247,7 @@ jobs:
           operating_system: freebsd
           version: '15.0'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-freebsd-builder/releases/download/v6/freebsd-15.0-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-freebsd-builder/releases/download/v7/freebsd-15.0-x86-64.qcow2'
           run: |
             git config --global --add safe.directory '*'
             . /opt/rust/cargo/env
@@ -270,7 +270,7 @@ jobs:
           operating_system: netbsd
           version: '10.1'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-netbsd-builder/releases/download/v4/netbsd-10.1-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-netbsd-builder/releases/download/v5/netbsd-10.1-x86-64.qcow2'
           run: |
             git config --global --add safe.directory '*'
             . /opt/rust/cargo/env
@@ -293,7 +293,7 @@ jobs:
           operating_system: openbsd
           version: '7.8'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-openbsd-builder/releases/download/v1/openbsd-7.8-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-openbsd-builder/releases/download/v2/openbsd-7.8-x86-64.qcow2'
           run: |
             git config --global --add safe.directory '*'
             ( cd .build/bsd-unix && ./build-openbsd.sh )
@@ -315,7 +315,7 @@ jobs:
           operating_system: omnios
           version: 'r151056'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-omnios-builder/releases/download/v5/omnios-r151056-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-omnios-builder/releases/download/v6/omnios-r151056-x86-64.qcow2'
           run: |
             git config --global --add safe.directory '*'
             . /opt/rust/cargo/env
@@ -338,7 +338,7 @@ jobs:
           operating_system: haiku
           version: 'r1beta5'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-haiku-builder/releases/download/v1/haiku-r1beta5-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-haiku-builder/releases/download/v2/haiku-r1beta5-x86-64.qcow2'
           run: |
             git config --global --add safe.directory '*'
             ( cd .build/bsd-unix && ./build-haiku.sh )
@@ -551,26 +551,32 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           pattern: sponge256sum-*
-          path: target
+          path: .artifacts
           merge-multiple: true
       - run: |
-          for file in ./target/sponge256sum-*-linux.tar.xz; do
-            mkdir -p target/bin
-            tar -xvf ${file} -C target/bin
+          for file in ./.artifacts/sponge256sum-*-linux.tar.xz; do
+            mkdir -p .artifacts/bin
+            tar -xvf ${file} -C .artifacts/bin
           done
       - run: |
-          cp -vf target/bin/LICENSE target/bin/BUILD_INFO .build/docker/bin/
-          cp -vf target/bin/sponge256sum-i586 target/bin/sponge256sum-i686* .build/docker/bin/386/
-          cp -vf target/bin/sponge256sum-x86_64* .build/docker/bin/amd64/
-          cp -vf target/bin/sponge256sum-aarch64* .build/docker/bin/arm64/
-          cp -vf app/tests/data/text/*.txt .build/docker/resources/data/
+          install -vDm444 -t .build/docker/bin/ .artifacts/bin/LICENSE .artifacts/bin/BUILD_INFO
+          install -vDm555 -t .build/docker/bin/386/ .artifacts/bin/sponge256sum-i586 .artifacts/bin/sponge256sum-i686*
+          install -vDm555 -t .build/docker/bin/amd64/ .artifacts/bin/sponge256sum-x86_64*
+          install -vDm555 -t .build/docker/bin/arm64/ .artifacts/bin/sponge256sum-aarch64*
+          install -vDm444 -t .build/docker/resources/data/ app/tests/data/text/*.txt app/tests/data/LICENSE
       - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        with:
+          images: lordmulder/sponge256sum
+        id: meta
       - uses: docker/build-push-action@v5
         with:
           context: ./.build/docker
-          push: true
           platforms: linux/386,linux/amd64,linux/arm64
-          tags: lordmulder/sponge256sum:latest
+          push: true
+          no-cache: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

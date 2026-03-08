@@ -155,6 +155,7 @@ Official Git mirrors are available here:
 
 Additional resources you may find helpful:
 
+- <https://hub.docker.com/r/lordmulder/sponge256sum>
 - <https://www.appimagehub.com/p/2347075>
 - <https://sourceforge.net/projects/muldersoft/files/SpongeHash-AES256/>
 - <https://lib.rs/crates/sponge-hash-aes256>
