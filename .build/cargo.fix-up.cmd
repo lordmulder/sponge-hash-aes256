@@ -2,11 +2,11 @@
 cd /d "%~dp0.."
 
 cargo clean || goto:error
-cargo upgrade --recursive --incompatible --pinned || goto:error
-cargo update --workspace || goto:error
+cargo upgrade --recursive --incompatible || goto:error
+cargo update || goto:error
 cargo fmt --all || goto:error
-cargo clippy --workspace --all-targets --all-features || goto:error
-cargo build --workspace --release || goto:error
+cargo clippy --all-targets --all-features || goto:error
+cargo build --release || goto:error
 
 echo.
 echo Completed successfully.
