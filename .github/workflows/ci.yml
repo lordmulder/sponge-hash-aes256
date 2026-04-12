@@ -157,7 +157,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test-linux, test-windows, test-macos]
     container:
-      image: lordmulder/rust-xbuild:1.94-trixie-r3
+      image: lordmulder/rust-xbuild:1.94-trixie-r4
     steps:
       - uses: actions/checkout@v5
         with:
