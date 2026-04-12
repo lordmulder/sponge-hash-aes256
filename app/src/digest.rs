@@ -3,7 +3,10 @@
 // Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>
 
 use sponge_hash_aes256::SpongeHash256;
-use std::io::{BufRead, BufReader, Error as IoError, Read};
+use std::{
+    io::{BufRead, BufReader, Error as IoError, Read},
+    mem::MaybeUninit,
+};
 
 use crate::{
     arguments::Args,
@@ -15,11 +18,13 @@ use crate::{
 // ---------------------------------------------------------------------------
 
 #[cfg(target_pointer_width = "64")]
-const IO_BUFFER_SIZE: usize = 8192usize;
+const IO_BUFFER_SIZE: usize = 0x4000usize;
+
 #[cfg(target_pointer_width = "32")]
-const IO_BUFFER_SIZE: usize = 4096usize;
+const IO_BUFFER_SIZE: usize = 0x2000usize;
+
 #[cfg(target_pointer_width = "16")]
-const IO_BUFFER_SIZE: usize = 2048usize;
+const IO_BUFFER_SIZE: usize = 0x1000usize;
 
 // ---------------------------------------------------------------------------
 // Error type
@@ -33,6 +38,21 @@ pub enum Error {
 impl From<IoError> for Error {
     fn from(_io_error: IoError) -> Self {
         Self::IoError
+    }
+}
+
+// ===========================================================================
+// Aligned buffer
+// ===========================================================================
+
+/// The aligned byte buffer (64 bytes)
+#[repr(align(32))]
+struct AlignedBuffer<const CAPACITY: usize>(pub [u8; CAPACITY]);
+
+impl<const CAPACITY: usize> AlignedBuffer<CAPACITY> {
+    const fn uninit() -> Self {
+        let array: MaybeUninit<[u8; CAPACITY]> = MaybeUninit::uninit();
+        Self(unsafe { array.assume_init() })
     }
 }
 
@@ -119,16 +139,16 @@ pub fn compute_digest(input: &mut dyn Read, digest_out: &mut [u8], args: &Args, 
     let mut hasher = Hasher::new(&args.info, args.snail);
 
     if !args.text {
-        let mut buffer = [0u8; IO_BUFFER_SIZE];
+        let mut buffer = AlignedBuffer::<IO_BUFFER_SIZE>::uninit();
         loop {
             check_cancelled!(halt);
-            match input.read(&mut buffer)? {
-                0 => break,
-                length => hasher.update(&buffer[..length]),
+            match input.read(&mut buffer.0)? {
+                0usize => break,
+                length => hasher.update(&buffer.0[..length]),
             }
         }
     } else {
-        let mut lines = BufReader::new(input).lines();
+        let mut lines = BufReader::with_capacity(IO_BUFFER_SIZE, input).lines();
         if let Some(line) = lines.next() {
             hasher.update(&(line?));
             for line in lines {
