@@ -6,11 +6,13 @@ use sponge_hash_aes256::SpongeHash256;
 use std::{
     io::{BufRead, BufReader, Error as IoError, Read},
     mem::MaybeUninit,
+    ops::{Deref, DerefMut},
 };
 
 use crate::{
     arguments::Args,
     common::{Flag, MAX_SNAIL_LEVEL},
+    io::{is_pipe, DataSource},
 };
 
 // ---------------------------------------------------------------------------
@@ -18,13 +20,13 @@ use crate::{
 // ---------------------------------------------------------------------------
 
 #[cfg(target_pointer_width = "64")]
-const IO_BUFFER_SIZE: usize = 0x4000usize;
+const IO_BUFFER_SIZE: usize = 16384usize;
 
 #[cfg(target_pointer_width = "32")]
-const IO_BUFFER_SIZE: usize = 0x2000usize;
+const IO_BUFFER_SIZE: usize = 8192usize;
 
-#[cfg(target_pointer_width = "16")]
-const IO_BUFFER_SIZE: usize = 0x1000usize;
+#[cfg(not(any(target_pointer_width = "32", target_pointer_width = "64")))]
+compile_error!("Platform not currently supported!");
 
 // ---------------------------------------------------------------------------
 // Error type
@@ -53,6 +55,46 @@ impl<const CAPACITY: usize> AlignedBuffer<CAPACITY> {
     const fn uninit() -> Self {
         let array: MaybeUninit<[u8; CAPACITY]> = MaybeUninit::uninit();
         Self(unsafe { array.assume_init() })
+    }
+}
+
+/// Wrapper to hold the actual buffer of the selected size
+#[repr(align(32))]
+#[allow(clippy::large_enum_variant)]
+enum ReadBuffer {
+    Small(AlignedBuffer<IO_BUFFER_SIZE>),
+    Large(AlignedBuffer<{ 4usize * IO_BUFFER_SIZE }>),
+}
+
+impl ReadBuffer {
+    const fn new(large: bool) -> Self {
+        if large {
+            Self::Large(AlignedBuffer::uninit())
+        } else {
+            Self::Small(AlignedBuffer::uninit())
+        }
+    }
+}
+
+impl Deref for ReadBuffer {
+    type Target = [u8];
+
+    #[inline(always)]
+    fn deref(&self) -> &Self::Target {
+        match self {
+            ReadBuffer::Small(buffer) => &buffer.0,
+            ReadBuffer::Large(buffer) => &buffer.0,
+        }
+    }
+}
+
+impl DerefMut for ReadBuffer {
+    #[inline(always)]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        match self {
+            ReadBuffer::Small(buffer) => &mut buffer.0,
+            ReadBuffer::Large(buffer) => &mut buffer.0,
+        }
     }
 }
 
@@ -134,17 +176,17 @@ macro_rules! check_cancelled {
 }
 
 /// Process a single input file
-pub fn compute_digest(input: &mut dyn Read, digest_out: &mut [u8], args: &Args, halt: &Flag) -> Result<(), Error> {
+pub fn compute_digest(input: &mut DataSource, digest_out: &mut [u8], args: &Args, halt: &Flag) -> Result<(), Error> {
     static LINE_BREAK: &str = "\n";
     let mut hasher = Hasher::new(&args.info, args.snail);
 
     if !args.text {
-        let mut buffer = AlignedBuffer::<IO_BUFFER_SIZE>::uninit();
+        let mut buffer = ReadBuffer::new(is_pipe(input));
         loop {
             check_cancelled!(halt);
-            match input.read(&mut buffer.0)? {
+            match input.read(&mut buffer)? {
                 0usize => break,
-                length => hasher.update(&buffer.0[..length]),
+                length => hasher.update(&buffer[..length]),
             }
         }
     } else {

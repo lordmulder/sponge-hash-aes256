@@ -165,7 +165,7 @@ fn print_summary(chck_errors: u64, file_errors: u64, args: &Args) {
 type VerifyResult = Result<(bool, PathBuf), Error>;
 
 /// Compute checksum and compare to expected value
-fn verify_checksum(source: &mut dyn Read, digest_expected: &[u8], args: &Args, halt: &Flag) -> Result<bool, DigestError> {
+fn verify_checksum(source: &mut DataSource, digest_expected: &[u8], args: &Args, halt: &Flag) -> Result<bool, DigestError> {
     let mut digest_computed: Digest = TinyVec::with_length(digest_expected.len());
     compute_digest(source, digest_computed.as_mut_slice(), args, halt)?;
     Ok(digest_equal(digest_computed.as_slice(), digest_expected))
