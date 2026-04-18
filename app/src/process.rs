@@ -25,7 +25,8 @@ use crate::{
     common::{get_capacity, increment, Aborted, Digest, ExitStatus, Flag, TinyVecEx},
     digest::{compute_digest, Error as DigestError},
     environment::Env,
-    io::{DataSource, Error as IoError, STDIN_NAME},
+    io::{DataSource, Error as IoError},
+    os::STDIN_NAME,
     print_error,
     thread_pool::{detect_thread_count, Cancelled, TaskResult, ThreadPool},
 };

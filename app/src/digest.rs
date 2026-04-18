@@ -12,21 +12,13 @@ use std::{
 use crate::{
     arguments::Args,
     common::{Flag, MAX_SNAIL_LEVEL},
-    io::{is_pipe, DataSource},
+    io::DataSource,
+    os::{is_pipe, IO_BUFFER_SIZE},
 };
 
 // ---------------------------------------------------------------------------
 // Platform support
 // ---------------------------------------------------------------------------
-
-#[cfg(target_pointer_width = "64")]
-const IO_BUFFER_SIZE: usize = 16384usize;
-
-#[cfg(target_pointer_width = "32")]
-const IO_BUFFER_SIZE: usize = 8192usize;
-
-#[cfg(not(any(target_pointer_width = "32", target_pointer_width = "64")))]
-compile_error!("Platform not currently supported!");
 
 // ---------------------------------------------------------------------------
 // Error type

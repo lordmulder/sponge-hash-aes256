@@ -2,18 +2,14 @@
 // sponge256sum
 // Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>
 
-use std::ffi::OsString;
-use std::sync::{LazyLock, Mutex, MutexGuard};
+use std::sync::{Mutex, MutexGuard};
 use std::{
     fs::File,
     io::{stdin, Read, Result as IoResult, StdinLock},
     path::Path,
 };
 
-#[cfg(target_family = "unix")]
-use std::os::fd::{AsRawFd, RawFd};
-#[cfg(target_family = "windows")]
-use std::os::windows::io::{AsRawHandle, RawHandle};
+use crate::os::STDIN_NAME;
 
 // ---------------------------------------------------------------------------
 // Error type
@@ -25,16 +21,6 @@ pub enum Error {
     AccessDenied,
     IsADirectory,
 }
-
-// ---------------------------------------------------------------------------
-// Standard streams
-// ---------------------------------------------------------------------------
-
-#[cfg(target_family = "windows")]
-pub static STDIN_NAME: LazyLock<OsString> = LazyLock::new(|| OsString::from("CONIN$"));
-
-#[cfg(not(target_family = "windows"))]
-pub static STDIN_NAME: LazyLock<OsString> = LazyLock::new(|| OsString::from("/dev/stdin"));
 
 // ---------------------------------------------------------------------------
 // I/O wrapper
@@ -88,54 +74,4 @@ impl Read for DataSource<'_> {
             DataSource::Stream(stream) => stream.0.read(buf),
         }
     }
-}
-
-#[cfg(target_family = "unix")]
-impl AsRawFd for DataSource<'_> {
-    #[inline(always)]
-    fn as_raw_fd(&self) -> RawFd {
-        match self {
-            DataSource::File(file) => file.as_raw_fd(),
-            DataSource::Stream(stream) => stream.0.as_raw_fd(),
-        }
-    }
-}
-
-#[cfg(target_family = "windows")]
-impl AsRawHandle for DataSource<'_> {
-    #[inline(always)]
-    fn as_raw_handle(&self) -> RawHandle {
-        match self {
-            DataSource::File(file) => file.as_raw_handle(),
-            DataSource::Stream(stream) => stream.0.as_raw_handle(),
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Utility Functions
-// ---------------------------------------------------------------------------
-
-#[cfg(target_family = "unix")]
-pub fn is_pipe(data_source: &DataSource) -> bool {
-    use libc::{fstat, stat};
-    use std::mem;
-    let mut info: stat = unsafe { mem::zeroed() };
-    if unsafe { fstat(data_source.as_raw_fd(), &mut info) } == 0 {
-        matches!(info.st_mode & libc::S_IFMT, libc::S_IFIFO | libc::S_IFSOCK)
-    } else {
-        false /*failure!*/
-    }
-}
-
-#[cfg(target_family = "windows")]
-pub fn is_pipe(data_source: &DataSource) -> bool {
-    use windows_sys::Win32::Storage::FileSystem::{GetFileType, FILE_TYPE_PIPE};
-    let file_type = unsafe { GetFileType(data_source.as_raw_handle()) };
-    file_type == FILE_TYPE_PIPE
-}
-
-#[cfg(not(any(target_family = "unix", target_family = "windows")))]
-pub fn is_pipe(_: &DataSource) -> bool {
-    false
 }

@@ -200,6 +200,7 @@ mod common;
 mod digest;
 mod environment;
 mod io;
+mod os;
 mod process;
 mod self_test;
 mod thread_pool;
