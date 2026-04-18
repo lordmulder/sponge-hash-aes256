@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Updated GitHub workflow (CI) to create builds with Rust version 1.94.1 (2026-03-27).
+- Updated GitHub workflow (CI) to create builds with Rust version 1.95.0 (2026-03-27).
 - Updated various dependencies to the latest version.
 
 ## Version 1.9.0
