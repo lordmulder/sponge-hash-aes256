@@ -28,7 +28,7 @@ build:
 	mkdir -p out/target/release /tmp/rust-build
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
 	for t in x86_64 i686 aarch64; do
-		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
+		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-22/lib/LLVMgold.so -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
 		TARGET_CC=/usr/local/musl/$$t/bin/musl-gcc \
 		cargo build --release --target $$t-unknown-linux-musl --features with-mimalloc --verbose
 		[ "$$t" = "i686" ] && suffix=i686-sse2 || suffix=$$t
@@ -40,7 +40,7 @@ vbuild:
 	mkdir -p out/target/release /tmp/rust-build
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
 	for t in x86_64 i686; do
-		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static,+aes -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
+		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-22/lib/LLVMgold.so -Ctarget-feature=+crt-static,+aes -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
 		TARGET_CC=/usr/local/musl/$$t/bin/musl-gcc \
 		cargo build --release --target $$t-unknown-linux-musl --features with-mimalloc --verbose
 		[ "$$t" = "i686" ] && suffix=i686-sse2-aes || suffix=$$t-aes
@@ -52,7 +52,7 @@ wbuild:
 	mkdir -p out/target/release /tmp/rust-build
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
 	for a in '' aes; do
-		RUSTFLAGS="-Dwarnings -Clinker=x86_64-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-21/lib/LLVMgold.so -Ctarget-feature=+crt-static$${a:+,+}$$a -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast -Ctarget-cpu=x86-64-v3" \
+		RUSTFLAGS="-Dwarnings -Clinker=x86_64-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-22/lib/LLVMgold.so -Ctarget-feature=+crt-static$${a:+,+}$$a -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast -Ctarget-cpu=x86-64-v3" \
 		TARGET_CC=/usr/local/musl/x86_64/bin/musl-gcc \
 		cargo build --release --target x86_64-unknown-linux-musl --features with-mimalloc --verbose
 		[ "$$a" = "aes" ] && suffix=v3-aes || suffix=v3
