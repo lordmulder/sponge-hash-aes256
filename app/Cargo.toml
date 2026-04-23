@@ -27,7 +27,7 @@ tinyvec = { version = "1.11.0", default-features = false, features = ["alloc"] }
 wild = { version = "2.2.1", default-features = false }
 
 # Optional dependencies
-mimalloc = { version = "0.1.48", default-features = false, optional = true }
+mimalloc = { version = "0.1.50", default-features = false, optional = true }
 simple_logger = { version = "5.2.0", default-features = false, optional = true }
 
 [features]
@@ -41,7 +41,7 @@ nix = { version = "0.31.2", default-features = false, features = ["signal"] }
 regex = { version = "1.12.3", default-features = false, features = ["unicode"] }
 
 [target.'cfg(unix)'.dependencies]
-libc = { version = "0.2.185", default-features = false }
+libc = { version = "0.2.186", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", default-features = false, features = ["Win32_Storage_FileSystem"] }
