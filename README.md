@@ -1,14 +1,14 @@
 # SpongeHash-AES256
 
-[![no_std](https://img.shields.io/badge/rust-no__std-orchid?logo=rust)](https://docs.rust-embedded.org/book/intro/no-std.html)
-[![Crates.io](https://img.shields.io/crates/v/sponge-hash-aes256)](https://crates.io/crates/sponge-hash-aes256)
-[![Downloads](https://img.shields.io/crates/d/sponge-hash-aes256)](https://crates.io/crates/sponge-hash-aes256)
-[![Release Date](https://img.shields.io/github/release-date/lordmulder/sponge-hash-aes256)](https://crates.io/crates/sponge-hash-aes256/versions)
-[![Docs.rs](https://img.shields.io/docsrs/sponge-hash-aes256)](https://docs.rs/sponge-hash-aes256/latest/)
-[![License](https://img.shields.io/crates/l/sponge-hash-aes256)](https://opensource.org/license/0BSD)
-[![Codecov](https://codecov.io/gh/lordmulder/sponge-hash-aes256/graph/badge.svg?token=O9IBQHXHDM)](https://codecov.io/gh/lordmulder/sponge-hash-aes256)
+[![](https://img.shields.io/badge/rust-no__std-orchid?logo=rust)](https://docs.rust-embedded.org/book/intro/no-std.html)
+[![](https://img.shields.io/crates/v/sponge-hash-aes256)](https://crates.io/crates/sponge-hash-aes256)
+[![](https://img.shields.io/crates/d/sponge-hash-aes256)](https://crates.io/crates/sponge-hash-aes256)
+[![](https://img.shields.io/github/release-date/lordmulder/sponge-hash-aes256)](https://crates.io/crates/sponge-hash-aes256/versions)
+[![](https://img.shields.io/docsrs/sponge-hash-aes256)](https://docs.rs/sponge-hash-aes256/latest/)
+[![](https://img.shields.io/crates/l/sponge-hash-aes256)](https://opensource.org/license/0BSD)
+[![](https://codecov.io/gh/lordmulder/sponge-hash-aes256/graph/badge.svg?token=O9IBQHXHDM)](https://codecov.io/gh/lordmulder/sponge-hash-aes256)
 
-![SpongeHash-AES256](.assets/images/sponge-hash-aes256.png)
+![](.assets/images/sponge-hash-aes256.png)
 
 A [**sponge**](https://en.wikipedia.org/wiki/Sponge_function)-based secure hash function that uses [AES-256](https://docs.rs/aes/latest/aes/index.html) as its internal [PRF](https://en.wikipedia.org/wiki/Pseudorandom_permutation).
 
@@ -62,7 +62,7 @@ Please refer to the [**`sponge-hash-aes256` documentation**](https://lordmulder.
 
 The **`sponge256sum`** command-line tool, similar to [`sha256sum`](https://man7.org/linux/man-pages/man1/sha256sum.1.html) and friends:
 
-![sponge256sum](.assets/images/sponge256sum.png)
+![](.assets/images/sponge256sum.png)
 
 ### Usage
 
@@ -114,13 +114,13 @@ The state has a total size of 384 bits, consisting of three 128-bit blocks, and 
 
 The “update” function, which *absorbs* input blocks into the state and *squeezes* the corresponding output from it, is defined as follows, where `input[i]` denotes the *i*-th input block and `output[k]` the *k*-th output block:
 
-![Update](.assets/images/function-update.png)
+![](.assets/images/function-update.png)
 
 ### Permutation function
 
 The “permutation” function, applied to scramble the state after each absorbing or squeezing step, is defined as follows, where `AES-256` denotes the [AES](https://en.wikipedia.org/wiki/Advanced_Encryption_Standard) cipher with a key size of 256 bits and a block size of 128 bits.
 
-![Permutation](.assets/images/function-permutation.png)
+![](.assets/images/function-permutation.png)
 
 The constants `const_0` and `const_1` are defined as full blocks filled with `0x5C` and `0x36`, respectively.
 

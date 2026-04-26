@@ -76,6 +76,7 @@ doc:
 	export CARGO_TARGET_DIR="$$(mktemp --tmpdir=/tmp/rust-build -d)"
 	RUSTFLAGS=-Dwarnings cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256
 	cp -rf $${CARGO_TARGET_DIR}/doc out/target/release/
+	pandoc --standalone --embed-resources --resource-path=../.. -t html5 -V maxwidth=48em -o out/target/release/README.html ../../README.md
 	RUSTFLAGS=-Dwarnings cargo pkgid --package sponge256sum | grep -Eo '[^@]+$$' | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//' > out/target/.PKG_VERSION
 	printf '%s\n\n' "$$(RUSTFLAGS=-Dwarnings cargo --version --verbose)" > out/target/.RUSTC_VERSION
 	printf '%s\n' "$$(RUSTFLAGS=-Dwarnings cargo rustc --manifest-path ../.auxiliary-files/blank-project/Cargo.toml -- --version --verbose)" >> out/target/.RUSTC_VERSION
