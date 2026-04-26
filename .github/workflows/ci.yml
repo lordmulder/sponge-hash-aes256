@@ -192,6 +192,7 @@ jobs:
         with:
           install: xorriso
           update: true
+      - run: choco install pandoc -y
       - run: |
           git config --global core.symlinks false
           git config --global --add safe.directory '*'

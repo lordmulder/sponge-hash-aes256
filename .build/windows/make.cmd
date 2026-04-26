@@ -26,6 +26,10 @@ if "%XORRISO_INSTALL_DIR%" == "" (
 	set "XORRISO_INSTALL_DIR=C:\msys64\usr\bin"
 )
 
+if "%PANDOC_INSTALL_DIR%" == "" (
+	set "PANDOC_INSTALL_DIR=%ProgramFiles%\Pandoc"
+)
+
 REM --------------------------------------------------------------------------
 REM Check paths
 REM --------------------------------------------------------------------------
@@ -61,7 +65,12 @@ if exist "%SEVENZIP_INSTALL_DIR%\7za.exe" (
 	)
 )
 
-set "PATH=%CD%\bin;%CARGO_INSTALL_DIR%;%GIT_INSTALL_DIR%\cmd;%SEVENZIP_INSTALL_DIR%;%NSIS_INSTALL_DIR%;%XORRISO_INSTALL_DIR%;%SystemRoot%\System32;%SystemRoot%"
+if not exist "%PANDOC_INSTALL_DIR%\pandoc.exe" (
+	echo File "%PANDOC_INSTALL_DIR%\pandoc.exe" not found. Please check PANDOC_INSTALL_DIR and try again^^!
+	goto:error
+)
+
+set "PATH=%CD%\bin;%CARGO_INSTALL_DIR%;%GIT_INSTALL_DIR%\cmd;%SEVENZIP_INSTALL_DIR%;%NSIS_INSTALL_DIR%;%XORRISO_INSTALL_DIR%;%PANDOC_INSTALL_DIR%;%SystemRoot%\System32;%SystemRoot%"
 
 REM --------------------------------------------------------------------------
 REM Check the Rust version
@@ -221,6 +230,8 @@ set "RUSTFLAGS=-Dwarnings"
 cargo clean || goto:error
 cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256 || goto:error
 xcopy /E /H /I /Y "%CARGO_TARGET_DIR%\doc" "out\target\release\doc" || goto:error
+
+pandoc.exe --standalone --embed-resources --resource-path=../.. -t html5 -V maxwidth=48em -o out/target/release/README.html ../../README.md || goto:error
 
 cargo --version --verbose > "%CARGO_TARGET_DIR%\.RUSTC_VERSION"
 >> "%CARGO_TARGET_DIR%\.RUSTC_VERSION" echo.
