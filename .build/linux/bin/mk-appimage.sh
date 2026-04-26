@@ -53,6 +53,7 @@ install -v --mode 444 "${SCRIPT_PATH}/../resources/sponge256sum.png" "${MY_APP_D
 install -v --mode 644 "${SCRIPT_PATH}/../resources/sponge256sum.xml" "${MY_APP_DIR}/usr/share/metainfo/sponge256sum.appdata.xml"
 install -v --mode 444 "${SCRIPT_PATH}/../../../LICENSE" "${MY_APP_DIR}/LICENSE"
 install -v --mode 444 "${SCRIPT_PATH}/../../../README.md" "${MY_APP_DIR}/README.md"
+install -v --mode 444 "${SCRIPT_PATH}/../out/target/release/BUILD_INFO" "${MY_APP_DIR}/BUILD_INFO"
 
 sed -i "s/{{REL_VERSION}}/${MY_APP_VERS}/g" "${MY_APP_DIR}/usr/share/metainfo/sponge256sum.appdata.xml"
 sed -i "s/{{REL_ISODATE}}/$(date -Idate)/g" "${MY_APP_DIR}/usr/share/metainfo/sponge256sum.appdata.xml"
