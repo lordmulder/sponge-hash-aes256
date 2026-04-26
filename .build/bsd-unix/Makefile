@@ -43,7 +43,7 @@ doc:
 dist: build xbuild doc
 	set -e; \
 	cp -f ../../.assets/html/index.html out/target/release/doc/index.html; \
-	cp -f ../../LICENSE out/target/release/LICENSE; \
+	cp -f ../../README.md ../../LICENSE out/target/release/; \
 	printf 'Revision: %s\n' "`git describe --long --tags --always --dirty`" > out/target/release/BUILD_INFO; \
 	printf 'Built: %s\n\n' "`date +'%Y-%m-%d %H:%M:%S'`" >> out/target/release/BUILD_INFO; \
 	cat out/target/.RUSTC_VERSION >> out/target/release/BUILD_INFO; \
