@@ -203,7 +203,7 @@ jobs:
       - working-directory: ${{ github.workspace }}/.build/windows
         run: cmd.exe /c make.cmd
         env:
-          XORRISO_INSTALL_DIR: ${{ steps.msys2.outputs.msys2-location }}\usr\bin
+          MSYS2_INSTALL_DIR: ${{ steps.msys2.outputs.msys2-location }}
       - uses: actions/upload-artifact@v4
         with:
           name: sponge256sum-windows

@@ -22,8 +22,8 @@ if "%NSIS_INSTALL_DIR%" == "" (
 	set "NSIS_INSTALL_DIR=%ProgramFiles(x86)%\NSIS"
 )
 
-if "%XORRISO_INSTALL_DIR%" == "" (
-	set "XORRISO_INSTALL_DIR=C:\msys64\usr\bin"
+if "%MSYS2_INSTALL_DIR%" == "" (
+	set "MSYS2_INSTALL_DIR=C:\msys64"
 )
 
 if "%PANDOC_INSTALL_DIR%" == "" (
@@ -49,11 +49,6 @@ if not exist "%NSIS_INSTALL_DIR%\makensis.exe" (
 	goto:error
 )
 
-if not exist "%XORRISO_INSTALL_DIR%\xorriso.exe" (
-	echo File "%XORRISO_INSTALL_DIR%\xorriso.exe" not found. Please check XORRISO_INSTALL_DIR and try again^^!
-	goto:error
-)
-
 if exist "%SEVENZIP_INSTALL_DIR%\7za.exe" (
 	set SEVENZIP=7za.exe
 ) else (
@@ -70,7 +65,17 @@ if not exist "%PANDOC_INSTALL_DIR%\pandoc.exe" (
 	goto:error
 )
 
-set "PATH=%CD%\bin;%CARGO_INSTALL_DIR%;%GIT_INSTALL_DIR%\cmd;%SEVENZIP_INSTALL_DIR%;%NSIS_INSTALL_DIR%;%XORRISO_INSTALL_DIR%;%PANDOC_INSTALL_DIR%;%SystemRoot%\System32;%SystemRoot%"
+if not exist "%MSYS2_INSTALL_DIR%\usr\bin\sed.exe" (
+	echo File "%MSYS2_INSTALL_DIR%\usr\bin\sed.exe" not found. Please check MSYS2_INSTALL_DIR and try again^^!
+	goto:error
+)
+
+if not exist "%MSYS2_INSTALL_DIR%\usr\bin\xorriso.exe" (
+	echo File "%MSYS2_INSTALL_DIR%\usr\bin\xorriso.exe" not found. Please check MSYS2_INSTALL_DIR and try again^^!
+	goto:error
+)
+
+set "PATH=%CD%\bin;%CARGO_INSTALL_DIR%;%GIT_INSTALL_DIR%\cmd;%SEVENZIP_INSTALL_DIR%;%NSIS_INSTALL_DIR%;%PANDOC_INSTALL_DIR%;%MSYS2_INSTALL_DIR%\usr\bin;%SystemRoot%\System32;%SystemRoot%"
 
 REM --------------------------------------------------------------------------
 REM Check the Rust version
@@ -231,7 +236,7 @@ cargo clean || goto:error
 cargo doc --no-deps --package sponge256sum --package sponge-hash-aes256 || goto:error
 xcopy /E /H /I /Y "%CARGO_TARGET_DIR%\doc" "out\target\release\doc" || goto:error
 
-pandoc.exe --standalone --embed-resources --resource-path=../.. -t html5 -V maxwidth=48em -o out/target/release/README.html ../../README.md || goto:error
+sed.exe "/shields.io/d;/codecov.io/d" ..\..\README.md | pandoc.exe --standalone --embed-resources --resource-path=..\.. -t html5 -M title="sponge256sum - README" -V maxwidth=48em -o out\target\release\README.html || goto:error
 
 cargo --version --verbose > "%CARGO_TARGET_DIR%\.RUSTC_VERSION"
 >> "%CARGO_TARGET_DIR%\.RUSTC_VERSION" echo.
@@ -266,7 +271,7 @@ attrib +R "out\target\*.zip" || goto:error
 makensis.exe -NOCD -WX -INPUTCHARSET UTF8 "-DOUTPUT_FILE=out\target\sponge256sum-%PKG_VERSION%-windows.exe" "-DSOURCE_PATH=out\target\release" "-DPKG_VERSION=%PKG_VERSION%" "-DPKG_REGUUID=%PKG_REGUUID%" "resources\setup.nsi" || goto:error
 attrib +R "out\target\*.exe" || goto:error
 
-xorriso.exe -as mkisofs -iso-level 3 --norock -joliet -volid SPONGE256SUM -o "out\target\sponge256sum-%PKG_VERSION%-windows.iso" "out/target/release" "resources/autorun.inf" || goto:error
+xorriso.exe -as mkisofs -iso-level 3 -joliet -volid SPONGE256SUM -o "out\target\sponge256sum-%PKG_VERSION%-windows.iso" "out/target/release" "resources/autorun.inf" || goto:error
 attrib +R "out\target\*.iso" || goto:error
 
 REM --------------------------------------------------------------------------
