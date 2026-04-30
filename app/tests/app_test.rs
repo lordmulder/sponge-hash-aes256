@@ -925,7 +925,7 @@ fn test_interrupt() {
 
 #[test]
 fn test_invalid_args_1a() {
-    let output = run_binary([OsStr::new("-x")], false, true);
+    let output = run_binary([OsStr::new("-w")], false, true);
     assert!(REGEX_UNKNOWN.is_match(&output))
 }
 #[test]
