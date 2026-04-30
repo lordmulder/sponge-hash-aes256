@@ -16,6 +16,7 @@ use std::{
     num::NonZeroUsize,
     path::PathBuf,
     process::ExitCode,
+    sync::Arc,
 };
 use wild::args_os;
 
@@ -55,7 +56,7 @@ const HELP_TEXT: &str = "If no input files are specified, reads input data from 
 #[command(before_help = HEADER_LINE)]
 #[command(long_version = LONG_VERSION)]
 #[command(version = VERSION)]
-#[command(group(ArgGroup::new("walk").args(["dirs", "recursive"]).multiple(true)))]
+#[command(group(ArgGroup::new("walk").args(["dirs", "recursive", "cross_dev"]).multiple(true)))]
 pub struct Args {
     /// Read the input file(s) in binary mode, i.e., default mode
     #[arg(short, long, conflicts_with = "text")]
@@ -76,6 +77,10 @@ pub struct Args {
     /// Recursively process the provided directories (implies -d)
     #[arg(short, long, conflicts_with = "check")]
     pub recursive: bool,
+
+    /// Descend into directories on other devices (implies -r)
+    #[arg(short = 'x', long, conflicts_with = "check")]
+    pub cross_dev: bool,
 
     /// Iterate all kinds of files, instead of just regular files
     #[arg(short, long, requires = "walk")]
@@ -128,11 +133,18 @@ pub struct Args {
 
 impl Args {
     /// Parse command-line arguments
-    pub fn try_parse_command_line() -> Result<Self, ExitCode> {
+    pub fn try_parse_command_line() -> Result<Arc<Self>, ExitCode> {
         match Self::try_parse_from(args_os()) {
-            Ok(args) => Ok(args),
+            Ok(value) => Self::initialize_args(value),
             Err(error) => Err(print_arg_error(error)),
         }
+    }
+
+    #[inline]
+    fn initialize_args(mut self) -> Result<Arc<Self>, ExitCode> {
+        self.recursive |= self.cross_dev;
+        self.dirs |= self.recursive;
+        Ok(Arc::new(self))
     }
 }
 

@@ -30,6 +30,7 @@
 //!   -c, --check            Read and verify checksums from the provided input file(s)
 //!   -d, --dirs             Enable processing of directories as arguments
 //!   -r, --recursive        Recursively process the provided directories (implies -d)
+//!   -x, --cross-dev        Descend into directories on other devices (implies -r)
 //!   -a, --all              Iterate all kinds of files, instead of just regular files
 //!   -k, --keep-going       Continue processing even if errors are encountered
 //!   -l, --length <LENGTH>  Digest output size, in bits (default: 256, maximum: 2048)
@@ -83,15 +84,17 @@
 //!
 //! - **Directory processing**
 //!
-//!   The `--dirs` option enables directory processing. This means that for each input file name (path) that resolves to a directory, the program processes all files contained in that directory, but **without** descending into subdirectories.
+//!   The **`--dirs`** option enables directory processing. This means that for each input file name (path) that resolves to a directory, the program processes all files contained in that directory, but *without* descending into subdirectories.
 //!
-//!   Additionally, the `--recursive` option enables *recursive* directory scanning, behaving identically to the `--dirs` option except that it also traverses subdirectories. The `--recursive` option implies the `--dirs` option.
+//!   Additionally, the **`--recursive`** option enables *recursive* directory scanning, behaving identically to the `--dirs` option except that it also traverses subdirectories. The `--recursive` option implies the `--dirs` option.
 //!
-//!   Furthermore, the `--all` option can be combined with the `--dirs` or `--recursive` options to process **all** files found in a directory. By default, the program will only process “regular” files, *skipping* special files like FIFOs or sockets.
+//!   By default, the program does **not** descend into directories that have a device number different than that of the directory from which the descent began. This restriction may be bypassed by specifying the **`--cross-dev`** option.
+//!
+//!   Furthermore, the **`--all`** option can be combined with `--dirs`, `--recursive` or `--cross-dev` to process **all** files found in a directory. Otherwise, the program will only process “regular” files, *skipping* special files like FIFOs or sockets.
 //!
 //! - **Checksum verification**
 //!
-//!   The `--check` option runs the program in verification mode. This means that a list of checksums (hash values) is read from each given input file, and those checksums are then verified against the corresponding target files.
+//!   The **`--check`** option runs the program in verification mode. This means that a list of checksums (hash values) is read from each given input file, and those checksums are then verified against the corresponding target files.
 //!
 //!   This mode expects input files to contain one checksum (and its corresponding file path) per line, formatted as follows:
 //!   ```
@@ -104,7 +107,7 @@
 //!
 //! - **Multi-threading**
 //!
-//!   The `--multi-threading` option enables [multithreading](https://en.wikipedia.org/wiki/Thread_(computing)) mode, in which multiple files can be processed concurrently.
+//!   The **`--multi-threading`** option enables [multithreading](https://en.wikipedia.org/wiki/Thread_(computing)) mode, in which multiple files can be processed concurrently.
 //!
 //!   Note that, in this mode, the order in which the files will be processed is ***undefined***. That is because the work will be distributed across multiple “worker” threads and each result is printed as soon as it becomes available.
 //!
@@ -112,13 +115,13 @@
 //!
 //! - **Output length**
 //!
-//!   The `--length <LENGTH>` option can be used to specify the digest output size, in bits. The default size is 256 bits.
+//!   The **`--length <LENGTH>`** option can be used to specify the digest output size, in bits. The default size is 256 bits.
 //!
 //!   Currently, the maximum output size is 1024 bits. Also, the output size, in bits, must be divisible by eight!
 //!
 //! - **Context information**
 //!
-//!   The `--info <INFO>` option can be used to include some additional context information in the hash computation.
+//!   The **`--info <INFO>`** option can be used to include some additional context information in the hash computation.
 //!
 //!   For each unique “info” string, different digests (hash values) are generated from the same messages (inputs).
 //!
@@ -126,7 +129,7 @@
 //!
 //! - **Snail mode**
 //!
-//!   The `--snail` option can be passed to the program, optionally more than once, to slow down the hash computation.
+//!   The **`--snail`** option can be passed to the program, optionally more than once, to slow down the hash computation.
 //!
 //!   This improves the security of certain applications, e.g., password hashing, by making “brute force” attacks harder.
 //!
@@ -140,7 +143,7 @@
 //!
 //! - **Text mode**
 //!
-//!   The `--text` option enables “text” mode. In this mode, the input file is read as a *text* file, line by line.
+//!   The **`--text`** option enables “text” mode. In this mode, the input file is read as a *text* file, line by line.
 //!
 //!   Unlike in “binary” mode (the default), platform-specific line endings will be normalized to a single `\n` character.
 //!
@@ -321,7 +324,7 @@ fn ctrlc_handler(halt: &Arc<Flag>) -> ! {
 fn main() -> ExitCode {
     // Initialize the Args from the given command-line arguments
     let args = match Args::try_parse_command_line() {
-        Ok(args) => Arc::new(args),
+        Ok(args) => args,
         Err(exit_code) => return exit_code,
     };
 

@@ -61,8 +61,11 @@ impl Error {
 // Platform support
 // ---------------------------------------------------------------------------
 
-type FileId = (u64, u64);
-type FileIdSet = BTreeSet<FileId>;
+#[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
+struct FileId(u64, u64);
+
+type IdSet = BTreeSet<FileId>;
+type DevId = Option<u64>;
 
 #[cfg(target_family = "unix")]
 mod file_id {
@@ -72,7 +75,7 @@ mod file_id {
     /// Get the unique file id
     #[inline(always)]
     pub fn get(meta: Metadata) -> Option<FileId> {
-        Some((meta.dev(), meta.ino()))
+        Some(FileId(meta.dev(), meta.ino()))
     }
 }
 
@@ -104,7 +107,7 @@ fn get_metadata(dir_entry: &DirEntry) -> Option<Metadata> {
 
 /// Appends a directory id to the set of visited directories
 #[inline]
-fn append(visited: &'_ FileIdSet, file_id: Option<FileId>) -> Cow<'_, FileIdSet> {
+fn append(visited: &'_ IdSet, file_id: Option<FileId>) -> Cow<'_, IdSet> {
     file_id.map_or(Cow::Borrowed(visited), |id| {
         let mut cloned = visited.clone();
         cloned.insert(id);
@@ -251,7 +254,7 @@ fn compute_thread(path_rx: &Receiver<PathResult>, digest_tx: &Sender<DigestResul
 type PathResult = Result<PathBuf, Error>;
 
 /// Iterate all files and sub-directories in a directory
-fn iterate_directory(path_tx: &Sender<PathResult>, dir_name: PathBuf, visited: &FileIdSet, bfs: bool, args: &Args, halt: &Flag) -> Result<bool, Cancelled> {
+fn do_iterate(path_tx: &Sender<PathResult>, dir_name: PathBuf, fs_id: DevId, visited: &IdSet, bfs: bool, args: &Args, halt: &Flag) -> Result<bool, Cancelled> {
     let dir_iter = match fs::read_dir(&dir_name) {
         Ok(dir_iter) => dir_iter,
         Err(_) => {
@@ -270,10 +273,10 @@ fn iterate_directory(path_tx: &Sender<PathResult>, dir_name: PathBuf, visited: &
                 if meta_data.as_ref().is_some_and(|meta| meta.is_dir()) {
                     if args.recursive {
                         let file_id = file_id::get(meta_data.unwrap());
-                        if file_id.is_none_or(|uid| !visited.contains(&uid)) {
+                        if file_id.is_none_or(|uid| (args.cross_dev || fs_id.is_none_or(|dev| uid.0 == dev)) && !visited.contains(&uid)) {
                             if bfs {
                                 dir_queue.push((file_id, dir_entry.path()));
-                            } else if !(iterate_directory(path_tx, dir_entry.path(), &append(visited, file_id), bfs, args, halt)? || args.keep_going) {
+                            } else if !(do_iterate(path_tx, dir_entry.path(), fs_id, &append(visited, file_id), bfs, args, halt)? || args.keep_going) {
                                 return Ok(false);
                             }
                         }
@@ -291,7 +294,7 @@ fn iterate_directory(path_tx: &Sender<PathResult>, dir_name: PathBuf, visited: &
 
     for (file_id, dir_name) in dir_queue.into_iter() {
         check_cancelled!(halt);
-        if !(iterate_directory(path_tx, dir_name, &append(visited, file_id), bfs, args, halt)? || args.keep_going) {
+        if !(do_iterate(path_tx, dir_name, fs_id, &append(visited, file_id), bfs, args, halt)? || args.keep_going) {
             return Ok(false);
         }
     }
@@ -301,14 +304,12 @@ fn iterate_directory(path_tx: &Sender<PathResult>, dir_name: PathBuf, visited: &
 
 /// Iterate a list of input files
 fn iterate_thread(path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &Flag) -> TaskResult {
-    let handle_directories = args.dirs || args.recursive;
-
     for file_name in args.files.iter().cloned() {
         check_cancelled!(halt);
-        let directory_info = if handle_directories { fs::metadata(&file_name).ok().filter(|meta| meta.is_dir()) } else { None };
+        let directory_info = if args.dirs { fs::metadata(&file_name).ok().filter(|meta| meta.is_dir()) } else { None };
         if let Some(meta_data) = directory_info {
-            let visited = file_id::get(meta_data).map_or_else(FileIdSet::new, |dir_id| iter::once(dir_id).collect());
-            if !(iterate_directory(path_tx, file_name, &visited, bfs, args, halt)? || args.keep_going) {
+            let (fs_id, visited) = file_id::get(meta_data).map_or_else(|| (None, IdSet::new()), |dir_id| (Some(dir_id.0), iter::once(dir_id).collect()));
+            if !(do_iterate(path_tx, file_name, fs_id, &visited, bfs, args, halt)? || args.keep_going) {
                 break;
             }
         } else {
@@ -325,7 +326,7 @@ fn iterate_thread(path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &F
 
 /// Start the file iteration thread, if it is needed
 fn start_iteration(bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> (Receiver<PathResult>, Option<JoinHandle<TaskResult>>) {
-    if args.dirs || args.recursive || args.files.len() > 1024usize {
+    if args.dirs || (args.files.len() > 1024usize) {
         let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
         let (path_tx, path_rx) = bounded::<PathResult>(256usize);
         (path_rx, Some(thread::spawn(move || iterate_thread(&path_tx, bfs, &args_cloned, &halt_cloned))))
