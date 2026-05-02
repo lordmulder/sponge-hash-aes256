@@ -5,15 +5,19 @@
 use libc::{fstat, stat};
 use std::{
     ffi::OsString,
+    fs::Metadata,
     mem::zeroed,
-    os::fd::{AsRawFd, RawFd},
+    os::{
+        fd::{AsRawFd, RawFd},
+        unix::fs::MetadataExt,
+    },
     sync::LazyLock,
 };
 
 use crate::io::DataSource;
 
 // ---------------------------------------------------------------------------
-// Unix functions
+// Pipe functions
 // ---------------------------------------------------------------------------
 
 pub static STDIN_NAME: LazyLock<OsString> = LazyLock::new(|| OsString::from("/dev/stdin"));
@@ -36,4 +40,28 @@ impl AsRawFd for DataSource<'_> {
             DataSource::Stream(stream) => stream.0.as_raw_fd(),
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// File id functions
+// ---------------------------------------------------------------------------
+
+pub type DevId = Option<u64>;
+
+#[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
+pub struct FileId {
+    pub dev: u64,
+    pub ino: u64,
+}
+
+impl FileId {
+    #[inline(always)]
+    pub const fn new(dev: u64, ino: u64) -> Self {
+        Self { dev, ino }
+    }
+}
+
+#[inline]
+pub fn file_id(meta: Metadata) -> Option<FileId> {
+    Some(FileId::new(meta.dev(), meta.ino()))
 }

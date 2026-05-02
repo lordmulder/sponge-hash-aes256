@@ -4,6 +4,7 @@
 
 use std::{
     ffi::OsString,
+    fs::Metadata,
     os::windows::io::{AsRawHandle, RawHandle},
     sync::LazyLock,
 };
@@ -12,7 +13,7 @@ use windows_sys::Win32::Storage::FileSystem::{GetFileType, FILE_TYPE_PIPE};
 use crate::io::DataSource;
 
 // ---------------------------------------------------------------------------
-// Windows functions
+// Pipe functions
 // ---------------------------------------------------------------------------
 
 pub static STDIN_NAME: LazyLock<OsString> = LazyLock::new(|| OsString::from("CONIN$"));
@@ -30,4 +31,21 @@ impl AsRawHandle for DataSource<'_> {
             DataSource::Stream(stream) => stream.0.as_raw_handle(),
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// File id functions
+// ---------------------------------------------------------------------------
+
+pub type DevId = Option<u32>;
+
+#[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
+pub struct FileId {
+    pub dev: u32,
+    pub ino: u64,
+}
+
+#[inline]
+pub fn file_id(_meta: Metadata) -> Option<FileId> {
+    None // MetadataExt::volume_serial_number() and MetadataExt::file_index() are *not* stabilized yet!
 }

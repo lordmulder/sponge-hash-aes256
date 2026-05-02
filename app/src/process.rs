@@ -26,10 +26,12 @@ use crate::{
     digest::{compute_digest, Error as DigestError},
     environment::Env,
     io::{DataSource, Error as IoError},
-    os::STDIN_NAME,
+    os::{file_id, DevId, FileId, STDIN_NAME},
     print_error,
     thread_pool::{detect_thread_count, Cancelled, TaskResult, ThreadPool},
 };
+
+pub type IdSet = BTreeSet<FileId>;
 
 // ---------------------------------------------------------------------------
 // Error Type
@@ -54,38 +56,6 @@ impl Error {
             IoError::FileNotFound => Error::NotFound(path),
             IoError::IsADirectory => Error::ObjIsDir(path),
         }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Platform support
-// ---------------------------------------------------------------------------
-
-#[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
-struct FileId(u64, u64);
-
-type IdSet = BTreeSet<FileId>;
-type DevId = Option<u64>;
-
-#[cfg(target_family = "unix")]
-mod file_id {
-    use super::*;
-    use std::os::unix::fs::MetadataExt;
-
-    /// Get the unique file id
-    #[inline(always)]
-    pub fn get(meta: Metadata) -> Option<FileId> {
-        Some(FileId(meta.dev(), meta.ino()))
-    }
-}
-
-#[cfg(not(target_family = "unix"))]
-mod file_id {
-    use super::*;
-
-    #[inline(always)]
-    pub fn get(_: Metadata) -> Option<FileId> {
-        None
     }
 }
 
@@ -272,8 +242,8 @@ fn do_iterate(path_tx: &Sender<PathResult>, dir_name: PathBuf, fs_id: DevId, vis
                 let meta_data = get_metadata(&dir_entry);
                 if meta_data.as_ref().is_some_and(|meta| meta.is_dir()) {
                     if args.recursive {
-                        let file_id = file_id::get(meta_data.unwrap());
-                        if file_id.is_none_or(|uid| (args.cross_dev || fs_id.is_none_or(|dev| uid.0 == dev)) && !visited.contains(&uid)) {
+                        let file_id = file_id(meta_data.unwrap());
+                        if file_id.is_none_or(|uid| (args.cross_dev || fs_id.is_none_or(|dev| uid.dev == dev)) && !visited.contains(&uid)) {
                             if bfs {
                                 dir_queue.push((file_id, dir_entry.path()));
                             } else if !(do_iterate(path_tx, dir_entry.path(), fs_id, &append(visited, file_id), bfs, args, halt)? || args.keep_going) {
@@ -308,7 +278,7 @@ fn iterate_thread(path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &F
         check_cancelled!(halt);
         let directory_info = if args.dirs { fs::metadata(&file_name).ok().filter(|meta| meta.is_dir()) } else { None };
         if let Some(meta_data) = directory_info {
-            let (fs_id, visited) = file_id::get(meta_data).map_or_else(|| (None, IdSet::new()), |dir_id| (Some(dir_id.0), iter::once(dir_id).collect()));
+            let (fs_id, visited) = file_id(meta_data).map_or_else(|| (None, IdSet::new()), |uid| (Some(uid.dev), iter::once(uid).collect()));
             if !(do_iterate(path_tx, file_name, fs_id, &visited, bfs, args, halt)? || args.keep_going) {
                 break;
             }
