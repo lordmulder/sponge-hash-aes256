@@ -37,15 +37,24 @@ impl AsRawHandle for DataSource<'_> {
 // File id functions
 // ---------------------------------------------------------------------------
 
-pub type DevId = Option<u32>;
+pub struct DevId;
 
 #[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
-pub struct FileId {
-    pub dev: u32,
-    pub ino: u64,
+pub struct FileId;
+
+impl FileId {
+    #[inline(always)]
+    pub fn same_dev(&self, _dev_id: &DevId) -> bool {
+        true
+    }
+
+    #[inline(always)]
+    pub fn dev_id(&self) -> DevId {
+        DevId
+    }
 }
 
 #[inline]
 pub fn file_id(_meta: Metadata) -> Option<FileId> {
-    None // MetadataExt::volume_serial_number() and MetadataExt::file_index() are *not* stabilized yet!
+    None
 }

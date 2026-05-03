@@ -46,18 +46,28 @@ impl AsRawFd for DataSource<'_> {
 // File id functions
 // ---------------------------------------------------------------------------
 
-pub type DevId = Option<u64>;
+pub type DevId = u64;
 
 #[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
 pub struct FileId {
-    pub dev: u64,
-    pub ino: u64,
+    dev: u64,
+    ino: u64,
 }
 
 impl FileId {
     #[inline(always)]
     pub const fn new(dev: u64, ino: u64) -> Self {
         Self { dev, ino }
+    }
+
+    #[inline]
+    pub fn dev_id(&self) -> DevId {
+        self.dev
+    }
+
+    #[inline]
+    pub fn same_dev(&self, dev_id: &DevId) -> bool {
+        self.dev == *dev_id
     }
 }
 

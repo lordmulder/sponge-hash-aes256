@@ -31,7 +31,8 @@ use crate::{
     thread_pool::{detect_thread_count, Cancelled, TaskResult, ThreadPool},
 };
 
-pub type IdSet = BTreeSet<FileId>;
+type FsId<'a> = Option<&'a DevId>;
+type IdSet = BTreeSet<FileId>;
 
 // ---------------------------------------------------------------------------
 // Error Type
@@ -224,7 +225,7 @@ fn compute_thread(path_rx: &Receiver<PathResult>, digest_tx: &Sender<DigestResul
 type PathResult = Result<PathBuf, Error>;
 
 /// Iterate all files and sub-directories in a directory
-fn do_iterate(path_tx: &Sender<PathResult>, dir_name: PathBuf, fs_id: DevId, visited: &IdSet, bfs: bool, args: &Args, halt: &Flag) -> Result<bool, Cancelled> {
+fn do_iterate(path_tx: &Sender<PathResult>, dir_name: PathBuf, fs_id: FsId, visited: &IdSet, bfs: bool, args: &Args, halt: &Flag) -> Result<bool, Cancelled> {
     let dir_iter = match fs::read_dir(&dir_name) {
         Ok(dir_iter) => dir_iter,
         Err(_) => {
@@ -243,7 +244,7 @@ fn do_iterate(path_tx: &Sender<PathResult>, dir_name: PathBuf, fs_id: DevId, vis
                 if meta_data.as_ref().is_some_and(|meta| meta.is_dir()) {
                     if args.recursive {
                         let file_id = file_id(meta_data.unwrap());
-                        if file_id.is_none_or(|uid| (args.cross_dev || fs_id.is_none_or(|dev| uid.dev == dev)) && !visited.contains(&uid)) {
+                        if file_id.is_none_or(|uid| (args.cross_dev || fs_id.is_none_or(|dev| uid.same_dev(dev))) && !visited.contains(&uid)) {
                             if bfs {
                                 dir_queue.push((file_id, dir_entry.path()));
                             } else if !(do_iterate(path_tx, dir_entry.path(), fs_id, &append(visited, file_id), bfs, args, halt)? || args.keep_going) {
@@ -278,8 +279,8 @@ fn iterate_thread(path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &F
         check_cancelled!(halt);
         let directory_info = if args.dirs { fs::metadata(&file_name).ok().filter(|meta| meta.is_dir()) } else { None };
         if let Some(meta_data) = directory_info {
-            let (fs_id, visited) = file_id(meta_data).map_or_else(|| (None, IdSet::new()), |uid| (Some(uid.dev), iter::once(uid).collect()));
-            if !(do_iterate(path_tx, file_name, fs_id, &visited, bfs, args, halt)? || args.keep_going) {
+            let (fs_id, visited) = file_id(meta_data).map_or_else(|| (None, IdSet::new()), |uid| (Some(uid.dev_id()), iter::once(uid).collect()));
+            if !(do_iterate(path_tx, file_name, fs_id.as_ref(), &visited, bfs, args, halt)? || args.keep_going) {
                 break;
             }
         } else {
