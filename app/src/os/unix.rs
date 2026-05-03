@@ -47,21 +47,22 @@ impl AsRawFd for DataSource<'_> {
 // ---------------------------------------------------------------------------
 
 pub type DevId = u64;
+pub type InoId = u64;
 
 #[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
 pub struct FileId {
-    dev: u64,
-    ino: u64,
+    dev: DevId,
+    ino: InoId,
 }
 
 impl FileId {
-    #[inline(always)]
+    #[inline]
     pub const fn new(dev: u64, ino: u64) -> Self {
         Self { dev, ino }
     }
 
     #[inline]
-    pub fn dev_id(&self) -> DevId {
+    pub fn dev(&self) -> DevId {
         self.dev
     }
 

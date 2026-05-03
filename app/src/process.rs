@@ -4,10 +4,10 @@
 
 use crossbeam_channel::{bounded, Receiver, Sender};
 use hex::encode_to_slice;
+use imbl::OrdSet;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
 use std::{
     borrow::Cow,
-    collections::BTreeSet,
     ffi::OsStr,
     fs::{self, DirEntry, Metadata},
     io::{Result as IoResult, Write},
@@ -32,7 +32,7 @@ use crate::{
 };
 
 type FsId<'a> = Option<&'a DevId>;
-type IdSet = BTreeSet<FileId>;
+type IdSet = OrdSet<FileId>;
 
 // ---------------------------------------------------------------------------
 // Error Type
@@ -79,11 +79,7 @@ fn get_metadata(dir_entry: &DirEntry) -> Option<Metadata> {
 /// Appends a directory id to the set of visited directories
 #[inline]
 fn append(visited: &'_ IdSet, file_id: Option<FileId>) -> Cow<'_, IdSet> {
-    file_id.map_or(Cow::Borrowed(visited), |id| {
-        let mut cloned = visited.clone();
-        cloned.insert(id);
-        Cow::Owned(cloned)
-    })
+    file_id.map_or(Cow::Borrowed(visited), |uid| Cow::Owned(visited.update(uid)))
 }
 
 /// Check if the computation has been cancelled
@@ -279,7 +275,7 @@ fn iterate_thread(path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &F
         check_cancelled!(halt);
         let directory_info = if args.dirs { fs::metadata(&file_name).ok().filter(|meta| meta.is_dir()) } else { None };
         if let Some(meta_data) = directory_info {
-            let (fs_id, visited) = file_id(meta_data).map_or_else(|| (None, IdSet::new()), |uid| (Some(uid.dev_id()), iter::once(uid).collect()));
+            let (fs_id, visited) = file_id(meta_data).map_or_else(|| (None, IdSet::new()), |uid| (Some(uid.dev()), iter::once(uid).collect()));
             if !(do_iterate(path_tx, file_name, fs_id.as_ref(), &visited, bfs, args, halt)? || args.keep_going) {
                 break;
             }

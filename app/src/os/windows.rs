@@ -45,12 +45,12 @@ pub struct FileId;
 impl FileId {
     #[inline(always)]
     pub fn same_dev(&self, _dev_id: &DevId) -> bool {
-        true
+        unreachable!()
     }
 
     #[inline(always)]
-    pub fn dev_id(&self) -> DevId {
-        DevId
+    pub fn dev(&self) -> DevId {
+        unreachable!()
     }
 }
 
