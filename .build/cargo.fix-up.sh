@@ -7,6 +7,7 @@ cargo upgrade --recursive --incompatible
 cargo update
 cargo fmt --all
 cargo clippy --all-targets --all-features
+cargo audit
 cargo build --release
 
 echo "Completed successfully."

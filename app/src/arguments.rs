@@ -16,7 +16,6 @@ use std::{
     num::NonZeroUsize,
     path::PathBuf,
     process::ExitCode,
-    sync::Arc,
 };
 use wild::args_os;
 
@@ -28,10 +27,10 @@ use wild::args_os;
 const BUILD_PROFILE: &str = if cfg!(debug_assertions) { "debug" } else { "release" };
 
 /// Version string
-pub const VERSION: &str = formatcp!("v{} [SpongeHash-AES256 v{}] [{OS}] [{ARCH}] [{BUILD_PROFILE}]", env!("CARGO_PKG_VERSION"), version());
+const VERSION: &str = formatcp!("v{} [SpongeHash-AES256 v{}] [{OS}] [{ARCH}] [{BUILD_PROFILE}]", env!("CARGO_PKG_VERSION"), version());
 
 /// Full version string
-pub const LONG_VERSION: &str = formatcp!("{VERSION}\nBuilt on: {}\nCompiled using rustc version: {}", build_time_utc!("%F, %T"), rustc_version_full());
+const LONG_VERSION: &str = formatcp!("{VERSION}\nBuilt on: {}\nCompiled using rustc version: {}", build_time_utc!("%F, %T"), rustc_version_full());
 
 /// Header line
 pub const HEADER_LINE: &str = formatcp!("{} v{} (with SpongeHash-AES256 v{})", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"), version());
@@ -131,20 +130,14 @@ pub struct Args {
     pub files: Vec<PathBuf>,
 }
 
-impl Args {
-    /// Parse command-line arguments
-    pub fn try_parse_command_line() -> Result<Arc<Self>, ExitCode> {
-        match Self::try_parse_from(args_os()) {
-            Ok(value) => Self::initialize_args(value),
-            Err(error) => Err(print_arg_error(error)),
+pub fn parse_command_line() -> Result<Args, ExitCode> {
+    match Args::try_parse_from(args_os()) {
+        Ok(mut args) => {
+            args.recursive |= args.cross_dev;
+            args.dirs |= args.recursive;
+            Ok(args)
         }
-    }
-
-    #[inline]
-    fn initialize_args(mut self) -> Result<Arc<Self>, ExitCode> {
-        self.recursive |= self.cross_dev;
-        self.dirs |= self.recursive;
-        Ok(Arc::new(self))
+        Err(error) => Err(print_arg_error(error)),
     }
 }
 

@@ -67,8 +67,8 @@ impl FileId {
     }
 
     #[inline]
-    pub fn same_dev(&self, dev_id: &DevId) -> bool {
-        self.dev == *dev_id
+    pub fn same_dev(&self, other: DevId) -> bool {
+        self.dev == other
     }
 }
 

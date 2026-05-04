@@ -37,6 +37,7 @@ impl AsRawHandle for DataSource<'_> {
 // File id functions
 // ---------------------------------------------------------------------------
 
+#[derive(Clone, Copy)]
 pub struct DevId;
 
 #[derive(Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
@@ -44,7 +45,7 @@ pub struct FileId;
 
 impl FileId {
     #[inline(always)]
-    pub fn same_dev(&self, _dev_id: &DevId) -> bool {
+    pub fn same_dev(&self, _other: DevId) -> bool {
         unreachable!()
     }
 

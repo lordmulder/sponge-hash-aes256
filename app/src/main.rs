@@ -223,7 +223,7 @@ use crate::common::{Aborted, ExitStatus, Flag};
 use crate::environment::Env;
 use crate::verify::verify_files;
 use crate::{
-    arguments::Args,
+    arguments::{parse_command_line, Args},
     common::{MAX_DIGEST_SIZE, MAX_SNAIL_LEVEL},
     process::process_files,
     self_test::self_test,
@@ -320,11 +320,11 @@ fn ctrlc_handler(halt: &Arc<Flag>) -> ! {
 // Entry point
 // ---------------------------------------------------------------------------
 
-/// Applicationm entry point (“main” function)
+/// Application entry point (“main” function)
 fn main() -> ExitCode {
     // Initialize the Args from the given command-line arguments
-    let args = match Args::try_parse_command_line() {
-        Ok(args) => args,
+    let args = match parse_command_line() {
+        Ok(args) => Arc::new(args),
         Err(exit_code) => return exit_code,
     };
 

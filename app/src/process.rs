@@ -4,14 +4,13 @@
 
 use crossbeam_channel::{bounded, Receiver, Sender};
 use hex::encode_to_slice;
-use imbl::OrdSet;
+use imbl::{ordset, OrdSet};
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
 use std::{
     borrow::Cow,
     ffi::OsStr,
     fs::{self, DirEntry, Metadata},
     io::{Result as IoResult, Write},
-    iter,
     num::NonZeroUsize,
     path::PathBuf,
     str::from_utf8_unchecked,
@@ -31,7 +30,7 @@ use crate::{
     thread_pool::{detect_thread_count, Cancelled, TaskResult, ThreadPool},
 };
 
-type FsId<'a> = Option<&'a DevId>;
+type FsId = Option<DevId>;
 type IdSet = OrdSet<FileId>;
 
 // ---------------------------------------------------------------------------
@@ -230,7 +229,7 @@ fn do_iterate(path_tx: &Sender<PathResult>, dir_name: PathBuf, fs_id: FsId, visi
         }
     };
 
-    let mut dir_queue = if bfs { Vec::with_capacity(32usize) } else { Vec::new() };
+    let mut dir_queue: TinyVec<[_; 96usize]> = TinyVec::new();
 
     for element in dir_iter {
         match element {
@@ -239,11 +238,11 @@ fn do_iterate(path_tx: &Sender<PathResult>, dir_name: PathBuf, fs_id: FsId, visi
                 let meta_data = get_metadata(&dir_entry);
                 if meta_data.as_ref().is_some_and(|meta| meta.is_dir()) {
                     if args.recursive {
-                        let file_id = file_id(meta_data.unwrap());
-                        if file_id.is_none_or(|uid| (args.cross_dev || fs_id.is_none_or(|dev| uid.same_dev(dev))) && !visited.contains(&uid)) {
+                        let unique_id = file_id(unsafe { meta_data.unwrap_unchecked() });
+                        if unique_id.is_none_or(|uid| (args.cross_dev || fs_id.is_none_or(|dev| uid.same_dev(dev))) && !visited.contains(&uid)) {
                             if bfs {
-                                dir_queue.push((file_id, dir_entry.path()));
-                            } else if !(do_iterate(path_tx, dir_entry.path(), fs_id, &append(visited, file_id), bfs, args, halt)? || args.keep_going) {
+                                dir_queue.push((unique_id, dir_entry.path()));
+                            } else if !(do_iterate(path_tx, dir_entry.path(), fs_id, &append(visited, unique_id), bfs, args, halt)? || args.keep_going) {
                                 return Ok(false);
                             }
                         }
@@ -259,9 +258,9 @@ fn do_iterate(path_tx: &Sender<PathResult>, dir_name: PathBuf, fs_id: FsId, visi
         }
     }
 
-    for (file_id, dir_name) in dir_queue.into_iter() {
+    for (unique_id, dir_name) in dir_queue.into_iter() {
         check_cancelled!(halt);
-        if !(do_iterate(path_tx, dir_name, fs_id, &append(visited, file_id), bfs, args, halt)? || args.keep_going) {
+        if !(do_iterate(path_tx, dir_name, fs_id, &append(visited, unique_id), bfs, args, halt)? || args.keep_going) {
             return Ok(false);
         }
     }
@@ -273,10 +272,10 @@ fn do_iterate(path_tx: &Sender<PathResult>, dir_name: PathBuf, fs_id: FsId, visi
 fn iterate_thread(path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &Flag) -> TaskResult {
     for file_name in args.files.iter().cloned() {
         check_cancelled!(halt);
-        let directory_info = if args.dirs { fs::metadata(&file_name).ok().filter(|meta| meta.is_dir()) } else { None };
-        if let Some(meta_data) = directory_info {
-            let (fs_id, visited) = file_id(meta_data).map_or_else(|| (None, IdSet::new()), |uid| (Some(uid.dev()), iter::once(uid).collect()));
-            if !(do_iterate(path_tx, file_name, fs_id.as_ref(), &visited, bfs, args, halt)? || args.keep_going) {
+        let directory = if args.dirs { fs::metadata(&file_name).ok().filter(|meta| meta.is_dir()) } else { None };
+        if let Some(meta_data) = directory {
+            let (visited, fs_id) = file_id(meta_data).map_or_else(Default::default, |uid| (ordset![uid], Some(uid.dev())));
+            if !(do_iterate(path_tx, file_name, fs_id, &visited, bfs, args, halt)? || args.keep_going) {
                 break;
             }
         } else {
