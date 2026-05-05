@@ -73,6 +73,12 @@ const STATUS_STOPPED: usize = 1usize;
 const STATUS_ABORTED: usize = 2usize;
 
 impl Flag {
+    /// Create a new flag instance with initial status `STATUS_RUNNING`
+    #[inline]
+    pub const fn default() -> Self {
+        Self(AtomicUsize::new(STATUS_RUNNING))
+    }
+
     /// Check whether the process is still running
     ///
     /// This will return `true`, unless either `stop_process()` or `abort_process()` has been triggered.
@@ -102,13 +108,6 @@ impl Flag {
                 false => Err(UpdateError),
             },
         }
-    }
-}
-
-impl Default for Flag {
-    #[inline]
-    fn default() -> Self {
-        Self(AtomicUsize::new(STATUS_RUNNING))
     }
 }
 

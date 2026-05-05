@@ -14,7 +14,6 @@ use std::{
     num::NonZeroUsize,
     path::PathBuf,
     str::from_utf8_unchecked,
-    sync::Arc,
     thread::{self, JoinHandle},
 };
 use tinyvec::TinyVec;
@@ -32,6 +31,7 @@ use crate::{
 
 type FsId = Option<DevId>;
 type IdSet = OrdSet<FileId>;
+type Count = NonZeroUsize;
 
 // ---------------------------------------------------------------------------
 // Error Type
@@ -291,11 +291,10 @@ fn iterate_thread(path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &F
 // ---------------------------------------------------------------------------
 
 /// Start the file iteration thread, if it is needed
-fn start_iteration(bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> (Receiver<PathResult>, Option<JoinHandle<TaskResult>>) {
+fn start_iteration(bfs: bool, args: &'static Args, halt: &'static Flag) -> (Receiver<PathResult>, Option<JoinHandle<TaskResult>>) {
     if args.dirs || (args.files.len() > 1024usize) {
-        let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
         let (path_tx, path_rx) = bounded::<PathResult>(256usize);
-        (path_rx, Some(thread::spawn(move || iterate_thread(&path_tx, bfs, &args_cloned, &halt_cloned))))
+        (path_rx, Some(thread::spawn(move || iterate_thread(&path_tx, bfs, args, halt))))
     } else {
         let (path_tx, path_rx) = bounded::<PathResult>(args.files.len());
         args.files.iter().cloned().for_each(|path| path_tx.try_send(Ok(path)).unwrap());
@@ -303,7 +302,7 @@ fn start_iteration(bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> (Receiver<P
     }
 }
 
-fn process_mt(output: &mut impl Write, n_threads: NonZeroUsize, out_size: usize, bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<ExitStatus, Aborted> {
+fn process_mt(output: &mut impl Write, n_threads: Count, out_size: usize, bfs: bool, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
     // Initialize channel
     let (digest_tx, digest_rx) = bounded::<DigestResult>(get_capacity(&n_threads));
 
@@ -311,8 +310,7 @@ fn process_mt(output: &mut impl Write, n_threads: NonZeroUsize, out_size: usize,
     let (path_rx, thread_handle) = start_iteration(bfs, args, halt);
 
     // Start the worker threads
-    let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
-    let thread_pool = ThreadPool::new(n_threads, move || compute_thread(&path_rx, &digest_tx, out_size, &args_cloned, &halt_cloned));
+    let thread_pool = ThreadPool::new(n_threads, move || compute_thread(&path_rx, &digest_tx, out_size, args, halt));
 
     // Initialize counters
     let (mut file_errors, mut write_errors) = (u64::MIN, false);
@@ -358,7 +356,7 @@ fn process_mt(output: &mut impl Write, n_threads: NonZeroUsize, out_size: usize,
     Ok(exit_status(write_errors, file_errors, args))
 }
 
-fn process_st(output: &mut impl Write, out_size: usize, bfs: bool, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<ExitStatus, Aborted> {
+fn process_st(output: &mut impl Write, out_size: usize, bfs: bool, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
     // Start the file iteration thread
     let (path_rx, thread_handle) = start_iteration(bfs, args, halt);
 
@@ -414,12 +412,12 @@ fn process_st(output: &mut impl Write, out_size: usize, bfs: bool, args: &Arc<Ar
 // ---------------------------------------------------------------------------
 
 /// Process data from 'stdin' stream
-fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args>, halt: Arc<Flag>) -> Result<ExitStatus, Cancelled> {
+fn process_stdin(output: &mut impl Write, digest_size: usize, args: &Args, halt: &Flag) -> Result<ExitStatus, Cancelled> {
     let mut stdin = DataSource::from_stdin();
     let mut digest = TinyVec::with_length(digest_size);
 
-    match compute_digest(&mut stdin, digest.as_mut_slice(), &args, &halt) {
-        Ok(_) => match print_digest(output, &STDIN_NAME, &digest, &args) {
+    match compute_digest(&mut stdin, digest.as_mut_slice(), args, halt) {
+        Ok(_) => match print_digest(output, &STDIN_NAME, &digest, args) {
             Ok(_) => Ok(ExitStatus::Success),
             Err(_) => Ok(ExitStatus::Failure),
         },
@@ -432,21 +430,21 @@ fn process_stdin(output: &mut impl Write, digest_size: usize, args: Arc<Args>, h
 }
 
 /// Process all input files
-pub fn process_files(output: &mut impl Write, digest_size: usize, args: Arc<Args>, env: &Env, halt: Arc<Flag>) -> Result<ExitStatus, Aborted> {
+pub fn process_files(output: &mut impl Write, digest_size: usize, args: &'static Args, env: &Env, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
     // Read input datat from 'stdin' stream?
     if args.files.is_empty() {
         return process_stdin(output, digest_size, args, halt).map_err(|_| Aborted);
     }
 
     // Determine number of threads
-    let thread_count = detect_thread_count(&args, env);
+    let thread_count = detect_thread_count(args, env);
 
     // Determine directory walking strategy
     let breadth_first = env.dirwalk_strategy.unwrap_or(true);
 
-    if thread_count > NonZeroUsize::MIN {
-        process_mt(output, thread_count, digest_size, breadth_first, &args, &halt)
+    if thread_count > Count::MIN {
+        process_mt(output, thread_count, digest_size, breadth_first, args, halt)
     } else {
-        process_st(output, digest_size, breadth_first, &args, &halt)
+        process_st(output, digest_size, breadth_first, args, halt)
     }
 }

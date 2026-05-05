@@ -3,21 +3,19 @@
 // Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>
 
 use build_time::build_time_utc;
-use clap::{
-    error::{ContextKind, ContextValue, Error, ErrorKind},
-    ArgAction, ArgGroup, Parser,
-};
+use clap::{ArgAction, ArgGroup, Error, Parser};
 use const_format::formatcp;
 use rustc_version_const::rustc_version_full;
 use sponge_hash_aes256::version;
 use std::{
     env::consts::{ARCH, OS},
-    iter::Peekable,
     num::NonZeroUsize,
     path::PathBuf,
-    process::ExitCode,
+    sync::OnceLock,
 };
 use wild::args_os;
+
+use crate::common::ExitStatus;
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -33,7 +31,7 @@ const VERSION: &str = formatcp!("v{} [SpongeHash-AES256 v{}] [{OS}] [{ARCH}] [{B
 const LONG_VERSION: &str = formatcp!("{VERSION}\nBuilt on: {}\nCompiled using rustc version: {}", build_time_utc!("%F, %T"), rustc_version_full());
 
 /// Header line
-pub const HEADER_LINE: &str = formatcp!("{} v{} (with SpongeHash-AES256 v{})", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"), version());
+const HEADER_LINE: &str = formatcp!("{} v{} (with SpongeHash-AES256 v{})", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"), version());
 
 /// About text
 const ABOUT_TEXT: &str = "A sponge-based secure hash function that uses AES-256 as its internal PRF.\n\
@@ -130,109 +128,30 @@ pub struct Args {
     pub files: Vec<PathBuf>,
 }
 
-pub fn parse_command_line() -> Result<Args, ExitCode> {
-    match Args::try_parse_from(args_os()) {
+/// Singleton instance
+static ARGS_INSTANCE: OnceLock<Result<Args, Error>> = OnceLock::new();
+
+/// Initialize command-line arguments
+pub fn parse_command_line() -> Result<&'static Args, ExitStatus> {
+    let instance = ARGS_INSTANCE.get_or_init(|| match Args::try_parse_from(args_os()) {
         Ok(mut args) => {
             args.recursive |= args.cross_dev;
             args.dirs |= args.recursive;
             Ok(args)
         }
-        Err(error) => Err(print_arg_error(error)),
+        Err(error) => Err(error),
+    });
+
+    match instance {
+        Ok(args) => Ok(args),
+        Err(error) => {
+            let _io = error.print();
+            Err(ExitStatus::Failure)
+        }
     }
 }
 
-// ---------------------------------------------------------------------------
-// Helper functions
-// ---------------------------------------------------------------------------
-
-macro_rules! print_arg_error {
-    ($fmt:literal $(,$arg:expr)*$(,)?) => {
-        eprintln!(concat!("[sponge256sum] Error: ", $fmt) $(, $arg)*)
-    };
-}
-
-#[inline]
-fn context_str(error: &Error, kind: ContextKind) -> &str {
-    static EMPTY_STRING: String = String::new();
-    if let Some(ContextValue::String(str_value)) = error.get(kind) {
-        str_value
-    } else {
-        &EMPTY_STRING
-    }
-}
-
-#[inline]
-fn context_vec(error: &Error, kind: ContextKind) -> &str {
-    static EMPTY_STRING: String = String::new();
-    if let Some(ContextValue::Strings(str_value)) = error.get(kind) {
-        str_value.first().unwrap_or(&EMPTY_STRING)
-    } else {
-        &EMPTY_STRING
-    }
-}
-
-#[inline]
-fn join_args<'a, I: Iterator<Item = &'a str>>(mut arg_iter: Peekable<I>) -> String {
-    if let Some(token) = arg_iter.next() {
-        let mut result_buffer = format!("{:?}", token);
-        while let Some(token) = arg_iter.next() {
-            if arg_iter.peek().is_none() {
-                result_buffer.push_str(&format!(" or {:?}", token));
-            } else {
-                result_buffer.push_str(&format!(", {:?}", token));
-            }
-        }
-        result_buffer
-    } else {
-        String::new()
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Error handling
-// ---------------------------------------------------------------------------
-
-/// Print argument parser error
-fn print_arg_error(error: Error) -> ExitCode {
-    match error.kind() {
-        ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => {
-            eprint!("{}", error);
-            ExitCode::SUCCESS
-        }
-        ErrorKind::UnknownArgument => {
-            print_arg_error!("Unknown option {:?} encountered!", context_str(&error, ContextKind::InvalidArg));
-            ExitCode::FAILURE
-        }
-        ErrorKind::InvalidValue | ErrorKind::ValueValidation => {
-            let (invalid_arg, invalid_value) = (context_str(&error, ContextKind::InvalidArg), context_str(&error, ContextKind::InvalidValue));
-            if invalid_value.is_empty() {
-                print_arg_error!("The required value for option {:?} is missing!", invalid_arg);
-            } else {
-                print_arg_error!("The given value {:?} for option {:?} is invalid!", invalid_value, invalid_arg);
-            }
-            ExitCode::FAILURE
-        }
-        ErrorKind::ArgumentConflict => {
-            let (invalid_arg, prior_arg) = (context_str(&error, ContextKind::InvalidArg), context_str(&error, ContextKind::PriorArg));
-            if prior_arg.is_empty() || (prior_arg == invalid_arg) {
-                print_arg_error!("The option {:?} can not be used more than once!", invalid_arg);
-            } else {
-                print_arg_error!("The options {:?} and {:?} are mutually exclusive!", invalid_arg, prior_arg);
-            }
-            ExitCode::FAILURE
-        }
-        ErrorKind::MissingRequiredArgument => {
-            let arg_name = context_vec(&error, ContextKind::InvalidArg).trim_start_matches("<").trim_end_matches(">");
-            if !arg_name.contains('|') {
-                print_arg_error!("The required option {:?} is missing!", arg_name);
-            } else {
-                print_arg_error!("One of the required options {} is missing!", join_args(arg_name.split('|').peekable()));
-            }
-            ExitCode::FAILURE
-        }
-        other => {
-            print_arg_error!("Invalid command-line arguments! ({:?})", other);
-            ExitCode::FAILURE
-        }
-    }
+/// Get header line
+pub const fn header_line() -> &'static str {
+    HEADER_LINE
 }

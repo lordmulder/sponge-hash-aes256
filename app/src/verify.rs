@@ -10,7 +10,6 @@ use std::{
     io::{BufRead, BufReader, Read, Result as IoResult, Write},
     num::NonZeroUsize,
     path::{Path, PathBuf},
-    sync::Arc,
     thread,
 };
 use tinyvec::TinyVec;
@@ -25,6 +24,8 @@ use crate::{
     print_error,
     thread_pool::{detect_thread_count, Cancelled, TaskResult, ThreadPool},
 };
+
+type Count = NonZeroUsize;
 
 // ---------------------------------------------------------------------------
 // Error Type
@@ -291,18 +292,16 @@ fn reader_thread(checksum_tx: &Sender<ReadResult>, args: &Args, halt: &Flag) -> 
 // Verify implementation
 // ---------------------------------------------------------------------------
 
-fn verify_mt(output: &mut impl Write, n_threads: NonZeroUsize, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<ExitStatus, Aborted> {
+fn verify_mt(output: &mut impl Write, n_threads: Count, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
     // Initialize channels
     let (checksum_tx, checksum_rx) = bounded::<ReadResult>(256usize);
     let (result_tx, result_rx) = bounded::<VerifyResult>(get_capacity(&n_threads));
 
     // Start the checksum reader thread
-    let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
-    let thread_handle = thread::spawn(move || reader_thread(&checksum_tx, &args_cloned, &halt_cloned));
+    let thread_handle = thread::spawn(move || reader_thread(&checksum_tx, args, halt));
 
     // Start the worker threads
-    let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
-    let thread_pool = ThreadPool::new(n_threads, move || verify_thread(&checksum_rx, &result_tx, &args_cloned, &halt_cloned));
+    let thread_pool = ThreadPool::new(n_threads, move || verify_thread(&checksum_rx, &result_tx, args, halt));
 
     // Initialize counters
     let (mut chck_errors, mut file_errors, mut write_errors) = (u64::MIN, u64::MIN, false);
@@ -351,13 +350,12 @@ fn verify_mt(output: &mut impl Write, n_threads: NonZeroUsize, args: &Arc<Args>,
     Ok(exit_status(write_errors, chck_errors, file_errors, args))
 }
 
-fn verify_st(output: &mut impl Write, args: &Arc<Args>, halt: &Arc<Flag>) -> Result<ExitStatus, Aborted> {
+fn verify_st(output: &mut impl Write, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
     // Initialize channel
     let (checksum_tx, checksum_rx) = bounded::<ReadResult>(256usize);
 
     // Start the checksum reader thread
-    let (args_cloned, halt_cloned) = (Arc::clone(args), Arc::clone(halt));
-    let thread_handle = thread::spawn(move || reader_thread(&checksum_tx, &args_cloned, &halt_cloned));
+    let thread_handle = thread::spawn(move || reader_thread(&checksum_tx, args, halt));
 
     // Initialize counters
     let (mut chck_errors, mut file_errors, mut write_errors) = (u64::MIN, u64::MIN, false);
@@ -414,13 +412,13 @@ fn verify_st(output: &mut impl Write, args: &Arc<Args>, halt: &Arc<Flag>) -> Res
 // ---------------------------------------------------------------------------
 
 /// Verify all input files
-pub fn verify_files(output: &mut impl Write, args: Arc<Args>, env: &Env, halt: Arc<Flag>) -> Result<ExitStatus, Aborted> {
+pub fn verify_files(output: &mut impl Write, args: &'static Args, env: &Env, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
     // Determine number of threads
-    let thread_count = detect_thread_count(&args, env);
+    let thread_count = detect_thread_count(args, env);
 
-    if thread_count > NonZeroUsize::MIN {
-        verify_mt(output, thread_count, &args, &halt)
+    if thread_count > Count::MIN {
+        verify_mt(output, thread_count, args, halt)
     } else {
-        verify_st(output, &args, &halt)
+        verify_st(output, args, halt)
     }
 }

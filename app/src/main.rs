@@ -214,7 +214,6 @@ use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
 use std::{
     io::stdout,
     process::{abort, ExitCode},
-    sync::Arc,
     thread,
     time::Duration,
 };
@@ -234,12 +233,15 @@ use crate::{
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+/// Global cancellation flag
+static HALT_FLAG: Flag = Flag::default();
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
 /// The actual "main" function
-fn sponge256sum_main(args: Arc<Args>) -> Result<ExitStatus, Aborted> {
+fn sponge256sum_main(args: &'static Args) -> Result<ExitStatus, Aborted> {
     // Initialize the SimpleLogger, if the "with-logging" feature is enabled
     #[cfg(feature = "with-logging")]
     simple_logger::SimpleLogger::new().init().unwrap();
@@ -283,23 +285,21 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<ExitStatus, Aborted> {
         }
     };
 
-    // Install the interrupt (CTRL+C) handling routine
-    let halt = Arc::new(Default::default());
-    let halt_cloned = Arc::clone(&halt);
-    let _ctrlc = ctrlc::set_handler(move || ctrlc_handler(&halt_cloned));
+    // Install the interrupt handler
+    let _ctrlc = ctrlc::set_handler(|| ctrlc_handler(&HALT_FLAG));
 
     // Acquire stdout handle
     let mut output = stdout().lock();
 
     // Run built-in self-test, if it was requested by the user
     if args.self_test {
-        self_test(&mut output, &args, &env, &halt)
+        self_test(&mut output, args, &env, &HALT_FLAG)
     } else if !args.check {
         // Process all input files/directories that were given on the command-line
-        process_files(&mut output, digest_size, args, &env, halt)
+        process_files(&mut output, digest_size, args, &env, &HALT_FLAG)
     } else {
         // Verify all checksum files that were given on the command-line
-        verify_files(&mut output, args, &env, halt)
+        verify_files(&mut output, args, &env, &HALT_FLAG)
     }
 }
 
@@ -310,7 +310,7 @@ fn sponge256sum_main(args: Arc<Args>) -> Result<ExitStatus, Aborted> {
 /// The SIGINT (CTRL+C) interrupt handler routine
 ///
 /// If the process does not exit cleanly after 10 seconds, we just proceed with the abort!
-fn ctrlc_handler(halt: &Arc<Flag>) -> ! {
+fn ctrlc_handler(halt: &'static Flag) -> ! {
     let _ = halt.abort_process();
     thread::sleep(Duration::from_secs(10u64));
     abort();
@@ -324,12 +324,12 @@ fn ctrlc_handler(halt: &Arc<Flag>) -> ! {
 fn main() -> ExitCode {
     // Initialize the Args from the given command-line arguments
     let args = match parse_command_line() {
-        Ok(args) => Arc::new(args),
-        Err(exit_code) => return exit_code,
+        Ok(args) => args,
+        Err(exit_code) => return exit_code.into(),
     };
 
     // Call the actual "main" function
-    match sponge256sum_main(Arc::clone(&args)) {
+    match sponge256sum_main(args) {
         Ok(status) => status.into(),
         Err(Aborted) => {
             print_error!(args, "Aborted: The process has been interrupted by the user!");
