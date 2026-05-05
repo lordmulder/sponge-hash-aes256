@@ -192,14 +192,14 @@ fn modify_checksum_file(original_file: &Path, modified_file: PathBuf, first_only
 // Test functions
 // ---------------------------------------------------------------------------
 
-fn do_test_file(expected: &str, file_name: &str, text_mode: bool, snail_level: usize) {
+fn do_test_file(expected: &str, file_name: &str, text_mode: bool, snail_level: usize, flush: bool) {
     let path = if !text_mode {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("binary").join(file_name)
     } else {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("text").join(file_name)
     };
 
-    let mut parameters = Vec::with_capacity(6usize);
+    let mut parameters = Vec::with_capacity(7usize);
 
     if text_mode {
         parameters.push(OsStr::new("--text"));
@@ -207,6 +207,10 @@ fn do_test_file(expected: &str, file_name: &str, text_mode: bool, snail_level: u
 
     for _ in 0..snail_level {
         parameters.push(OsStr::new("--snail"));
+    }
+
+    if flush {
+        parameters.push(OsStr::new("--flush"));
     }
 
     parameters.push(path.as_os_str());
@@ -345,7 +349,7 @@ fn do_test_data(expected: &str, data: &[u8], info: Option<&str>, snail_level: us
     assert!(digest_eq(caps.get(1).unwrap().as_str(), expected));
 }
 
-fn do_verify_files(modify: bool, file_count: usize, multi_threading: bool, force_null: bool) {
+fn do_verify_files(modify: bool, file_count: usize, multi_threading: bool, force_null: bool, flush: bool) {
     let source_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data");
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
 
@@ -358,7 +362,7 @@ fn do_verify_files(modify: bool, file_count: usize, multi_threading: bool, force
         check_file.clone()
     };
 
-    let mut parameters = Vec::with_capacity(5usize);
+    let mut parameters = Vec::with_capacity(6usize);
     parameters.extend_from_slice(&[OsStr::new("--check"), OsStr::new("--keep-going")]);
 
     if force_null {
@@ -367,6 +371,10 @@ fn do_verify_files(modify: bool, file_count: usize, multi_threading: bool, force
 
     if multi_threading {
         parameters.push(OsStr::new("--multi-threading"));
+    }
+
+    if flush {
+        parameters.push(OsStr::new("--flush"));
     }
 
     parameters.push(input_file.as_os_str());
@@ -430,56 +438,66 @@ fn do_test_exit_code(files: &[&str], verify_mode: bool, modify: bool, keep_going
 
 #[test]
 fn test_file_1a() {
-    do_test_file(EXPECTED[0usize], "frank.pdf", false, 0usize);
+    do_test_file(EXPECTED[0usize], "frank.pdf", false, 0usize, false);
 }
 
 #[test]
 fn test_file_1b() {
-    do_test_file(EXPECTED[1usize], "frank.pdf", false, 1usize);
+    do_test_file(EXPECTED[1usize], "frank.pdf", false, 1usize, false);
 }
 
 #[test]
 fn test_file_1c() {
-    do_test_file(EXPECTED[2usize], "frank.pdf", false, 2usize);
+    do_test_file(EXPECTED[2usize], "frank.pdf", false, 2usize, false);
 }
 
 #[test]
 #[ignore]
 fn test_file_1d() {
-    do_test_file(EXPECTED[3usize], "frank.pdf", false, 3usize);
+    do_test_file(EXPECTED[3usize], "frank.pdf", false, 3usize, false);
 }
 
 #[test]
 #[ignore]
 fn test_file_1e() {
-    do_test_file(EXPECTED[4usize], "frank.pdf", false, 4usize);
+    do_test_file(EXPECTED[4usize], "frank.pdf", false, 4usize, false);
 }
 
 #[test]
 fn test_file_2a() {
-    do_test_file(EXPECTED[5usize], "dracula.pdf", false, 0usize);
+    do_test_file(EXPECTED[5usize], "dracula.pdf", false, 0usize, false);
 }
 
 #[test]
 fn test_file_2b() {
-    do_test_file(EXPECTED[6usize], "dracula.pdf", false, 1usize);
+    do_test_file(EXPECTED[6usize], "dracula.pdf", false, 1usize, false);
 }
 
 #[test]
 fn test_file_2c() {
-    do_test_file(EXPECTED[7usize], "dracula.pdf", false, 2usize);
+    do_test_file(EXPECTED[7usize], "dracula.pdf", false, 2usize, false);
 }
 
 #[test]
 #[ignore]
 fn test_file_2d() {
-    do_test_file(EXPECTED[8usize], "dracula.pdf", false, 3usize);
+    do_test_file(EXPECTED[8usize], "dracula.pdf", false, 3usize, false);
 }
 
 #[test]
 #[ignore]
 fn test_file_2e() {
-    do_test_file(EXPECTED[9usize], "dracula.pdf", false, 4usize);
+    do_test_file(EXPECTED[9usize], "dracula.pdf", false, 4usize, false);
+}
+
+#[test]
+fn test_file_3a() {
+    do_test_file(EXPECTED[0usize], "frank.pdf", false, 0usize, true);
+}
+
+#[test]
+fn test_file_3b() {
+    do_test_file(EXPECTED[5usize], "dracula.pdf", false, 0usize, true);
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -576,56 +594,56 @@ fn test_file_with_info_2f() {
 
 #[test]
 fn test_text_file_1a() {
-    do_test_file(EXPECTED[26usize], "alice29.txt", true, 0usize);
+    do_test_file(EXPECTED[26usize], "alice29.txt", true, 0usize, false);
 }
 
 #[test]
 fn test_text_file_1b() {
-    do_test_file(EXPECTED[27usize], "alice29.txt", true, 1usize);
+    do_test_file(EXPECTED[27usize], "alice29.txt", true, 1usize, false);
 }
 
 #[test]
 fn test_text_file_1c() {
-    do_test_file(EXPECTED[28usize], "alice29.txt", true, 2usize);
+    do_test_file(EXPECTED[28usize], "alice29.txt", true, 2usize, false);
 }
 
 #[test]
 #[ignore]
 fn test_text_file_1d() {
-    do_test_file(EXPECTED[29usize], "alice29.txt", true, 3usize);
+    do_test_file(EXPECTED[29usize], "alice29.txt", true, 3usize, false);
 }
 
 #[test]
 #[ignore]
 fn test_text_file_1e() {
-    do_test_file(EXPECTED[30usize], "alice29.txt", true, 4usize);
+    do_test_file(EXPECTED[30usize], "alice29.txt", true, 4usize, false);
 }
 
 #[test]
 fn test_text_file_2a() {
-    do_test_file(EXPECTED[31usize], "asyoulik.txt", true, 0usize);
+    do_test_file(EXPECTED[31usize], "asyoulik.txt", true, 0usize, false);
 }
 
 #[test]
 fn test_text_file_2b() {
-    do_test_file(EXPECTED[32usize], "asyoulik.txt", true, 1usize);
+    do_test_file(EXPECTED[32usize], "asyoulik.txt", true, 1usize, false);
 }
 
 #[test]
 fn test_text_file_2c() {
-    do_test_file(EXPECTED[33usize], "asyoulik.txt", true, 2usize);
+    do_test_file(EXPECTED[33usize], "asyoulik.txt", true, 2usize, false);
 }
 
 #[test]
 #[ignore]
 fn test_text_file_2d() {
-    do_test_file(EXPECTED[34usize], "asyoulik.txt", true, 3usize);
+    do_test_file(EXPECTED[34usize], "asyoulik.txt", true, 3usize, false);
 }
 
 #[test]
 #[ignore]
 fn test_text_file_2e() {
-    do_test_file(EXPECTED[35usize], "asyoulik.txt", true, 4usize);
+    do_test_file(EXPECTED[35usize], "asyoulik.txt", true, 4usize, false);
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -868,32 +886,42 @@ fn test_data_5b() {
 
 #[test]
 fn test_verify_1a() {
-    do_verify_files(false, 3usize, false, false);
+    do_verify_files(false, 3usize, false, false, false);
 }
 
 #[test]
 fn test_verify_1b() {
-    do_verify_files(false, 3usize, true, false);
+    do_verify_files(false, 3usize, true, false, false);
 }
 
 #[test]
 fn test_verify_2a() {
-    do_verify_files(true, 3usize, false, false);
+    do_verify_files(true, 3usize, false, false, false);
 }
 
 #[test]
 fn test_verify_2b() {
-    do_verify_files(true, 3usize, true, false);
+    do_verify_files(true, 3usize, true, false, false);
 }
 
 #[test]
 fn test_verify_3a() {
-    do_verify_files(false, 3usize, false, true);
+    do_verify_files(false, 3usize, false, true, false);
 }
 
 #[test]
 fn test_verify_3b() {
-    do_verify_files(false, 3usize, true, true);
+    do_verify_files(false, 3usize, true, true, false);
+}
+
+#[test]
+fn test_verify_4a() {
+    do_verify_files(false, 3usize, false, false, true);
+}
+
+#[test]
+fn test_verify_4b() {
+    do_verify_files(true, 3usize, false, false, true);
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
