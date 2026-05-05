@@ -126,13 +126,13 @@ static REGEX_CHECK_ZERO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"([\x20-
 static REGEX_VERSION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^sponge256sum\s+v(\d+\.\d+\.\d+)[\s$]").unwrap());
 static REGEX_HELP: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Usage:\s+sponge256sum(\.exe)?[\s$]").unwrap());
 static REGEX_SELFTEST: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^Successful.").unwrap());
-static REGEX_UNKNOWN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: Unknown option "([^"]+)" encountered!"#).unwrap());
-static REGEX_MUTEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The options "([^"]+)" and "([^"]+)" are mutually exclusive!"#).unwrap());
-static REGEX_MULTIPLE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The option "([^"]+)" can not be used more than once!"#).unwrap());
-static REGEX_MISSING_VAL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The required value for option "([^"]+)" is missing!"#).unwrap());
-static REGEX_MISSING_ARG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: One of the required options "(.+)" is missing!"#).unwrap());
-static REGEX_INVALID_UTF: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: Invalid command-line arguments! \(InvalidUtf8\)"#).unwrap());
-static REGEX_INVALID_VAL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: The given value "([^"]+)" for option "([^"]+)" is invalid!"#).unwrap());
+static REGEX_UNKNOWN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"error: unexpected argument '([^']+)' found"#).unwrap());
+static REGEX_MUTEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"error: the argument '([^']+)' cannot be used with '([^']+)'"#).unwrap());
+static REGEX_MULTIPLE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"error: the argument '([^']+)' cannot be used multiple times"#).unwrap());
+static REGEX_MISSING_VAL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"error: a value is required for '([^']+)' but none was supplied"#).unwrap());
+static REGEX_MISSING_ARG: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"error: the following required arguments were not provided:"#).unwrap());
+static REGEX_INVALID_UTF: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"error: invalid UTF-8 was detected in one or more arguments"#).unwrap());
+static REGEX_INVALID_VAL: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"error: invalid value '([^']+)' for '([^']+)':"#).unwrap());
 static REGEX_LEN_DIV: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Error: Digest output size must be divisible by eight!").unwrap());
 static REGEX_LEN_MAX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Error: Digest output size exceeds the allowable maximum!").unwrap());
 static REGEX_INFO: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"Error: Length of context info must not exceed 255 characters!").unwrap());
@@ -143,7 +143,7 @@ static REGEX_CHECK_FOPEN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Faile
 static REGEX_MALFORMED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Malformed checksum file: "([^"]+)" \[line #(\d+)\]"#).unwrap());
 static REGEX_TARGET_NOENT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Target file not found: "([^"]+)"#).unwrap());
 static REGEX_TARGET_FOPEN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to open target file: "([^"]+)"#).unwrap());
-static REGEX_ENVIRON: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: Environment variable (\w+)="([^"]+)" is invalid!"#).unwrap());
+static REGEX_ENVIRON: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: Value "([^"]+)" for environment variable "([^"]+)" is invalid!"#).unwrap());
 
 #[cfg(unix)]
 static REGEX_ABORTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)\bAborted: The process has been interrupted").unwrap());
@@ -1241,14 +1241,14 @@ fn test_invalid_env_3b() {
 
 #[test]
 fn test_version() {
-    let output = run_binary([OsStr::new("--version")], true, true);
+    let output = run_binary([OsStr::new("--version")], true, false);
     let caps = REGEX_VERSION.captures(&output).expect("Regex did not match!");
     assert_eq!(caps.get(1).unwrap().as_str(), env!("CARGO_PKG_VERSION"));
 }
 
 #[test]
 fn test_help() {
-    assert!(REGEX_HELP.is_match(&run_binary([OsStr::new("--help")], true, true)));
+    assert!(REGEX_HELP.is_match(&run_binary([OsStr::new("--help")], true, false)));
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
