@@ -19,7 +19,7 @@ use crate::{
     common::{get_capacity, increment, Aborted, Digest, ExitStatus, Flag, TinyVecEx, MAX_DIGEST_SIZE},
     digest::{compute_digest, digest_equal, Error as DigestError},
     environment::Env,
-    io::{DataSource, Error as IoError},
+    io::{DataSource, Error as IoError, Output},
     os::STDIN_NAME,
     print_error, print_warn,
     thread_pool::{detect_thread_count, Cancelled, TaskResult, ThreadPool},
@@ -102,7 +102,7 @@ static VERIFICATION: [&str; 2usize] = ["FAILED", "OK"];
 
 /// Print a single verification result
 #[inline]
-fn print_match(output: &mut impl Write, is_match: bool, file_name: &Path, args: &Args) -> IoResult<()> {
+fn print_match(output: &mut dyn Write, is_match: bool, file_name: &Path, args: &Args) -> IoResult<()> {
     if args.null {
         write!(output, "{}: {}\0", file_name.to_string_lossy(), VERIFICATION[is_match as usize])?;
     } else {
@@ -118,23 +118,23 @@ fn print_match(output: &mut impl Write, is_match: bool, file_name: &Path, args: 
 
 /// Print result to output
 #[inline]
-fn print_result(output: &mut impl Write, verify_result: &VerifyResult, args: &Args) -> bool {
+fn print_result(output: &mut Output, verify_result: &VerifyResult, args: &Args) -> bool {
     match verify_result {
-        Ok((is_match, path)) => print_match(output, *is_match, path, args).is_ok(),
+        Ok((is_match, path)) => print_match(output.out(), *is_match, path, args).is_ok(),
         Err(error) => {
             match error {
                 Error::ChkSumFile(kind) => match kind {
-                    ErrorKind::FileOpen(path) => print_error!(args, "Failed to open checksum file: {:?}", path),
-                    ErrorKind::FileRead(path) => print_error!(args, "Failed to read checksum file: {:?}", path),
-                    ErrorKind::NotFound(path) => print_error!(args, "Checksum file not found: {:?}", path),
-                    ErrorKind::ObjIsDir(path) => print_error!(args, "Checksum file is a directory: {:?}", path),
-                    ErrorKind::ParseErr(path, line) => print_error!(args, "Malformed checksum file: {:?} [line #{}]", path, line),
+                    ErrorKind::FileOpen(path) => print_error!(output, args, "Failed to open checksum file: {:?}", path),
+                    ErrorKind::FileRead(path) => print_error!(output, args, "Failed to read checksum file: {:?}", path),
+                    ErrorKind::NotFound(path) => print_error!(output, args, "Checksum file not found: {:?}", path),
+                    ErrorKind::ObjIsDir(path) => print_error!(output, args, "Checksum file is a directory: {:?}", path),
+                    ErrorKind::ParseErr(path, line) => print_error!(output, args, "Malformed checksum file: {:?} [line #{}]", path, line),
                 },
                 Error::TargetFile(kind) => match kind {
-                    ErrorKind::FileOpen(path) => print_error!(args, "Failed to open target file: {:?}", path),
-                    ErrorKind::FileRead(path) => print_error!(args, "Failed to read target file: {:?}", path),
-                    ErrorKind::NotFound(path) => print_error!(args, "Target file not found: {:?}", path),
-                    ErrorKind::ObjIsDir(path) => print_error!(args, "Target file is a directory: {:?}", path),
+                    ErrorKind::FileOpen(path) => print_error!(output, args, "Failed to open target file: {:?}", path),
+                    ErrorKind::FileRead(path) => print_error!(output, args, "Failed to read target file: {:?}", path),
+                    ErrorKind::NotFound(path) => print_error!(output, args, "Target file not found: {:?}", path),
+                    ErrorKind::ObjIsDir(path) => print_error!(output, args, "Target file is a directory: {:?}", path),
                     ErrorKind::ParseErr(_path, _line) => unreachable!(),
                 },
             }
@@ -145,17 +145,17 @@ fn print_result(output: &mut impl Write, verify_result: &VerifyResult, args: &Ar
 
 /// Print the summary
 #[inline]
-fn print_summary(chck_errors: u64, file_errors: u64, args: &Args) {
+fn print_summary(output: &mut Output, chck_errors: u64, file_errors: u64, args: &Args) {
     if (chck_errors > u64::MIN) || (file_errors > u64::MIN) {
         if args.keep_going {
             if chck_errors > u64::MIN {
-                print_warn!(args, "Warning: {} computed checksum(s) did *not* match!", chck_errors);
+                print_warn!(output, args, "Warning: {} computed checksum(s) did *not* match!", chck_errors);
             }
             if file_errors > u64::MIN {
-                print_warn!(args, "Warning: {} file(s) could not be verified due to errors!", file_errors);
+                print_warn!(output, args, "Warning: {} file(s) could not be verified due to errors!", file_errors);
             }
         } else {
-            print_error!(args, "Error: The checksum verification has failed!");
+            print_error!(output, args, "Error: The checksum verification has failed!");
         }
     }
 }
@@ -292,7 +292,7 @@ fn reader_thread(checksum_tx: &Sender<ReadResult>, args: &Args, halt: &Flag) -> 
 // Verify implementation
 // ---------------------------------------------------------------------------
 
-fn verify_mt(output: &mut impl Write, n_threads: Count, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
+fn verify_mt(output: &mut Output, n_threads: Count, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
     // Initialize channels
     let (checksum_tx, checksum_rx) = bounded::<ReadResult>(256usize);
     let (result_tx, result_rx) = bounded::<VerifyResult>(get_capacity(&n_threads));
@@ -344,13 +344,13 @@ fn verify_mt(output: &mut impl Write, n_threads: Count, args: &'static Args, hal
     }
 
     // Print warning if any file(s) did not match the expected checksum
-    print_summary(chck_errors, file_errors, args);
+    print_summary(output, chck_errors, file_errors, args);
 
     // Check for errors
     Ok(exit_status(write_errors, chck_errors, file_errors, args))
 }
 
-fn verify_st(output: &mut impl Write, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
+fn verify_st(output: &mut Output, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
     // Initialize channel
     let (checksum_tx, checksum_rx) = bounded::<ReadResult>(256usize);
 
@@ -401,7 +401,7 @@ fn verify_st(output: &mut impl Write, args: &'static Args, halt: &'static Flag) 
     }
 
     // Print warning if any file(s) did not match the expected checksum
-    print_summary(chck_errors, file_errors, args);
+    print_summary(output, chck_errors, file_errors, args);
 
     // Check for errors
     Ok(exit_status(write_errors, chck_errors, file_errors, args))
@@ -412,7 +412,7 @@ fn verify_st(output: &mut impl Write, args: &'static Args, halt: &'static Flag) 
 // ---------------------------------------------------------------------------
 
 /// Verify all input files
-pub fn verify_files(output: &mut impl Write, args: &'static Args, env: &Env, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
+pub fn verify_files(output: &mut Output, args: &'static Args, env: &Env, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
     // Determine number of threads
     let thread_count = detect_thread_count(args, env);
 

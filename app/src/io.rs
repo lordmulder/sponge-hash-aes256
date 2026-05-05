@@ -2,11 +2,12 @@
 // sponge256sum
 // Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>
 
-use std::sync::{Mutex, MutexGuard};
+use anstream::AutoStream;
 use std::{
     fs::File,
-    io::{stdin, Read, Result as IoResult, StdinLock},
+    io::{stderr, stdin, stdout, Read, Result as IoResult, StderrLock, StdinLock, StdoutLock, Write},
     path::Path,
+    sync::{Mutex, MutexGuard},
 };
 
 use crate::os::STDIN_NAME;
@@ -23,7 +24,7 @@ pub enum Error {
 }
 
 // ---------------------------------------------------------------------------
-// I/O wrapper
+// Source wrapper
 // ---------------------------------------------------------------------------
 
 static STDIN_MUTEX: Mutex<()> = Mutex::new(());
@@ -73,5 +74,37 @@ impl Read for DataSource<'_> {
             DataSource::File(file) => file.read(buf),
             DataSource::Stream(stream) => stream.0.read(buf),
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Output wrapper
+// ---------------------------------------------------------------------------
+
+pub struct Output {
+    out: StdoutLock<'static>,
+    err: AutoStream<StderrLock<'static>>,
+}
+
+impl Output {
+    pub fn initialize(disable_color: bool) -> Self {
+        let (stdout_lock, stderr_lock) = (stdout().lock(), stderr().lock());
+        Self {
+            out: stdout_lock,
+            err: match disable_color {
+                true => AutoStream::never(stderr_lock),
+                false => AutoStream::auto(stderr_lock),
+            },
+        }
+    }
+
+    #[inline(always)]
+    pub const fn out(&mut self) -> &mut dyn Write {
+        &mut self.out
+    }
+
+    #[inline(always)]
+    pub const fn err(&mut self) -> &mut dyn Write {
+        &mut self.err
     }
 }

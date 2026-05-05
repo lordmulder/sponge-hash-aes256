@@ -22,6 +22,7 @@ use crate::{
     common::{Aborted, ExitStatus, Flag},
     digest::digest_equal,
     environment::Env,
+    io::Output,
     print_error,
 };
 
@@ -90,7 +91,7 @@ const MAX_ITERATION: u32 = 249989u32;
 const TOTAL_BYTES: u64 = (BUFFER_SIZE as u64) * (MAX_ITERATION as u64) * (PCG64_SEEDVALUE.len() as u64);
 
 /// The actual **SpongeHash256** self-test routine
-fn do_self_test(output: &mut impl Write, halt: &Flag) -> Result<bool, Error> {
+fn do_self_test(output: &mut dyn Write, halt: &Flag) -> Result<bool, Error> {
     let mut success = true;
     let mut counter = 0u64;
 
@@ -122,7 +123,7 @@ fn do_self_test(output: &mut impl Write, halt: &Flag) -> Result<bool, Error> {
 }
 
 /// Runs the self-test routine for `passes` times
-fn test_runner(output: &mut impl Write, passes: NonZeroUsize, args: &Args, halt: &Flag) -> Result<ExitStatus, Error> {
+fn test_runner(output: &mut dyn Write, passes: NonZeroUsize, args: &Args, halt: &Flag) -> Result<ExitStatus, Error> {
     writeln!(output, "{}", header_line())?;
     let mut median = Median::new();
     let mut errors_encountered = 0usize;
@@ -166,14 +167,14 @@ fn test_runner(output: &mut impl Write, passes: NonZeroUsize, args: &Args, halt:
 // ---------------------------------------------------------------------------
 
 /// The built-in self-test (BIST)
-pub fn self_test(output: &mut impl Write, args: &Args, env: &Env, halt: &Flag) -> Result<ExitStatus, Aborted> {
+pub fn self_test(output: &mut Output, args: &Args, env: &Env, halt: &Flag) -> Result<ExitStatus, Aborted> {
     let passes = env.sefltest_passes.unwrap_or(NonZeroUsize::new(3usize).unwrap());
 
-    match test_runner(output, passes, args, halt) {
+    match test_runner(output.out(), passes, args, halt) {
         Ok(result) => Ok(result),
         Err(Error::Cancelled) => Err(Aborted),
         Err(error) => {
-            print_error!(args, "Self-test encountered an error: {:?}", error);
+            print_error!(output, args, "Self-test encountered an error: {:?}", error);
             Ok(ExitStatus::Failure)
         }
     }

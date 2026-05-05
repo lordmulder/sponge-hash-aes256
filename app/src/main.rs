@@ -213,20 +213,20 @@ mod verify;
 use num::Integer;
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
 use std::{
-    io::stdout,
     process::{abort, ExitCode},
     thread,
     time::Duration,
 };
 
-use crate::common::{Aborted, ExitStatus, Flag};
-use crate::environment::Env;
-use crate::verify::verify_files;
 use crate::{
     arguments::{parse_command_line, Args},
+    common::{Aborted, ExitStatus, Flag},
     common::{MAX_DIGEST_SIZE, MAX_SNAIL_LEVEL},
+    environment::Env,
+    io::Output,
     process::process_files,
     self_test::self_test,
+    verify::verify_files,
 };
 
 // Enable MiMalloc, if the "with-mimalloc" feature is enabled
@@ -242,7 +242,7 @@ static HALT_FLAG: Flag = Flag::default();
 // ---------------------------------------------------------------------------
 
 /// The actual "main" function
-fn sponge256sum_main(args: &'static Args) -> Result<ExitStatus, Aborted> {
+fn sponge256sum_main(output: &mut Output, args: &'static Args) -> Result<ExitStatus, Aborted> {
     // Initialize the SimpleLogger, if the "with-logging" feature is enabled
     #[cfg(feature = "with-logging")]
     simple_logger::SimpleLogger::new().init().unwrap();
@@ -255,25 +255,25 @@ fn sponge256sum_main(args: &'static Args) -> Result<ExitStatus, Aborted> {
 
     // Make sure that the digest size is divisble by eight
     if digest_rem != 0usize {
-        print_error!(args, "Error: Digest output size must be divisible by eight! (given value: {}, remainder: {})", args.length.unwrap().get(), digest_rem);
+        print_error!(output, args, "Error: Digest output size must be divisible by eight! (value: {}, remainder: {})", args.length.unwrap().get(), digest_rem);
         return Ok(ExitStatus::Failure);
     }
 
     // Make sure that the digest size doesn't exceed the allowable maximum
     if digest_size > MAX_DIGEST_SIZE {
-        print_error!(args, "Error: Digest output size exceeds the allowable maximum! (given value: {})", digest_size * 8usize);
+        print_error!(output, args, "Error: Digest output size exceeds the allowable maximum! (given value: {})", digest_size * 8usize);
         return Ok(ExitStatus::Failure);
     }
 
     // Check for snail level being out of bounds
     if args.snail > MAX_SNAIL_LEVEL {
-        print_error!(args, "\n{}", include_str!("../../.assets/text/goat.txt"));
+        print_error!(output, args, "\n{}", include_str!("../../.assets/text/goat.txt"));
         return Ok(ExitStatus::Failure);
     }
 
     // Check the maximum allowable info length
     if args.info.as_ref().is_some_and(|str| str.len() > u8::MAX as usize) {
-        print_error!(args, "Error: Length of context info must not exceed 255 characters! (given length: {})", args.info.as_ref().unwrap().len());
+        print_error!(output, args, "Error: Length of context info must not exceed 255 characters! (given length: {})", args.info.as_ref().unwrap().len());
         return Ok(ExitStatus::Failure);
     }
 
@@ -281,7 +281,7 @@ fn sponge256sum_main(args: &'static Args) -> Result<ExitStatus, Aborted> {
     let env = match Env::from_env() {
         Ok(options) => options,
         Err(error) => {
-            print_error!(args, "Error: Value {:?} for environment variable {:?} is invalid!", error.value, error.name);
+            print_error!(output, args, "Error: Value {:?} for environment variable {:?} is invalid!", error.value, error.name);
             return Ok(ExitStatus::Failure);
         }
     };
@@ -289,18 +289,15 @@ fn sponge256sum_main(args: &'static Args) -> Result<ExitStatus, Aborted> {
     // Install the interrupt handler
     let _ctrlc = ctrlc::set_handler(|| ctrlc_handler(&HALT_FLAG));
 
-    // Acquire stdout handle
-    let mut output = stdout().lock();
-
     // Run built-in self-test, if it was requested by the user
     if args.self_test {
-        self_test(&mut output, args, &env, &HALT_FLAG)
+        self_test(output, args, &env, &HALT_FLAG)
     } else if !args.check {
         // Process all input files/directories that were given on the command-line
-        process_files(&mut output, digest_size, args, &env, &HALT_FLAG)
+        process_files(output, digest_size, args, &env, &HALT_FLAG)
     } else {
         // Verify all checksum files that were given on the command-line
-        verify_files(&mut output, args, &env, &HALT_FLAG)
+        verify_files(output, args, &env, &HALT_FLAG)
     }
 }
 
@@ -329,11 +326,14 @@ fn main() -> ExitCode {
         Err(exit_code) => return exit_code.into(),
     };
 
+    // Acquire stdout+stderr handles
+    let mut output = Output::initialize(args.no_color);
+
     // Call the actual "main" function
-    match sponge256sum_main(args) {
+    match sponge256sum_main(&mut output, args) {
         Ok(status) => status.into(),
         Err(Aborted) => {
-            print_error!(args, "Aborted: The process has been interrupted by the user!");
+            print_error!(output, args, "Aborted: The process has been interrupted by the user!");
             Aborted.into()
         }
     }
