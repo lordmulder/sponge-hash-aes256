@@ -823,6 +823,8 @@ dependencies = [
 name = "sponge256sum"
 version = "1.9.2"
 dependencies = [
+ "anstream",
+ "anstyle",
  "build-time",
  "clap",
  "const_format",

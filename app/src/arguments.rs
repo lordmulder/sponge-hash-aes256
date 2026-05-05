@@ -3,7 +3,7 @@
 // Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>
 
 use build_time::build_time_utc;
-use clap::{ArgAction, ArgGroup, Error, Parser};
+use clap::{error::ErrorKind, ArgAction, ArgGroup, Error, Parser};
 use const_format::formatcp;
 use rustc_version_const::rustc_version_full;
 use sponge_hash_aes256::version;
@@ -103,6 +103,10 @@ pub struct Args {
     #[arg(short, long)]
     pub quiet: bool,
 
+    /// Disable colored terminal output (ANSI color codes)
+    #[arg(short, long, conflicts_with = "quiet")]
+    pub no_color: bool,
+
     /// Print digest(s) in plain format, i.e., without file names
     #[arg(short, long, conflicts_with = "check")]
     pub plain: bool,
@@ -145,8 +149,11 @@ pub fn parse_command_line() -> Result<&'static Args, ExitStatus> {
     match instance {
         Ok(args) => Ok(args),
         Err(error) => {
-            let _io = error.print();
-            Err(ExitStatus::Failure)
+            let _result = error.print();
+            match error.kind() {
+                ErrorKind::DisplayHelp | ErrorKind::DisplayVersion => Err(ExitStatus::Success),
+                _ => Err(ExitStatus::Failure),
+            }
         }
     }
 }

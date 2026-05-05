@@ -25,7 +25,7 @@ use crate::{
     environment::Env,
     io::{DataSource, Error as IoError},
     os::{file_id, DevId, FileId, STDIN_NAME},
-    print_error,
+    print_error, print_warn,
     thread_pool::{detect_thread_count, Cancelled, TaskResult, ThreadPool},
 };
 
@@ -167,7 +167,7 @@ fn print_result(output: &mut impl Write, digest_result: &DigestResult, args: &Ar
 fn print_summary(file_errors: u64, args: &Args) {
     if file_errors > u64::MIN {
         if args.keep_going {
-            print_error!(args, "Warning: {} file(s) were skipped due to errors!", file_errors);
+            print_warn!(args, "Warning: {} file(s) were skipped due to errors!", file_errors);
         } else {
             print_error!(args, "Error: The checksum computation has failed!");
         }

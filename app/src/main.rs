@@ -37,6 +37,7 @@
 //!   -i, --info <INFO>      Include additional context information
 //!   -s, --snail...         Enable "snail" mode, i.e., slow down the hash computation
 //!   -q, --quiet            Do not output any error messages or warnings
+//!   -n, --no-color         Disable colored terminal output (ANSI color codes)
 //!   -p, --plain            Print digest(s) in plain format, i.e., without file names
 //!   -0, --null             Separate digest(s) by NULL characters instead of newlines
 //!   -m, --multi-threading  Enable multi-threaded processing of input files
@@ -46,7 +47,7 @@
 //!   -V, --version          Print version
 //!
 //! If no input files are specified, reads input data from the 'stdin' stream.
-//! Returns a non-zero exit code if any errors occurred; otherwise, zero.
+//! Returns a non-zero exit code if any errors occurred; otherwise, zero
 //! ```
 //!
 //! ## Examples
@@ -280,7 +281,7 @@ fn sponge256sum_main(args: &'static Args) -> Result<ExitStatus, Aborted> {
     let env = match Env::from_env() {
         Ok(options) => options,
         Err(error) => {
-            print_error!(args, "Error: Environment variable {}={:?} is invalid!", error.name, error.value);
+            print_error!(args, "Error: Value {:?} for environment variable {:?} is invalid!", error.value, error.name);
             return Ok(ExitStatus::Failure);
         }
     };

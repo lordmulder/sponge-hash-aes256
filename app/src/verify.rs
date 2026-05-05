@@ -21,7 +21,7 @@ use crate::{
     environment::Env,
     io::{DataSource, Error as IoError},
     os::STDIN_NAME,
-    print_error,
+    print_error, print_warn,
     thread_pool::{detect_thread_count, Cancelled, TaskResult, ThreadPool},
 };
 
@@ -149,10 +149,10 @@ fn print_summary(chck_errors: u64, file_errors: u64, args: &Args) {
     if (chck_errors > u64::MIN) || (file_errors > u64::MIN) {
         if args.keep_going {
             if chck_errors > u64::MIN {
-                print_error!(args, "Warning: {} computed checksum(s) did *not* match!", chck_errors);
+                print_warn!(args, "Warning: {} computed checksum(s) did *not* match!", chck_errors);
             }
             if file_errors > u64::MIN {
-                print_error!(args, "Warning: {} file(s) could not be verified due to errors!", file_errors);
+                print_warn!(args, "Warning: {} file(s) could not be verified due to errors!", file_errors);
             }
         } else {
             print_error!(args, "Error: The checksum verification has failed!");
