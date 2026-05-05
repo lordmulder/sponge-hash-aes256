@@ -18,7 +18,7 @@ use std::{
 };
 
 use crate::{
-    arguments::{header_line, Args},
+    arguments::{Args, HEADER_LINE},
     common::{Aborted, ExitStatus, Flag},
     digest::digest_equal,
     environment::Env,
@@ -124,7 +124,7 @@ fn do_self_test(output: &mut dyn Write, halt: &Flag) -> Result<bool, Error> {
 
 /// Runs the self-test routine for `passes` times
 fn test_runner(output: &mut dyn Write, passes: NonZeroUsize, args: &Args, halt: &Flag) -> Result<ExitStatus, Error> {
-    writeln!(output, "{}", header_line())?;
+    writeln!(output, "{}", HEADER_LINE)?;
     let mut median = Median::new();
     let mut errors_encountered = 0usize;
 

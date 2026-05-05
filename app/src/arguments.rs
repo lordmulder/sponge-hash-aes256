@@ -22,23 +22,23 @@ use crate::common::ExitStatus;
 // ---------------------------------------------------------------------------
 
 /// Build profile
-const BUILD_PROFILE: &str = if cfg!(debug_assertions) { "debug" } else { "release" };
+pub const BUILD_PROFILE: &str = if cfg!(debug_assertions) { "debug" } else { "release" };
 
 /// Version string
-const VERSION: &str = formatcp!("v{} [SpongeHash-AES256 v{}] [{OS}] [{ARCH}] [{BUILD_PROFILE}]", env!("CARGO_PKG_VERSION"), version());
+pub const VERSION: &str = formatcp!("v{} [SpongeHash-AES256 v{}] [{OS}] [{ARCH}] [{BUILD_PROFILE}]", env!("CARGO_PKG_VERSION"), version());
 
 /// Full version string
-const LONG_VERSION: &str = formatcp!("{VERSION}\nBuilt on: {}\nCompiled using rustc version: {}", build_time_utc!("%F, %T"), rustc_version_full());
+pub const LONG_VERSION: &str = formatcp!("{VERSION}\nBuilt on: {}\nCompiled using rustc version: {}", build_time_utc!("%F, %T"), rustc_version_full());
 
 /// Header line
-const HEADER_LINE: &str = formatcp!("{} v{} (with SpongeHash-AES256 v{})", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"), version());
+pub const HEADER_LINE: &str = formatcp!("{} v{} (with SpongeHash-AES256 v{})", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"), version());
 
 /// About text
-const ABOUT_TEXT: &str = "A sponge-based secure hash function that uses AES-256 as its internal PRF.\n\
+pub const ABOUT_TEXT: &str = "A sponge-based secure hash function that uses AES-256 as its internal PRF.\n\
     This software is released under the Zero-Clause BSD License.";
 
 /// Additional help text
-const HELP_TEXT: &str = "If no input files are specified, reads input data from the 'stdin' stream.\n\
+pub const HELP_TEXT: &str = "If no input files are specified, reads input data from the 'stdin' stream.\n\
     Returns a non-zero exit code if any errors occurred; otherwise, zero.\n\
     For details please refer to: <https://crates.io/crates/sponge-hash-aes256>";
 
@@ -156,9 +156,4 @@ pub fn parse_command_line() -> Result<&'static Args, ExitStatus> {
             }
         }
     }
-}
-
-/// Get header line
-pub const fn header_line() -> &'static str {
-    HEADER_LINE
 }
