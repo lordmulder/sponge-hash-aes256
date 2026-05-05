@@ -155,29 +155,18 @@ pub fn get_capacity(thread_count: &NonZeroUsize) -> usize {
 // Helper macros
 // ---------------------------------------------------------------------------
 
-/// Conditional printing of message to the terminal
-#[macro_export]
-#[doc(hidden)]
-macro_rules! _print_message_helper {
-    ($ansi_color:ident, $args:ident, $fmt:literal $(,$arg:expr)*$(,)?) => {
-        if !$args.quiet {
-            if !$args.no_color {
-                const COLOR: anstyle::Style = anstyle::Style::new().fg_color(Some(anstyle::Color::Ansi(anstyle::AnsiColor::$ansi_color)));
-                const BOLD: anstyle::Style = COLOR.bold();
-                anstream::eprintln!(concat!("{}[sponge256sum]{:#} {}", $fmt, "{:#}"), BOLD, BOLD, COLOR $(, $arg)*, COLOR);
-            } else {
-                eprintln!(concat!("[sponge256sum] ", $fmt) $(, $arg)*);
-            }
-        }
-    };
-}
-
 /// Conditional printing of warning message
 #[macro_export]
 #[doc(hidden)]
 macro_rules! print_warn {
     ($args:ident, $fmt:literal $(,$arg:expr)*$(,)?) => {
-        $crate::_print_message_helper!(Yellow, $args, $fmt $(, $arg)*)
+        if !$args.quiet {
+            if !$args.no_color {
+                anstream::eprintln!(concat!("\x1b[1;33m[sponge256sum]\x1b[22;33m ", $fmt, "\x1b[0m") $(, $arg)*);
+            } else {
+                eprintln!(concat!("[sponge256sum] ", $fmt) $(, $arg)*);
+            }
+        }
     };
 }
 
@@ -186,6 +175,12 @@ macro_rules! print_warn {
 #[doc(hidden)]
 macro_rules! print_error {
     ($args:ident, $fmt:literal $(,$arg:expr)*$(,)?) => {
-        $crate::_print_message_helper!(Red, $args, $fmt $(, $arg)*)
+        if !$args.quiet {
+            if !$args.no_color {
+                anstream::eprintln!(concat!("\x1b[1;31m[sponge256sum]\x1b[22;31m ", $fmt, "\x1b[0m") $(, $arg)*);
+            } else {
+                eprintln!(concat!("[sponge256sum] ", $fmt) $(, $arg)*);
+            }
+        }
     };
 }
