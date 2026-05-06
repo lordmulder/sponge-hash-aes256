@@ -84,6 +84,24 @@ where
     assert!(child.wait_with_output().unwrap().status.success());
 }
 
+#[cfg(unix)]
+pub fn run_binary_from_file<I, S>(args: I, src_file: &Path, expected_success: bool, force_stderr: bool) -> String
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let output = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
+        .args(args)
+        .stdout(if force_stderr { Stdio::null() } else { Stdio::piped() })
+        .stderr(if force_stderr { Stdio::piped() } else { Stdio::null() })
+        .stdin(Stdio::from(File::open(src_file).expect("Failed to open the specified input file!")))
+        .output()
+        .expect("Failed to run binary!");
+
+    assert_eq!(output.status.success(), expected_success);
+    String::from_utf8(if force_stderr { output.stderr } else { output.stdout }).unwrap()
+}
+
 pub fn run_binary_with_env<I, S>(args: I, env: HashMap<&str, String>, expected_success: bool, force_stderr: bool) -> String
 where
     I: IntoIterator<Item = S>,

@@ -29,7 +29,7 @@ use std::{
 };
 
 #[cfg(unix)]
-use crate::common::utils::run_binary_with_signal;
+use crate::common::utils::{run_binary_from_file, run_binary_with_signal};
 
 #[cfg(windows)]
 use std::os::windows::ffi::OsStringExt;
@@ -156,6 +156,9 @@ static REGEX_FILE_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Input 
 static REGEX_CHECK_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Checksum file is a directory: "([^"]+)""#).unwrap());
 #[cfg(unix)]
 static REGEX_TARGET_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Target file is a directory: "([^"]+)"#).unwrap());
+#[cfg(unix)]
+static REGEX_STDIN_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read data from the standard input stream!"#).unwrap());
+
 #[cfg(target_os = "linux")]
 static REGEX_FILE_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read input file: "([^"]+)""#).unwrap());
 #[cfg(target_os = "linux")]
@@ -1223,6 +1226,13 @@ fn test_file_error_4a() {
 fn test_file_error_4b() {
     let output = run_binary([OsStr::new("--multi-threading"), OsStr::new("/proc/self/mem")], false, true);
     assert!(REGEX_FILE_READ.is_match(&output));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_file_error_5() {
+    let output = run_binary_from_file::<[&OsStr; 0usize], _>([], Path::new("/"), false, true);
+    assert!(REGEX_STDIN_READ.is_match(&output));
 }
 
 #[test]
