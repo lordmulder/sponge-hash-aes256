@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 1.10.0
+
+### Added
+
+- Implemented colored terminal output (ANSI). Can be disabled by specifying the new `--no-color` option.
+- Added more tests cases to further improve the code coverage.
+- Added [`crago audit`](https://crates.io/crates/cargo-audit) to the GitHub workflow (CI) to detect vulnerabilities in our dependencies.
+
+### Changed
+
+- Use [`imbl::OrdSet`](https://crates.io/crates/imbl) instead of `std::collections::BTreeSet` to keep track of the visited directories.
+- By default, "recursive" mode does *not* descend into directories that have a device number different than that of the directory from which the descent began. May be bypassed by specifying the new `--cross-dev` option.
+- Greatly simplified the code used to parse the command-line arguments.
+- More platform-specific code has been refactored to the `os::unix` and `os::windows` modules.
+- Updated various dependencies to the latest version.
+- Updated GitHub workflow (CI) to create builds with Rust version 1.95.0 (2026-04-24).
+
 ## Version 1.9.2
 
 ### Changed

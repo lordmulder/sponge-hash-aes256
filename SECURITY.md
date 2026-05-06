@@ -6,9 +6,9 @@ Versions that are currently supported with security updates:
 
 | Version | Supported          |
 | ------- | ------------------ |
+| 1.10.x  | :white_check_mark: |
 | 1.9.x   | :white_check_mark: |
-| 1.8.x   | :white_check_mark: |
-| < 1.8   | :x:                |
+| < 1.9   | :x:                |
 
 ## Reporting a Vulnerability
 
