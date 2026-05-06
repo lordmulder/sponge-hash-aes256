@@ -19,7 +19,7 @@ use crate::{
     common::{get_capacity, increment, Aborted, Digest, ExitStatus, Flag, TinyVecEx, MAX_DIGEST_SIZE},
     digest::{compute_digest, digest_equal, Error as DigestError},
     environment::Env,
-    io::{DataSource, Error as IoError, Output},
+    io::{DataSource, Error as IoError, OutStream},
     os::STDIN_NAME,
     print_error, print_warn,
     thread_pool::{detect_thread_count, Cancelled, TaskResult, ThreadPool},
@@ -118,7 +118,7 @@ fn print_match(output: &mut dyn Write, is_match: bool, file_name: &Path, args: &
 
 /// Print result to output
 #[inline]
-fn print_result(output: &mut Output, verify_result: &VerifyResult, args: &Args) -> bool {
+fn print_result(output: &mut OutStream, verify_result: &VerifyResult, args: &Args) -> bool {
     match verify_result {
         Ok((is_match, path)) => print_match(output.out(), *is_match, path, args).is_ok(),
         Err(error) => {
@@ -145,7 +145,7 @@ fn print_result(output: &mut Output, verify_result: &VerifyResult, args: &Args) 
 
 /// Print the summary
 #[inline]
-fn print_summary(output: &mut Output, chck_errors: u64, file_errors: u64, args: &Args) {
+fn print_summary(output: &mut OutStream, chck_errors: u64, file_errors: u64, args: &Args) {
     if (chck_errors > u64::MIN) || (file_errors > u64::MIN) {
         if args.keep_going {
             if chck_errors > u64::MIN {
@@ -292,7 +292,7 @@ fn reader_thread(checksum_tx: &Sender<ReadResult>, args: &Args, halt: &Flag) -> 
 // Verify implementation
 // ---------------------------------------------------------------------------
 
-fn verify_mt(output: &mut Output, n_threads: Count, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
+fn verify_mt(output: &mut OutStream, n_threads: Count, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
     // Initialize channels
     let (checksum_tx, checksum_rx) = bounded::<ReadResult>(256usize);
     let (result_tx, result_rx) = bounded::<VerifyResult>(get_capacity(&n_threads));
@@ -350,7 +350,7 @@ fn verify_mt(output: &mut Output, n_threads: Count, args: &'static Args, halt: &
     Ok(exit_status(write_errors, chck_errors, file_errors, args))
 }
 
-fn verify_st(output: &mut Output, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
+fn verify_st(output: &mut OutStream, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
     // Initialize channel
     let (checksum_tx, checksum_rx) = bounded::<ReadResult>(256usize);
 
@@ -412,9 +412,14 @@ fn verify_st(output: &mut Output, args: &'static Args, halt: &'static Flag) -> R
 // ---------------------------------------------------------------------------
 
 /// Verify all input files
-pub fn verify_files(output: &mut Output, args: &'static Args, env: &Env, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
+pub fn verify_files(output: &mut OutStream, args: &'static Args, env: &Env, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
     // Determine number of threads
     let thread_count = detect_thread_count(args, env);
+
+    // Check if process has been aborted
+    if !halt.running() {
+        return Err(Aborted);
+    }
 
     if thread_count > Count::MIN {
         verify_mt(output, thread_count, args, halt)

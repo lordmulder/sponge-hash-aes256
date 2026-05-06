@@ -81,19 +81,24 @@ impl Read for DataSource<'_> {
 // Output wrapper
 // ---------------------------------------------------------------------------
 
-pub struct Output {
-    out: StdoutLock<'static>,
-    err: AutoStream<StderrLock<'static>>,
+enum StderrWrapper {
+    Lock(StderrLock<'static>),
+    Auto(AutoStream<StderrLock<'static>>),
 }
 
-impl Output {
-    pub fn initialize(disable_color: bool) -> Self {
+pub struct OutStream {
+    out: StdoutLock<'static>,
+    err: StderrWrapper,
+}
+
+impl OutStream {
+    pub fn initialize(no_color_support: bool) -> Self {
         let (stdout_lock, stderr_lock) = (stdout().lock(), stderr().lock());
         Self {
             out: stdout_lock,
-            err: match disable_color {
-                true => AutoStream::never(stderr_lock),
-                false => AutoStream::auto(stderr_lock),
+            err: match no_color_support {
+                true => StderrWrapper::Lock(stderr_lock),
+                _ => StderrWrapper::Auto(AutoStream::auto(stderr_lock)),
             },
         }
     }
@@ -105,6 +110,9 @@ impl Output {
 
     #[inline(always)]
     pub const fn err(&mut self) -> &mut dyn Write {
-        &mut self.err
+        match &mut self.err {
+            StderrWrapper::Lock(stderr_lock) => stderr_lock,
+            StderrWrapper::Auto(auto_stream) => auto_stream,
+        }
     }
 }

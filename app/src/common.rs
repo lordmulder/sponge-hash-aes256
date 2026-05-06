@@ -161,7 +161,11 @@ pub fn get_capacity(thread_count: &NonZeroUsize) -> usize {
 macro_rules! print_warn {
     ($out:ident, $args:ident, $fmt:literal $(,$arg:expr)*$(,)?) => {
         if !$args.quiet {
-            let _ = writeln!($out.err(), concat!("\x1b[1;33m[sponge256sum]\x1b[22;33m ", $fmt, "\x1b[0m") $(, $arg)*);
+            if !$args.no_color {
+                let _ = writeln!($out.err(), concat!("\x1b[1;33m[sponge256sum]\x1b[22;33m ", $fmt, "\x1b[0m") $(, $arg)*);
+            } else {
+                let _ = writeln!($out.err(), concat!("[sponge256sum] ", $fmt) $(, $arg)*);
+            }
         }
     };
 }
@@ -172,7 +176,11 @@ macro_rules! print_warn {
 macro_rules! print_error {
     ($out:ident, $args:ident, $fmt:literal $(,$arg:expr)*$(,)?) => {
         if !$args.quiet {
-            let _ = writeln!($out.err(), concat!("\x1b[1;31m[sponge256sum]\x1b[22;31m ", $fmt, "\x1b[0m") $(, $arg)*);
+            if !$args.no_color {
+                let _ = writeln!($out.err(), concat!("\x1b[1;31m[sponge256sum]\x1b[22;31m ", $fmt, "\x1b[0m") $(, $arg)*);
+            } else {
+                let _ = writeln!($out.err(), concat!("[sponge256sum] ", $fmt) $(, $arg)*);
+            }
         }
     };
 }

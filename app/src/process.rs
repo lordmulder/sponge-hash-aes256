@@ -23,7 +23,7 @@ use crate::{
     common::{get_capacity, increment, Aborted, Digest, ExitStatus, Flag, TinyVecEx},
     digest::{compute_digest, Error as DigestError},
     environment::Env,
-    io::{DataSource, Error as IoError, Output},
+    io::{DataSource, Error as IoError, OutStream},
     os::{file_id, DevId, FileId, STDIN_NAME},
     print_error, print_warn,
     thread_pool::{detect_thread_count, Cancelled, TaskResult, ThreadPool},
@@ -145,7 +145,7 @@ fn print_digest(output: &mut dyn Write, file_name: &OsStr, digest: &Digest, args
 
 /// Print result to output
 #[inline]
-fn print_result(output: &mut Output, digest_result: &DigestResult, args: &Args) -> bool {
+fn print_result(output: &mut OutStream, digest_result: &DigestResult, args: &Args) -> bool {
     match digest_result {
         Ok(digest) => print_digest(output.out(), digest.1.as_os_str(), &digest.0, args).is_ok(),
         Err(error) => {
@@ -164,7 +164,7 @@ fn print_result(output: &mut Output, digest_result: &DigestResult, args: &Args) 
 
 /// Print the summary
 #[inline]
-fn print_summary(output: &mut Output, file_errors: u64, args: &Args) {
+fn print_summary(output: &mut OutStream, file_errors: u64, args: &Args) {
     if file_errors > u64::MIN {
         if args.keep_going {
             print_warn!(output, args, "Warning: {} file(s) were skipped due to errors!", file_errors);
@@ -302,7 +302,7 @@ fn start_iteration(bfs: bool, args: &'static Args, halt: &'static Flag) -> (Rece
     }
 }
 
-fn process_mt(output: &mut Output, n_threads: Count, out_size: usize, bfs: bool, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
+fn process_mt(output: &mut OutStream, n_threads: Count, out_size: usize, bfs: bool, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
     // Initialize channel
     let (digest_tx, digest_rx) = bounded::<DigestResult>(get_capacity(&n_threads));
 
@@ -356,7 +356,7 @@ fn process_mt(output: &mut Output, n_threads: Count, out_size: usize, bfs: bool,
     Ok(exit_status(write_errors, file_errors, args))
 }
 
-fn process_st(output: &mut Output, out_size: usize, bfs: bool, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
+fn process_st(output: &mut OutStream, out_size: usize, bfs: bool, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
     // Start the file iteration thread
     let (path_rx, thread_handle) = start_iteration(bfs, args, halt);
 
@@ -412,7 +412,7 @@ fn process_st(output: &mut Output, out_size: usize, bfs: bool, args: &'static Ar
 // ---------------------------------------------------------------------------
 
 /// Process data from 'stdin' stream
-fn process_stdin(output: &mut Output, digest_size: usize, args: &Args, halt: &Flag) -> Result<ExitStatus, Cancelled> {
+fn process_stdin(output: &mut OutStream, digest_size: usize, args: &Args, halt: &Flag) -> Result<ExitStatus, Cancelled> {
     let mut stdin = DataSource::from_stdin();
     let mut digest = TinyVec::with_length(digest_size);
 
@@ -430,7 +430,7 @@ fn process_stdin(output: &mut Output, digest_size: usize, args: &Args, halt: &Fl
 }
 
 /// Process all input files
-pub fn process_files(output: &mut Output, digest_size: usize, args: &'static Args, env: &Env, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
+pub fn process_files(output: &mut OutStream, digest_size: usize, args: &'static Args, env: &Env, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
     // Read input datat from 'stdin' stream?
     if args.files.is_empty() {
         return process_stdin(output, digest_size, args, halt).map_err(|_| Aborted);
@@ -441,6 +441,11 @@ pub fn process_files(output: &mut Output, digest_size: usize, args: &'static Arg
 
     // Determine directory walking strategy
     let breadth_first = env.dirwalk_strategy.unwrap_or(true);
+
+    // Check if process has been aborted
+    if !halt.running() {
+        return Err(Aborted);
+    }
 
     if thread_count > Count::MIN {
         process_mt(output, thread_count, digest_size, breadth_first, args, halt)

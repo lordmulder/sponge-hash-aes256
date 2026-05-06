@@ -223,7 +223,7 @@ use crate::{
     common::{Aborted, ExitStatus, Flag},
     common::{MAX_DIGEST_SIZE, MAX_SNAIL_LEVEL},
     environment::Env,
-    io::Output,
+    io::OutStream,
     process::process_files,
     self_test::self_test,
     verify::verify_files,
@@ -234,15 +234,15 @@ use crate::{
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-/// Global cancellation flag
-static HALT_FLAG: Flag = Flag::default();
-
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
 /// The actual "main" function
-fn sponge256sum_main(output: &mut Output, args: &'static Args) -> Result<ExitStatus, Aborted> {
+fn sponge256sum_main(output: &mut OutStream, args: &'static Args) -> Result<ExitStatus, Aborted> {
+    // Initialize cancellation flag
+    static HALT_FLAG: Flag = Flag::default();
+
     // Initialize the SimpleLogger, if the "with-logging" feature is enabled
     #[cfg(feature = "with-logging")]
     simple_logger::SimpleLogger::new().init().unwrap();
@@ -286,7 +286,7 @@ fn sponge256sum_main(output: &mut Output, args: &'static Args) -> Result<ExitSta
         }
     };
 
-    // Install the interrupt handler
+    // Install interrupt handler
     let _ctrlc = ctrlc::set_handler(|| ctrlc_handler_routine(&HALT_FLAG));
 
     // Run built-in self-test, if it was requested by the user
@@ -327,7 +327,7 @@ fn main() -> ExitCode {
     };
 
     // Acquire stdout+stderr handles
-    let mut output = Output::initialize(args.no_color);
+    let mut output = OutStream::initialize(args.no_color);
 
     // Call the actual "main" function
     match sponge256sum_main(&mut output, args) {

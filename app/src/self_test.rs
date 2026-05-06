@@ -22,7 +22,7 @@ use crate::{
     common::{Aborted, ExitStatus, Flag},
     digest::digest_equal,
     environment::Env,
-    io::Output,
+    io::OutStream,
     print_error,
 };
 
@@ -167,7 +167,7 @@ fn test_runner(output: &mut dyn Write, passes: NonZeroUsize, args: &Args, halt: 
 // ---------------------------------------------------------------------------
 
 /// The built-in self-test (BIST)
-pub fn self_test(output: &mut Output, args: &Args, env: &Env, halt: &Flag) -> Result<ExitStatus, Aborted> {
+pub fn self_test(output: &mut OutStream, args: &Args, env: &Env, halt: &Flag) -> Result<ExitStatus, Aborted> {
     let passes = env.sefltest_passes.unwrap_or(NonZeroUsize::new(3usize).unwrap());
 
     match test_runner(output.out(), passes, args, halt) {
