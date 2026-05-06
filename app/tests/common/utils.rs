@@ -24,6 +24,9 @@ use nix::{
     unistd::Pid,
 };
 
+#[cfg(target_os = "linux")]
+use which::which;
+
 // ---------------------------------------------------------------------------
 // Utility functions
 // ---------------------------------------------------------------------------
@@ -136,6 +139,27 @@ where
 
     let exit_status = child.wait().expect("Failed to wait for process!");
     exit_status.code().expect("Failed to get exit code!")
+}
+
+#[cfg(target_os = "linux")]
+pub fn run_binary_unbuffered<I, S>(args: I, expected_success: bool) -> String
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let unbuffer_exe = which("expect_unbuffer").expect("The command 'expect_unbuffer' could not be found!");
+
+    let output = Command::new(unbuffer_exe)
+        .arg(env!("CARGO_BIN_EXE_sponge256sum"))
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .stdin(Stdio::null())
+        .output()
+        .expect("Failed to run binary!");
+
+    assert_eq!(output.status.success(), expected_success);
+    String::from_utf8(output.stdout).unwrap()
 }
 
 pub fn get_file_name(path: &str) -> &str {

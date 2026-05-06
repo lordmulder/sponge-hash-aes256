@@ -34,6 +34,9 @@ use crate::common::utils::run_binary_with_signal;
 #[cfg(windows)]
 use std::os::windows::ffi::OsStringExt;
 
+#[cfg(target_os = "linux")]
+use crate::common::utils::run_binary_unbuffered;
+
 #[used]
 static DROP_ROOT_CAPS: () = drop_root_caps::set_up();
 
@@ -1056,14 +1059,40 @@ fn test_invalid_args_1b() {
 
 #[test]
 fn test_invalid_args_2a() {
-    let output = run_binary([OsStr::new("--binary"), OsStr::new("--text")], false, true);
-    assert!(REGEX_MUTEX.is_match(&output))
+    for (arg_1, arg_2) in [("--binary", "--text"), ("-b", "-t"), ("--quiet", "--no-color"), ("-q", "-n")] {
+        let output = run_binary([OsStr::new(arg_1), OsStr::new(arg_2)], false, true);
+        assert!(REGEX_MUTEX.is_match(&output))
+    }
 }
 
 #[test]
 fn test_invalid_args_2b() {
-    let output = run_binary([OsStr::new("--binary"), OsStr::new("--binary")], false, true);
-    assert!(REGEX_MULTIPLE.is_match(&output))
+    for arg_2 in ["--dirs", "--recursive", "--cross-dev", "--plain"] {
+        let output = run_binary([OsStr::new("--check"), OsStr::new(arg_2)], false, true);
+        assert!(REGEX_MUTEX.is_match(&output))
+    }
+}
+
+#[test]
+fn test_invalid_args_2c() {
+    let output = run_binary([OsStr::new("--check"), OsStr::new("--length"), OsStr::new("64")], false, true);
+    assert!(REGEX_MUTEX.is_match(&output))
+}
+
+#[test]
+fn test_invalid_args_2d() {
+    for arg_2 in ["--multi-threading", "--check", "filename.txt"] {
+        let output = run_binary([OsStr::new("--self-test"), OsStr::new(arg_2)], false, true);
+        assert!(REGEX_MUTEX.is_match(&output))
+    }
+}
+
+#[test]
+fn test_invalid_args_2e() {
+    for (arg_1, arg_2) in [("--binary", "--binary"), ("--binary", "-b"), ("-b", "-b"), ("--text", "--text"), ("--text", "-t"), ("-t", "-t")] {
+        let output = run_binary([OsStr::new(arg_1), OsStr::new(arg_2)], false, true);
+        assert!(REGEX_MULTIPLE.is_match(&output))
+    }
 }
 
 #[test]
@@ -1369,6 +1398,26 @@ fn test_version() {
 #[test]
 fn test_help() {
     assert!(REGEX_HELP.is_match(&run_binary([OsStr::new("--help")], true, false)));
+}
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// ANSI color tests
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#[cfg(target_os = "linux")]
+#[test]
+#[ignore]
+fn test_unbuffered_1() {
+    let output = run_binary_unbuffered([OsStr::new("this-file-does-not-exist")], false);
+    assert!(output.trim_ascii_start().starts_with("\u{1b}[1;31m[sponge256sum]\u{1b}[22;31m Input file not found:"));
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+#[ignore]
+fn test_unbuffered_2() {
+    let output = run_binary_unbuffered([OsStr::new("--no-color"), OsStr::new("this-file-does-not-exist")], false);
+    assert!(output.trim_ascii_start().starts_with("[sponge256sum] Input file not found:"));
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

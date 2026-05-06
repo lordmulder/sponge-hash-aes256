@@ -51,6 +51,9 @@ windows-sys = { version = "0.61.2", default-features = false, features = ["Win32
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12", default-features = false }
 
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+which = { version = "8.0.2", default-features = false, features = ["real-sys"] }
+
 [package.metadata.winres]
 Comments = "SPDX-License-Identifier: 0BSD"
 CompanyName = "LoRd_MuldeR <mulder2@gmx.de>"

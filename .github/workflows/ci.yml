@@ -60,10 +60,9 @@ jobs:
           toolchain: ${{ matrix.rust }}
           target: ${{ matrix.arch }}-unknown-linux-gnu
           cache: false
-      - if: ${{ matrix.arch == 'i686' }}
-        run: |
+      - run: |
           export DEBIAN_FRONTEND=noninteractive
-          sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386
+          sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends ${{ matrix.arch == 'i686' && 'gcc-multilib libc6-dev-i386' || '' }} expect
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0

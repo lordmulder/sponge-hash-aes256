@@ -287,7 +287,7 @@ fn sponge256sum_main(output: &mut Output, args: &'static Args) -> Result<ExitSta
     };
 
     // Install the interrupt handler
-    let _ctrlc = ctrlc::set_handler(|| ctrlc_handler(&HALT_FLAG));
+    let _ctrlc = ctrlc::set_handler(|| ctrlc_handler_routine(&HALT_FLAG));
 
     // Run built-in self-test, if it was requested by the user
     if args.self_test {
@@ -308,7 +308,7 @@ fn sponge256sum_main(output: &mut Output, args: &'static Args) -> Result<ExitSta
 /// The SIGINT (CTRL+C) interrupt handler routine
 ///
 /// If the process does not exit cleanly after 10 seconds, we just proceed with the abort!
-fn ctrlc_handler(halt: &'static Flag) -> ! {
+fn ctrlc_handler_routine(halt: &'static Flag) -> ! {
     let _ = halt.abort_process();
     thread::sleep(Duration::from_secs(10u64));
     abort();
