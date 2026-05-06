@@ -156,6 +156,12 @@ static REGEX_FILE_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Input 
 static REGEX_CHECK_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Checksum file is a directory: "([^"]+)""#).unwrap());
 #[cfg(unix)]
 static REGEX_TARGET_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Target file is a directory: "([^"]+)"#).unwrap());
+#[cfg(target_os = "linux")]
+static REGEX_FILE_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read input file: "([^"]+)""#).unwrap());
+#[cfg(target_os = "linux")]
+static REGEX_TARGET_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read target file: "([^"]+)""#).unwrap());
+#[cfg(target_os = "linux")]
+static REGEX_CHECK_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read checksum file: "([^"]+)""#).unwrap());
 
 // ---------------------------------------------------------------------------
 // Miscellaneous functions
@@ -1041,8 +1047,15 @@ fn test_exit_code_2d() {
 
 #[cfg(unix)]
 #[test]
-fn test_interrupt() {
-    let output = run_binary_with_signal([OsStr::new("/dev/zero")], 1u64, 2i32, 3i32, true);
+fn test_interrupt_1() {
+    let output = run_binary_with_signal([OsStr::new("/dev/zero")], 3u64, 2i32, 3i32, true);
+    assert!(REGEX_ABORTED.is_match(&output))
+}
+
+#[cfg(unix)]
+#[test]
+fn test_interrupt_2() {
+    let output = run_binary_with_signal([OsStr::new("--multi-threading"), OsStr::new("/dev/zero")], 3u64, 2i32, 3i32, true);
     assert!(REGEX_ABORTED.is_match(&output))
 }
 
@@ -1198,6 +1211,20 @@ fn test_file_error_3b() {
     assert!(REGEX_FILE_FOPEN.is_match(&output));
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn test_file_error_4a() {
+    let output = run_binary([OsStr::new("/proc/self/mem")], false, true);
+    assert!(REGEX_FILE_READ.is_match(&output));
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn test_file_error_4b() {
+    let output = run_binary([OsStr::new("--multi-threading"), OsStr::new("/proc/self/mem")], false, true);
+    assert!(REGEX_FILE_READ.is_match(&output));
+}
+
 #[test]
 fn test_check_error_1a() {
     let output = run_binary([OsStr::new("--check"), OsStr::new(FILE_PATH)], false, true);
@@ -1342,6 +1369,38 @@ fn test_check_error_7b() {
     assert!(REGEX_TARGET_FOPEN.is_match(&output));
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn test_check_error_8a() {
+    let output = run_binary([OsStr::new("--check"), OsStr::new("/proc/self/mem")], false, true);
+    assert!(REGEX_CHECK_READ.is_match(&output))
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn test_check_error_8b() {
+    let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), OsStr::new("/proc/self/mem")], false, true);
+    assert!(REGEX_CHECK_READ.is_match(&output))
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn test_check_error_8c() {
+    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
+    File::create(&check_file).unwrap().write_all(b"00000000 /proc/self/mem\n").unwrap();
+    let output = run_binary([OsStr::new("--check"), check_file.as_os_str()], false, true);
+    assert!(REGEX_TARGET_READ.is_match(&output))
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn test_check_error_8d() {
+    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
+    File::create(&check_file).unwrap().write_all(b"00000000 /proc/self/mem\n").unwrap();
+    let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), check_file.as_os_str()], false, true);
+    assert!(REGEX_TARGET_READ.is_match(&output))
+}
+
 #[test]
 fn test_invalid_env_1a() {
     let env = HashMap::from([("SPONGE256SUM_DIRWALK_STRATEGY", "foo".to_owned())]);
@@ -1408,7 +1467,7 @@ fn test_help() {
 #[test]
 #[ignore]
 fn test_unbuffered_1() {
-    let output = run_binary_unbuffered([OsStr::new("this-file-does-not-exist")], false);
+    let output = run_binary_unbuffered([OsStr::new(FILE_PATH)], false);
     assert!(output.trim_ascii_start().starts_with("\u{1b}[1;31m[sponge256sum]\u{1b}[22;31m Input file not found:"));
 }
 
@@ -1416,7 +1475,7 @@ fn test_unbuffered_1() {
 #[test]
 #[ignore]
 fn test_unbuffered_2() {
-    let output = run_binary_unbuffered([OsStr::new("--no-color"), OsStr::new("this-file-does-not-exist")], false);
+    let output = run_binary_unbuffered([OsStr::new("--no-color"), OsStr::new(FILE_PATH)], false);
     assert!(output.trim_ascii_start().starts_with("[sponge256sum] Input file not found:"));
 }
 
