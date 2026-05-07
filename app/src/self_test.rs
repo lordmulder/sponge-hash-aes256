@@ -2,7 +2,6 @@
 // sponge256sum
 // Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>
 
-use hex::encode_to_slice;
 use hex_literal::hex;
 use rand_pcg::{
     rand_core::{Rng, SeedableRng},
@@ -11,7 +10,6 @@ use rand_pcg::{
 use rolling_median::Median;
 use sponge_hash_aes256::{SpongeHash256, DEFAULT_DIGEST_SIZE};
 use std::{
-    hint::black_box,
     io::{Error as IoError, Write},
     num::NonZeroUsize,
     time::Instant,
@@ -61,10 +59,11 @@ fn format_bytes(mut value: f64) -> (f64, &'static str) {
 }
 
 /// Format the given digest as hex string
+#[cfg(debug_assertions)]
 fn format_digest<T: AsRef<[u8]>>(digest: T, hex_buffer: &mut [u8]) -> &str {
     let hex_len = digest.as_ref().len().checked_mul(2usize).unwrap();
     assert!(hex_buffer.len() >= hex_len, "Digest hex length exceeds buffer capacity!");
-    encode_to_slice(digest, &mut hex_buffer[..hex_len]).unwrap();
+    hex::encode_to_slice(digest, &mut hex_buffer[..hex_len]).unwrap();
     str::from_utf8(&hex_buffer[..hex_len]).expect("Failed to format digest!")
 }
 
@@ -85,27 +84,27 @@ macro_rules! check_cancelled {
 const PCG64_SEEDVALUE: [u64; 2usize] = [18446744073709551557u64, 18446744073709551533u64];
 
 // Number of iterations to perform
-#[cfg(not(coverage))]
-const MAX_ITERATION: u32 = 249989u32;
-#[cfg(coverage)]
-const MAX_ITERATION: u32 = 13u32;
+#[cfg(any(debug_assertions, coverage))]
+const ITERATIONS: usize = 1499usize;
+#[cfg(not(any(debug_assertions, coverage)))]
+const ITERATIONS: usize = 249989usize;
 
-// Expected hash values (for each seed)
-#[cfg(not(coverage))]
+// Expected hash values
+#[cfg(any(debug_assertions, coverage))]
+const DIGEST_EXPECTED: [[u8; DEFAULT_DIGEST_SIZE]; 2usize] =
+    [hex!("743f54562887e0687fed4a75b57d596aa5438604b1bda7ef799836d0810d6276"), hex!("66a83c441436d8e90f152b850f94e9e582c50337265dbded21bd72746fe24067")];
+#[cfg(not(any(debug_assertions, coverage)))]
 const DIGEST_EXPECTED: [[u8; DEFAULT_DIGEST_SIZE]; 2usize] =
     [hex!("fbb2f74509d78f4ac30da4a9ed0769efff7fbe5367e363b75572820b8aa83fe0"), hex!("87dac84f3f485a61bc6cb73f5cf236d68831c7bb8a0cef15cce500cf17a5690e")];
-#[cfg(coverage)]
-const DIGEST_EXPECTED: [[u8; DEFAULT_DIGEST_SIZE]; 2usize] =
-    [hex!("08fee771920a4ce9785ca7c80f944c92d154623d5d4cfb6842ae86d89cc7ec8d"), hex!("724c7423a4789a36a7dc07898689cc48e48d489255004add8794beca7b103779")];
 
 // Buffer size, in bytes
 const BUFFER_SIZE: usize = 4093usize;
 
-// Total number of bytes (per test)
-const TOTAL_BYTES: u64 = (BUFFER_SIZE as u64) * (MAX_ITERATION as u64) * (PCG64_SEEDVALUE.len() as u64);
+// Total number of bytes
+const TOTAL_BYTES: u64 = (BUFFER_SIZE as u64) * (ITERATIONS as u64) * (PCG64_SEEDVALUE.len() as u64);
 
 /// The actual **SpongeHash256** self-test routine
-fn do_self_test(output: &mut dyn Write, halt: &Flag) -> Result<bool, Error> {
+fn do_self_test(_output: &mut dyn Write, halt: &Flag) -> Result<bool, Error> {
     let mut success = true;
     let mut counter = 0u64;
 
@@ -114,19 +113,20 @@ fn do_self_test(output: &mut dyn Write, halt: &Flag) -> Result<bool, Error> {
         let mut buffer = [0u8; BUFFER_SIZE];
         let mut hasher = SpongeHash256::default();
 
-        for _ in 0..MAX_ITERATION {
+        for _ in 0..ITERATIONS {
             source.fill_bytes(&mut buffer);
             hasher.update(buffer);
             counter += buffer.len() as u64;
             check_cancelled!(halt);
         }
 
-        let digest_computed: [u8; DEFAULT_DIGEST_SIZE] = black_box(hasher.digest());
+        let digest_computed: [u8; DEFAULT_DIGEST_SIZE] = hasher.digest();
 
-        if cfg!(debug_assertions) {
+        #[cfg(debug_assertions)]
+        {
             let mut hex_buffer = [0u8; DEFAULT_DIGEST_SIZE * 2usize];
-            writeln!(output, "Computed: {}", format_digest(digest_computed, &mut hex_buffer))?;
-            writeln!(output, "Expected: {}", format_digest(digest_expected, &mut hex_buffer))?;
+            writeln!(_output, "> Computed: {}", format_digest(digest_computed, &mut hex_buffer))?;
+            writeln!(_output, "> Expected: {}", format_digest(digest_expected, &mut hex_buffer))?;
         }
 
         success &= digest_equal(&digest_computed, digest_expected);
@@ -147,7 +147,7 @@ fn test_runner(output: &mut dyn Write, passes: NonZeroUsize, halt: &Flag) -> Res
         check_cancelled!(halt);
 
         let start_time = Instant::now();
-        let success = black_box(do_self_test(output, halt)?);
+        let success = do_self_test(output, halt)?;
         let elapsed = start_time.elapsed();
 
         writeln!(output, "{}", if success { "Successful." } else { "Failure !!!" })?;

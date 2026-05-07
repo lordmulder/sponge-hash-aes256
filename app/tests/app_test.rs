@@ -369,7 +369,7 @@ fn do_verify_files(modify: bool, file_count: usize, multi_threading: bool, force
     let source_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data");
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
 
-    run_binary_to_file([OsStr::new("--recursive"), source_dir.as_os_str()], &check_file);
+    run_binary_to_file([OsStr::new("--recursive"), source_dir.as_os_str()], &check_file, true);
 
     let input_file = if modify {
         let modified_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("modified_{:016X}.txt", random_u64()));
@@ -425,7 +425,7 @@ fn do_test_exit_code(files: &[&str], verify_mode: bool, modify: bool, keep_going
     } else {
         let parameters: Vec<&OsStr> = paths.iter().map(|path| path.as_os_str()).collect();
         let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
-        run_binary_to_file(parameters, &check_file);
+        run_binary_to_file(parameters, &check_file, true);
 
         let input_file = if modify {
             let modified_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));

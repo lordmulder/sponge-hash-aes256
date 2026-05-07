@@ -67,13 +67,18 @@ where
     String::from_utf8(output.stdout).unwrap()
 }
 
-pub fn run_binary_to_file<I, S>(args: I, dest_file: &Path)
+pub fn run_binary_to_file<I, S>(args: I, dest_file: &Path, create_new: bool)
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
 {
-    let dest_file = File::create_new(dest_file).expect("Failed to create output file!");
-    let child = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
+    let dest_file = if create_new {
+        File::create_new(dest_file).expect("Failed to create output file!")
+    } else {
+        File::open(dest_file).expect("Failed to open output file!")
+    };
+
+    let mut child = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
         .args(args)
         .stdout(Stdio::from(dest_file))
         .stderr(Stdio::null())
@@ -81,7 +86,7 @@ where
         .spawn()
         .expect("Failed to run binary!");
 
-    assert!(child.wait_with_output().unwrap().status.success());
+    assert!(child.wait().unwrap().success());
 }
 
 #[cfg(unix)]
