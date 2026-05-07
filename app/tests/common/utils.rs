@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: 0BSD
-// SpongeHash-AES256
+// sponge256sum
 // Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>
 
 use hex::decode_to_slice;

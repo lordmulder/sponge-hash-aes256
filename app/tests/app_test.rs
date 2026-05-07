@@ -1494,8 +1494,7 @@ fn test_unbuffered_2() {
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 #[test]
-#[ignore]
 fn test_selftest() {
-    let env = HashMap::from([("SPONGE256SUM_SELFTEST_PASSES", 1.to_string())]);
+    let env = HashMap::from([("SPONGE256SUM_SELFTEST_PASSES", "1".to_owned())]);
     assert!(REGEX_SELFTEST.is_match(&run_binary_with_env([OsStr::new("--self-test")], env, true, false)));
 }

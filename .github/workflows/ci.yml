@@ -139,7 +139,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - run: cargo llvm-cov --features with-mimalloc --workspace --ignore-filename-regex test --lcov --output-path /tmp/sponge256sum.lcov
+      - run: cargo llvm-cov --features with-mimalloc --workspace --lcov --output-path /tmp/sponge256sum.lcov
         env:
           CARGO_TARGET_DIR: /tmp/sponge256sum-coverage
       - uses: codecov/codecov-action@v5

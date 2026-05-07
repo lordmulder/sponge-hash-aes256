@@ -81,13 +81,27 @@ macro_rules! check_cancelled {
 // Test runner
 // ---------------------------------------------------------------------------
 
+// Seed values
 const PCG64_SEEDVALUE: [u64; 2usize] = [18446744073709551557u64, 18446744073709551533u64];
+
+// Number of iterations to perform
+#[cfg(not(coverage))]
+const MAX_ITERATION: u32 = 249989u32;
+#[cfg(coverage)]
+const MAX_ITERATION: u32 = 13u32;
+
+// Expected hash values (for each seed)
+#[cfg(not(coverage))]
 const DIGEST_EXPECTED: [[u8; DEFAULT_DIGEST_SIZE]; 2usize] =
     [hex!("fbb2f74509d78f4ac30da4a9ed0769efff7fbe5367e363b75572820b8aa83fe0"), hex!("87dac84f3f485a61bc6cb73f5cf236d68831c7bb8a0cef15cce500cf17a5690e")];
+#[cfg(coverage)]
+const DIGEST_EXPECTED: [[u8; DEFAULT_DIGEST_SIZE]; 2usize] =
+    [hex!("08fee771920a4ce9785ca7c80f944c92d154623d5d4cfb6842ae86d89cc7ec8d"), hex!("724c7423a4789a36a7dc07898689cc48e48d489255004add8794beca7b103779")];
 
+// Buffer size, in bytes
 const BUFFER_SIZE: usize = 4093usize;
-const MAX_ITERATION: u32 = 249989u32;
 
+// Total number of bytes (per test)
 const TOTAL_BYTES: u64 = (BUFFER_SIZE as u64) * (MAX_ITERATION as u64) * (PCG64_SEEDVALUE.len() as u64);
 
 /// The actual **SpongeHash256** self-test routine
@@ -123,10 +137,9 @@ fn do_self_test(output: &mut dyn Write, halt: &Flag) -> Result<bool, Error> {
 }
 
 /// Runs the self-test routine for `passes` times
-fn test_runner(output: &mut dyn Write, passes: NonZeroUsize, args: &Args, halt: &Flag) -> Result<ExitStatus, Error> {
+fn test_runner(output: &mut dyn Write, passes: NonZeroUsize, halt: &Flag) -> Result<ExitStatus, Error> {
     writeln!(output, "{}", HEADER_LINE)?;
     let mut median = Median::new();
-    let mut errors_encountered = 0usize;
 
     for pass in 0usize..passes.get() {
         writeln!(output, "\nSelf-test pass {} of {} is running...", (pass as u32) + 1u32, passes)?;
@@ -139,14 +152,11 @@ fn test_runner(output: &mut dyn Write, passes: NonZeroUsize, args: &Args, halt: 
 
         writeln!(output, "{}", if success { "Successful." } else { "Failure !!!" })?;
 
-        if !success {
-            errors_encountered += 1usize;
-            if !args.keep_going {
-                return Ok(ExitStatus::Failure);
-            }
+        if success {
+            median.push(elapsed.as_secs_f64()).expect("Invalid elapsed time!");
+        } else {
+            return Ok(ExitStatus::Failure);
         }
-
-        median.push(elapsed.as_secs_f64()).expect("Invalid elapsed time!");
     }
 
     let secs_median = median.get().unwrap_or(f64::MAX);
@@ -155,11 +165,7 @@ fn test_runner(output: &mut dyn Write, passes: NonZeroUsize, args: &Args, halt: 
     writeln!(output, "\n--------\n")?;
     writeln!(output, "Median execution time: {:.1} seconds ({:.2} {}/s)", secs_median, rate_median, rate_unit)?;
 
-    if errors_encountered == usize::MIN {
-        Ok(ExitStatus::Success)
-    } else {
-        Ok(ExitStatus::Warning)
-    }
+    Ok(ExitStatus::Success)
 }
 
 // ---------------------------------------------------------------------------
@@ -170,7 +176,7 @@ fn test_runner(output: &mut dyn Write, passes: NonZeroUsize, args: &Args, halt: 
 pub fn self_test(output: &mut OutStream, args: &Args, env: &Env, halt: &Flag) -> Result<ExitStatus, Aborted> {
     let passes = env.sefltest_passes.unwrap_or(NonZeroUsize::new(3usize).unwrap());
 
-    match test_runner(output.out(), passes, args, halt) {
+    match test_runner(output.out(), passes, halt) {
         Ok(result) => Ok(result),
         Err(Error::Cancelled) => Err(Aborted),
         Err(error) => {
