@@ -35,9 +35,6 @@ use crate::common::utils::{run_binary_from_file, run_binary_to_pipe, run_binary_
 #[cfg(windows)]
 use std::os::windows::ffi::OsStringExt;
 
-#[cfg(target_os = "linux")]
-use crate::common::utils::run_binary_unbuffered;
-
 #[used]
 static DROP_ROOT_CAPS: () = drop_root_caps::set_up();
 
@@ -1540,19 +1537,27 @@ fn test_help() {
 // ANSI color tests
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 #[test]
-#[ignore]
-fn test_unbuffered_1() {
-    let output = run_binary_unbuffered([OsStr::new(FILE_PATH)], false);
+fn test_color_1a() {
+    let env = HashMap::from([("CLICOLOR_FORCE", "1".to_owned())]);
+    let output = run_binary_with_env([OsStr::new(FILE_PATH)], env, false, true);
     assert!(output.trim_ascii_start().starts_with("\u{1b}[1;31m[sponge256sum]\u{1b}[22;31m Input file not found:"));
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 #[test]
-#[ignore]
-fn test_unbuffered_2() {
-    let output = run_binary_unbuffered([OsStr::new("--no-color"), OsStr::new(FILE_PATH)], false);
+fn test_color_1b() {
+    let env = HashMap::from([("NO_COLOR", "1".to_owned())]);
+    let output = run_binary_with_env([OsStr::new(FILE_PATH)], env, false, true);
+    assert!(output.trim_ascii_start().starts_with("[sponge256sum] Input file not found:"));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_color_2() {
+    let env = HashMap::from([("CLICOLOR_FORCE", "1".to_owned())]);
+    let output = run_binary_with_env([OsStr::new("--no-color"), OsStr::new(FILE_PATH)], env, false, true);
     assert!(output.trim_ascii_start().starts_with("[sponge256sum] Input file not found:"));
 }
 
