@@ -4,8 +4,6 @@ permissions:
   contents: read
 
 on:
-  push:
-    branches: [main]
   schedule:
     - cron: '51 23 * * *'
 
