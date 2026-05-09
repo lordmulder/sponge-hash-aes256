@@ -83,10 +83,10 @@ macro_rules! break_cancelled {
 
 /// Compute the exit status
 #[inline]
-fn exit_status(write_errors: bool, chck_errors: u64, file_errors: u64, args: &Args) -> ExitStatus {
-    if (!write_errors) && (file_errors == u64::MIN) && (chck_errors == u64::MIN) {
+fn exit_status(chck_errors: u64, file_errors: u64, args: &Args) -> ExitStatus {
+    if (file_errors == u64::MIN) && (chck_errors == u64::MIN) {
         ExitStatus::Success
-    } else if (!write_errors) && (((file_errors == u64::MIN) && (chck_errors == u64::MIN)) || args.keep_going) {
+    } else if ((file_errors == u64::MIN) && (chck_errors == u64::MIN)) || args.keep_going {
         ExitStatus::Warning
     } else {
         ExitStatus::Failure
@@ -343,11 +343,17 @@ fn verify_mt(output: &mut OutStream, n_threads: Count, args: &'static Args, halt
         return Err(Aborted);
     }
 
+    // Have write any errors been encountered?
+    if write_errors {
+        print_error!(output, args, "Error: Failed to write to standard output stream!");
+        return Ok(ExitStatus::Failure);
+    }
+
     // Print warning if any file(s) did not match the expected checksum
     print_summary(output, chck_errors, file_errors, args);
 
     // Check for errors
-    Ok(exit_status(write_errors, chck_errors, file_errors, args))
+    Ok(exit_status(chck_errors, file_errors, args))
 }
 
 fn verify_st(output: &mut OutStream, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
@@ -400,11 +406,17 @@ fn verify_st(output: &mut OutStream, args: &'static Args, halt: &'static Flag) -
         return Err(Aborted);
     }
 
+    // Have write any errors been encountered?
+    if write_errors {
+        print_error!(output, args, "Error: Failed to write to standard output stream!");
+        return Ok(ExitStatus::Failure);
+    }
+
     // Print warning if any file(s) did not match the expected checksum
     print_summary(output, chck_errors, file_errors, args);
 
     // Check for errors
-    Ok(exit_status(write_errors, chck_errors, file_errors, args))
+    Ok(exit_status(chck_errors, file_errors, args))
 }
 
 // ---------------------------------------------------------------------------

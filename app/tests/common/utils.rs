@@ -16,7 +16,7 @@ use std::{
 use tinyvec::TinyVec;
 
 #[cfg(unix)]
-use std::{thread, time::Duration};
+use std::{io::PipeWriter, thread, time::Duration};
 
 #[cfg(unix)]
 use nix::{
@@ -87,6 +87,25 @@ where
         .expect("Failed to run binary!");
 
     assert!(child.wait().unwrap().success());
+}
+
+#[cfg(unix)]
+pub fn run_binary_to_pipe<I, S>(args: I, pipe: PipeWriter, expected_success: bool) -> String
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let child = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
+        .args(args)
+        .stdout(Stdio::from(pipe))
+        .stderr(Stdio::piped())
+        .stdin(Stdio::null())
+        .spawn()
+        .expect("Failed to run binary!");
+
+    let output = child.wait_with_output().expect("Failed to wait for process!");
+    assert_eq!(output.status.success(), expected_success);
+    String::from_utf8(output.stderr).unwrap()
 }
 
 #[cfg(unix)]

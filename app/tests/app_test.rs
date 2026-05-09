@@ -25,11 +25,12 @@ use std::{
 #[cfg(unix)]
 use std::{
     fs::{set_permissions, Permissions},
+    io::pipe,
     os::unix::fs::PermissionsExt,
 };
 
 #[cfg(unix)]
-use crate::common::utils::{run_binary_from_file, run_binary_with_signal};
+use crate::common::utils::{run_binary_from_file, run_binary_to_pipe, run_binary_with_signal};
 
 #[cfg(windows)]
 use std::os::windows::ffi::OsStringExt;
@@ -158,6 +159,10 @@ static REGEX_CHECK_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Check
 static REGEX_TARGET_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Target file is a directory: "([^"]+)"#).unwrap());
 #[cfg(unix)]
 static REGEX_STDIN_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read data from the standard input stream!"#).unwrap());
+#[cfg(unix)]
+static REGEX_STDIN_WRITE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to write to standard output stream!"#).unwrap());
+#[cfg(unix)]
+static REGEX_SELF_IOERR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Self-test encountered an error: IoError"#).unwrap());
 
 #[cfg(target_os = "linux")]
 static REGEX_FILE_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read input file: "([^"]+)""#).unwrap());
@@ -198,6 +203,16 @@ fn modify_checksum_file(original_file: &Path, modified_file: PathBuf, first_only
     }
 
     modified_file
+}
+
+#[cfg(unix)]
+fn write_checksum_file(file_name: &str) -> PathBuf {
+    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("binary").join(file_name);
+    let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
+
+    let mut writer = File::create(&check_file).unwrap();
+    writeln!(writer, "00000000 {}\n", source.to_str().unwrap()).unwrap();
+    check_file
 }
 
 // ---------------------------------------------------------------------------
@@ -1230,9 +1245,61 @@ fn test_file_error_4b() {
 
 #[cfg(unix)]
 #[test]
-fn test_file_error_5() {
+fn test_stdio_error_1() {
     let output = run_binary_from_file::<[&OsStr; 0usize], _>([], Path::new("/"), false, true);
     assert!(REGEX_STDIN_READ.is_match(&output));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_stdio_error_2a() {
+    let (_, writer) = pipe().unwrap();
+    let output = run_binary_to_pipe::<[&OsStr; 0usize], _>([], writer, false);
+    assert!(REGEX_STDIN_WRITE.is_match(&output));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_stdio_error_2b() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("binary").join("frank.pdf");
+    let (_, writer) = pipe().unwrap();
+    let output = run_binary_to_pipe([OsStr::new(&path)], writer, false);
+    assert!(REGEX_STDIN_WRITE.is_match(&output));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_stdio_error_2c() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("binary").join("frank.pdf");
+    let (_, writer) = pipe().unwrap();
+    let output = run_binary_to_pipe([OsStr::new("--multi-threading"), OsStr::new(&path)], writer, false);
+    assert!(REGEX_STDIN_WRITE.is_match(&output));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_stdio_error_2d() {
+    let check_file = write_checksum_file("frank.pdf");
+    let (_, writer) = pipe().unwrap();
+    let output = run_binary_to_pipe([OsStr::new("--check"), OsStr::new(&check_file)], writer, false);
+    assert!(REGEX_STDIN_WRITE.is_match(&output));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_stdio_error_2e() {
+    let check_file = write_checksum_file("frank.pdf");
+    let (_, writer) = pipe().unwrap();
+    let output = run_binary_to_pipe([OsStr::new("--check"), OsStr::new("--multi-threading"), OsStr::new(&check_file)], writer, false);
+    assert!(REGEX_STDIN_WRITE.is_match(&output));
+}
+
+#[cfg(unix)]
+#[test]
+fn test_stdio_error_2f() {
+    let (_, writer) = pipe().unwrap();
+    let output = run_binary_to_pipe([OsStr::new("--self-test")], writer, false);
+    assert!(REGEX_SELF_IOERR.is_match(&output));
 }
 
 #[test]

@@ -101,10 +101,10 @@ macro_rules! break_cancelled {
 
 /// Compute the exit status
 #[inline]
-fn exit_status(write_errors: bool, file_errors: u64, args: &Args) -> ExitStatus {
-    if (!write_errors) && (file_errors == u64::MIN) {
+fn exit_status(file_errors: u64, args: &Args) -> ExitStatus {
+    if file_errors == u64::MIN {
         ExitStatus::Success
-    } else if (!write_errors) && ((file_errors == u64::MIN) || args.keep_going) {
+    } else if (file_errors == u64::MIN) || args.keep_going {
         ExitStatus::Warning
     } else {
         ExitStatus::Failure
@@ -349,11 +349,17 @@ fn process_mt(output: &mut OutStream, n_threads: Count, out_size: usize, bfs: bo
         return Err(Aborted);
     }
 
+    // Have write any errors been encountered?
+    if write_errors {
+        print_error!(output, args, "Error: Failed to write to standard output stream!");
+        return Ok(ExitStatus::Failure);
+    }
+
     // Print warning if any file(s) have been skipped
     print_summary(output, file_errors, args);
 
     // Check for errors
-    Ok(exit_status(write_errors, file_errors, args))
+    Ok(exit_status(file_errors, args))
 }
 
 fn process_st(output: &mut OutStream, out_size: usize, bfs: bool, args: &'static Args, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
@@ -400,11 +406,17 @@ fn process_st(output: &mut OutStream, out_size: usize, bfs: bool, args: &'static
         return Err(Aborted);
     }
 
+    // Have write any errors been encountered?
+    if write_errors {
+        print_error!(output, args, "Error: Failed to write to standard output stream!");
+        return Ok(ExitStatus::Failure);
+    }
+
     // Print warning if any file(s) have been skipped
     print_summary(output, file_errors, args);
 
     // Check for errors
-    Ok(exit_status(write_errors, file_errors, args))
+    Ok(exit_status(file_errors, args))
 }
 
 // ---------------------------------------------------------------------------
@@ -419,7 +431,10 @@ fn process_stdin(output: &mut OutStream, digest_size: usize, args: &Args, halt: 
     match compute_digest(&mut stdin, digest.as_mut_slice(), args, halt) {
         Ok(_) => match print_digest(output.out(), &STDIN_NAME, &digest, args) {
             Ok(_) => Ok(ExitStatus::Success),
-            Err(_) => Ok(ExitStatus::Failure),
+            Err(_) => {
+                print_error!(output, args, "Error: Failed to write to standard output stream!");
+                Ok(ExitStatus::Failure)
+            }
         },
         Err(DigestError::IoError) => {
             print_error!(output, args, "Failed to read data from the standard input stream!");
