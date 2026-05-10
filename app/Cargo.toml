@@ -6,7 +6,7 @@ license = "0BSD"
 repository = "https://github.com/lordmulder/sponge-hash-aes256/"
 readme = "../README-cargo.md"
 edition = "2021"
-version = "1.10.0"
+version = "1.10.1"
 categories = ["algorithms", "cryptography", "no-std", "security"]
 keywords = ["hash", "digest", "sponge", "crypto", "aes"]
 
@@ -51,6 +51,9 @@ windows-sys = { version = "0.61.2", default-features = false, features = ["Win32
 [target.'cfg(windows)'.build-dependencies]
 winres = { version = "0.1.12", default-features = false }
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)'] }
+
 [package.metadata.winres]
 Comments = "SPDX-License-Identifier: 0BSD"
 CompanyName = "LoRd_MuldeR <mulder2@gmx.de>"
@@ -59,9 +62,6 @@ InternalName = "sponge256sum"
 LegalCopyright = "Copyright © 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>"
 OriginalFilename = "sponge256sum.exe"
 ProductName = "SpongeHash-AES256"
-
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(coverage)'] }
 
 [[bench]]
 name = "app_bench"

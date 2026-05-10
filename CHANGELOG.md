@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 1.10.1
+
+### Added
+
+- In the CLI application, print a proper error message when an I/O error has occurred.
+- Added more tests cases to further improve the code coverage.
+
+### Changed
+
+- Updated GitHub workflow (CI) to create builds with Rust version 1.95.0 (2026-05-09).
+- Github workflow (CI): Updated 'install-nsis' action to the latest version to fix [download errors](https://github.com/repolevedavaj/install-nsis/issues/38).
+
 ## Version 1.10.0
 
 ### Added
