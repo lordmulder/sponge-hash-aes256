@@ -29,6 +29,9 @@ use std::{
     os::unix::fs::PermissionsExt,
 };
 
+#[cfg(target_os = "linux")]
+use std::fs;
+
 #[cfg(unix)]
 use crate::common::utils::{run_binary_from_file, run_binary_to_pipe, run_binary_with_signal};
 
@@ -114,6 +117,10 @@ const STDIN_DEV_FILE: &str = "CONIN$";
 #[cfg(not(windows))]
 const STDIN_DEV_FILE: &str = "/dev/stdin";
 
+// Target processor architecture
+#[cfg(target_os = "linux")]
+const ARCH: &str = std::env::consts::ARCH;
+
 // ---------------------------------------------------------------------------
 // Regular expressions
 // ---------------------------------------------------------------------------
@@ -161,11 +168,15 @@ static REGEX_STDIN_WRITE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Faile
 #[cfg(unix)]
 static REGEX_SELF_IOERR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Self-test encountered an error: IoError"#).unwrap());
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
 static REGEX_FILE_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read input file: "([^"]+)""#).unwrap());
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+static REGEX_DIR_OPEN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to open directory: "([^"]+)""#).unwrap());
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+static REGEX_DIR_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read directory: "([^"]+)""#).unwrap());
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
 static REGEX_TARGET_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read target file: "([^"]+)""#).unwrap());
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
 static REGEX_CHECK_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read checksum file: "([^"]+)""#).unwrap());
 
 // ---------------------------------------------------------------------------
@@ -1226,24 +1237,72 @@ fn test_file_error_3b() {
     assert!(REGEX_FILE_FOPEN.is_match(&output));
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
 #[test]
 fn test_file_error_4a() {
-    let output = run_binary([OsStr::new("/proc/self/mem")], false, true);
+    let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_read.so");
+    assert!(fs::exists(&ld_path).unwrap_or(false));
+    let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
+    let output = run_binary_with_env([OsStr::new("/proc/version")], env, false, true);
     assert!(REGEX_FILE_READ.is_match(&output));
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
 #[test]
 fn test_file_error_4b() {
-    let output = run_binary([OsStr::new("--multi-threading"), OsStr::new("/proc/self/mem")], false, true);
+    let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_read.so");
+    assert!(fs::exists(&ld_path).unwrap_or(false));
+    let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
+    let output = run_binary_with_env([OsStr::new("--multi-threading"), OsStr::new("/proc/version")], env, false, true);
     assert!(REGEX_FILE_READ.is_match(&output));
+}
+
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+#[test]
+fn test_dir_error_1a() {
+    let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_opendir.so");
+    assert!(fs::exists(&ld_path).unwrap_or(false));
+    let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
+    let output = run_binary_with_env([OsStr::new("--dirs"), OsStr::new("/")], env, false, true);
+    eprintln!("{:?}", output);
+    assert!(REGEX_DIR_OPEN.is_match(&output));
+}
+
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+#[test]
+fn test_dir_error_1b() {
+    let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_opendir.so");
+    assert!(fs::exists(&ld_path).unwrap_or(false));
+    let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
+    let output = run_binary_with_env([OsStr::new("--multi-threading"), OsStr::new("--dirs"), OsStr::new("/")], env, false, true);
+    eprintln!("{:?}", output);
+    assert!(REGEX_DIR_OPEN.is_match(&output));
+}
+
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+#[test]
+fn test_dir_error_2a() {
+    let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_readdir.so");
+    assert!(fs::exists(&ld_path).unwrap_or(false));
+    let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
+    let output = run_binary_with_env([OsStr::new("--dirs"), OsStr::new("/")], env, false, true);
+    assert!(REGEX_DIR_READ.is_match(&output));
+}
+
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
+#[test]
+fn test_dir_error_2b() {
+    let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_readdir.so");
+    assert!(fs::exists(&ld_path).unwrap_or(false));
+    let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
+    let output = run_binary_with_env([OsStr::new("--multi-threading"), OsStr::new("--dirs"), OsStr::new("/")], env, false, true);
+    assert!(REGEX_DIR_READ.is_match(&output));
 }
 
 #[cfg(unix)]
 #[test]
 fn test_stdio_error_1() {
-    let output = run_binary_from_file::<[&OsStr; 0usize], _>([], Path::new("/"), false, true);
+    let output = run_binary_from_file([""; 0usize], Path::new("/"), false, true);
     assert!(REGEX_STDIN_READ.is_match(&output));
 }
 
@@ -1251,7 +1310,7 @@ fn test_stdio_error_1() {
 #[test]
 fn test_stdio_error_2a() {
     let (_, writer) = pipe().unwrap();
-    let output = run_binary_to_pipe::<[&OsStr; 0usize], _>([], writer, false);
+    let output = run_binary_to_pipe([""; 0usize], writer, false);
     assert!(REGEX_STDIN_WRITE.is_match(&output));
 }
 
@@ -1443,35 +1502,47 @@ fn test_check_error_7b() {
     assert!(REGEX_TARGET_FOPEN.is_match(&output));
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
 #[test]
 fn test_check_error_8a() {
-    let output = run_binary([OsStr::new("--check"), OsStr::new("/proc/self/mem")], false, true);
+    let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_read.so");
+    assert!(fs::exists(&ld_path).unwrap_or(false));
+    let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
+    let output = run_binary_with_env([OsStr::new("--check"), OsStr::new("/proc/version")], env, false, true);
     assert!(REGEX_CHECK_READ.is_match(&output))
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
 #[test]
 fn test_check_error_8b() {
-    let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), OsStr::new("/proc/self/mem")], false, true);
+    let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_read.so");
+    assert!(fs::exists(&ld_path).unwrap_or(false));
+    let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
+    let output = run_binary_with_env([OsStr::new("--check"), OsStr::new("--multi-threading"), OsStr::new("/proc/version")], env, false, true);
     assert!(REGEX_CHECK_READ.is_match(&output))
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
 #[test]
 fn test_check_error_8c() {
+    let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_read.so");
+    assert!(fs::exists(&ld_path).unwrap_or(false));
+    let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
-    File::create(&check_file).unwrap().write_all(b"00000000 /proc/self/mem\n").unwrap();
-    let output = run_binary([OsStr::new("--check"), check_file.as_os_str()], false, true);
+    File::create(&check_file).unwrap().write_all(b"00000000 /proc/version\n").unwrap();
+    let output = run_binary_with_env([OsStr::new("--check"), check_file.as_os_str()], env, false, true);
     assert!(REGEX_TARGET_READ.is_match(&output))
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", target_env = "gnu"))]
 #[test]
 fn test_check_error_8d() {
+    let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_read.so");
+    assert!(fs::exists(&ld_path).unwrap_or(false));
+    let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
-    File::create(&check_file).unwrap().write_all(b"00000000 /proc/self/mem\n").unwrap();
-    let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), check_file.as_os_str()], false, true);
+    File::create(&check_file).unwrap().write_all(b"00000000 /proc/version\n").unwrap();
+    let output = run_binary_with_env([OsStr::new("--check"), OsStr::new("--multi-threading"), check_file.as_os_str()], env, false, true);
     assert!(REGEX_TARGET_READ.is_match(&output))
 }
 
