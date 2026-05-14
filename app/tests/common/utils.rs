@@ -8,7 +8,7 @@ use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
 use std::{
     collections::HashMap,
     ffi::OsStr,
-    fs::File,
+    fs::{File, OpenOptions},
     io::Write,
     path::Path,
     process::{Command, Stdio},
@@ -16,7 +16,7 @@ use std::{
 use tinyvec::TinyVec;
 
 #[cfg(unix)]
-use std::{io::PipeWriter, thread, time::Duration};
+use std::{thread, time::Duration};
 
 #[cfg(unix)]
 use nix::{
@@ -64,7 +64,7 @@ where
     String::from_utf8(output.stdout).unwrap()
 }
 
-pub fn run_binary_to_file<I, S>(args: I, dest_file: &Path, create_new: bool)
+pub fn run_binary_to_file<I, S>(args: I, dest_file: &Path, create_new: bool, expected_success: bool) -> String
 where
     I: IntoIterator<Item = S>,
     S: AsRef<OsStr>,
@@ -72,35 +72,17 @@ where
     let dest_file = if create_new {
         File::create_new(dest_file).expect("Failed to create output file!")
     } else {
-        File::open(dest_file).expect("Failed to open output file!")
+        OpenOptions::new().append(true).open(dest_file).expect("Failed to open output file!")
     };
 
-    let mut child = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
+    let output = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
         .args(args)
         .stdout(Stdio::from(dest_file))
-        .stderr(Stdio::null())
-        .stdin(Stdio::null())
-        .spawn()
-        .expect("Failed to run binary!");
-
-    assert!(child.wait().unwrap().success());
-}
-
-#[cfg(unix)]
-pub fn run_binary_to_pipe<I, S>(args: I, pipe: PipeWriter, expected_success: bool) -> String
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let child = Command::new(env!("CARGO_BIN_EXE_sponge256sum"))
-        .args(args)
-        .stdout(Stdio::from(pipe))
         .stderr(Stdio::piped())
         .stdin(Stdio::null())
-        .spawn()
+        .output()
         .expect("Failed to run binary!");
 
-    let output = child.wait_with_output().expect("Failed to wait for process!");
     assert_eq!(output.status.success(), expected_success);
     String::from_utf8(output.stderr).unwrap()
 }

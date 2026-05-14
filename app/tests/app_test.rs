@@ -25,7 +25,6 @@ use std::{
 #[cfg(unix)]
 use std::{
     fs::{set_permissions, Permissions},
-    io::pipe,
     os::unix::fs::PermissionsExt,
 };
 
@@ -33,7 +32,7 @@ use std::{
 use std::fs;
 
 #[cfg(unix)]
-use crate::common::utils::{run_binary_from_file, run_binary_to_pipe, run_binary_with_signal};
+use crate::common::utils::{run_binary_from_file, run_binary_with_signal};
 
 #[cfg(windows)]
 use std::os::windows::ffi::OsStringExt;
@@ -156,28 +155,29 @@ static REGEX_ENVIRON: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: Va
 #[cfg(unix)]
 static REGEX_ABORTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)\bAborted: The process has been interrupted").unwrap());
 #[cfg(unix)]
-static REGEX_FILE_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Input file is a directory: "([^"]+)""#).unwrap());
-#[cfg(unix)]
 static REGEX_CHECK_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Checksum file is a directory: "([^"]+)""#).unwrap());
 #[cfg(unix)]
-static REGEX_TARGET_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Target file is a directory: "([^"]+)"#).unwrap());
+static REGEX_FILE_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Input file is a directory: "([^"]+)""#).unwrap());
 #[cfg(unix)]
 static REGEX_STDIN_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read data from the standard input stream!"#).unwrap());
 #[cfg(unix)]
-static REGEX_STDIN_WRITE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to write to standard output stream!"#).unwrap());
-#[cfg(unix)]
+static REGEX_TARGET_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Target file is a directory: "([^"]+)"#).unwrap());
+
+#[cfg(target_os = "linux")]
 static REGEX_SELF_IOERR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Self-test encountered an error: IoError"#).unwrap());
+#[cfg(target_os = "linux")]
+static REGEX_STDOUT_WRITE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to write to standard output stream!"#).unwrap());
 
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
-static REGEX_FILE_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read input file: "([^"]+)""#).unwrap());
+static REGEX_CHECK_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read checksum file: "([^"]+)""#).unwrap());
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 static REGEX_DIR_OPEN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to open directory: "([^"]+)""#).unwrap());
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 static REGEX_DIR_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read directory: "([^"]+)""#).unwrap());
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
-static REGEX_TARGET_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read target file: "([^"]+)""#).unwrap());
+static REGEX_FILE_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read input file: "([^"]+)""#).unwrap());
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
-static REGEX_CHECK_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read checksum file: "([^"]+)""#).unwrap());
+static REGEX_TARGET_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read target file: "([^"]+)""#).unwrap());
 
 // ---------------------------------------------------------------------------
 // Miscellaneous functions
@@ -213,7 +213,7 @@ fn modify_checksum_file(original_file: &Path, modified_file: PathBuf, first_only
     modified_file
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 fn write_checksum_file(file_name: &str) -> PathBuf {
     let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("binary").join(file_name);
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
@@ -392,7 +392,7 @@ fn do_verify_files(modify: bool, file_count: usize, multi_threading: bool, force
     let source_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data");
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
 
-    run_binary_to_file([OsStr::new("--recursive"), source_dir.as_os_str()], &check_file, true);
+    run_binary_to_file([OsStr::new("--recursive"), source_dir.as_os_str()], &check_file, true, true);
 
     let input_file = if modify {
         let modified_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("modified_{:016X}.txt", random_u64()));
@@ -448,7 +448,7 @@ fn do_test_exit_code(files: &[&str], verify_mode: bool, modify: bool, keep_going
     } else {
         let parameters: Vec<&OsStr> = paths.iter().map(|path| path.as_os_str()).collect();
         let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
-        run_binary_to_file(parameters, &check_file, true);
+        run_binary_to_file(parameters, &check_file, true, true);
 
         let input_file = if modify {
             let modified_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
@@ -1263,8 +1263,7 @@ fn test_dir_error_1a() {
     let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_opendir.so");
     assert!(fs::exists(&ld_path).unwrap_or(false));
     let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
-    let output = run_binary_with_env([OsStr::new("--dirs"), OsStr::new("/")], env, false, true);
-    eprintln!("{:?}", output);
+    let output = run_binary_with_env([OsStr::new("--dirs"), OsStr::new("/proc/sys/kernel")], env, false, true);
     assert!(REGEX_DIR_OPEN.is_match(&output));
 }
 
@@ -1274,8 +1273,7 @@ fn test_dir_error_1b() {
     let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_opendir.so");
     assert!(fs::exists(&ld_path).unwrap_or(false));
     let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
-    let output = run_binary_with_env([OsStr::new("--multi-threading"), OsStr::new("--dirs"), OsStr::new("/")], env, false, true);
-    eprintln!("{:?}", output);
+    let output = run_binary_with_env([OsStr::new("--multi-threading"), OsStr::new("--dirs"), OsStr::new("/proc/sys/kernel")], env, false, true);
     assert!(REGEX_DIR_OPEN.is_match(&output));
 }
 
@@ -1285,7 +1283,7 @@ fn test_dir_error_2a() {
     let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_readdir.so");
     assert!(fs::exists(&ld_path).unwrap_or(false));
     let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
-    let output = run_binary_with_env([OsStr::new("--dirs"), OsStr::new("/")], env, false, true);
+    let output = run_binary_with_env([OsStr::new("--dirs"), OsStr::new("/proc/sys/kernel")], env, false, true);
     assert!(REGEX_DIR_READ.is_match(&output));
 }
 
@@ -1295,7 +1293,7 @@ fn test_dir_error_2b() {
     let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_readdir.so");
     assert!(fs::exists(&ld_path).unwrap_or(false));
     let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
-    let output = run_binary_with_env([OsStr::new("--multi-threading"), OsStr::new("--dirs"), OsStr::new("/")], env, false, true);
+    let output = run_binary_with_env([OsStr::new("--multi-threading"), OsStr::new("--dirs"), OsStr::new("/proc/sys/kernel")], env, false, true);
     assert!(REGEX_DIR_READ.is_match(&output));
 }
 
@@ -1306,55 +1304,49 @@ fn test_stdio_error_1() {
     assert!(REGEX_STDIN_READ.is_match(&output));
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 #[test]
 fn test_stdio_error_2a() {
-    let (_, writer) = pipe().unwrap();
-    let output = run_binary_to_pipe([""; 0usize], writer, false);
-    assert!(REGEX_STDIN_WRITE.is_match(&output));
+    let output = run_binary_to_file([""; 0usize], Path::new("/dev/full"), false, false);
+    assert!(REGEX_STDOUT_WRITE.is_match(&output));
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 #[test]
 fn test_stdio_error_2b() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("binary").join("frank.pdf");
-    let (_, writer) = pipe().unwrap();
-    let output = run_binary_to_pipe([OsStr::new(&path)], writer, false);
-    assert!(REGEX_STDIN_WRITE.is_match(&output));
+    let output = run_binary_to_file([OsStr::new(&path)], Path::new("/dev/full"), false, false);
+    assert!(REGEX_STDOUT_WRITE.is_match(&output));
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 #[test]
 fn test_stdio_error_2c() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("binary").join("frank.pdf");
-    let (_, writer) = pipe().unwrap();
-    let output = run_binary_to_pipe([OsStr::new("--multi-threading"), OsStr::new(&path)], writer, false);
-    assert!(REGEX_STDIN_WRITE.is_match(&output));
+    let output = run_binary_to_file([OsStr::new("--multi-threading"), OsStr::new(&path)], Path::new("/dev/full"), false, false);
+    assert!(REGEX_STDOUT_WRITE.is_match(&output));
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 #[test]
 fn test_stdio_error_2d() {
     let check_file = write_checksum_file("frank.pdf");
-    let (_, writer) = pipe().unwrap();
-    let output = run_binary_to_pipe([OsStr::new("--check"), OsStr::new(&check_file)], writer, false);
-    assert!(REGEX_STDIN_WRITE.is_match(&output));
+    let output = run_binary_to_file([OsStr::new("--check"), OsStr::new(&check_file)], Path::new("/dev/full"), false, false);
+    assert!(REGEX_STDOUT_WRITE.is_match(&output));
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 #[test]
 fn test_stdio_error_2e() {
     let check_file = write_checksum_file("frank.pdf");
-    let (_, writer) = pipe().unwrap();
-    let output = run_binary_to_pipe([OsStr::new("--check"), OsStr::new("--multi-threading"), OsStr::new(&check_file)], writer, false);
-    assert!(REGEX_STDIN_WRITE.is_match(&output));
+    let output = run_binary_to_file([OsStr::new("--check"), OsStr::new("--multi-threading"), OsStr::new(&check_file)], Path::new("/dev/full"), false, false);
+    assert!(REGEX_STDOUT_WRITE.is_match(&output));
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 #[test]
 fn test_stdio_error_2f() {
-    let (_, writer) = pipe().unwrap();
-    let output = run_binary_to_pipe([OsStr::new("--self-test")], writer, false);
+    let output = run_binary_to_file([OsStr::new("--self-test")], Path::new("/dev/full"), false, false);
     assert!(REGEX_SELF_IOERR.is_match(&output));
 }
 
