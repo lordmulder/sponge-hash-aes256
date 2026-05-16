@@ -330,9 +330,9 @@ jobs:
       - uses: cross-platform-actions/action@v0.32.0
         with:
           operating_system: omnios
-          version: 'r151056'
+          version: 'r151058'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-omnios-builder/releases/download/v8/omnios-r151056-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-omnios-builder/releases/download/v9/omnios-r151058-x86-64.qcow2'
           run: |
             git config --global --add safe.directory '*'
             . /opt/rust/cargo/env
