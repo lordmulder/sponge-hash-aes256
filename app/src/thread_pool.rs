@@ -105,3 +105,39 @@ impl Drop for ThreadPool {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_threadpool_1a() {
+        let pool = ThreadPool::new(NonZeroUsize::new(8).unwrap(), || Ok(()));
+        assert!(matches!(pool.join(), Ok(Ok(()))));
+    }
+
+    #[test]
+    fn test_threadpool_1b() {
+        let pool = ThreadPool::new(NonZeroUsize::new(8).unwrap(), || Err(Cancelled));
+        assert!(matches!(pool.join(), Ok(Err(Cancelled))));
+    }
+
+    #[test]
+    fn test_threadpool_1c() {
+        let pool = ThreadPool::new(NonZeroUsize::new(8).unwrap(), || {
+            let send_error = Err(SendError(()));
+            send_error?
+        });
+        assert!(matches!(pool.join(), Ok(Err(Cancelled))));
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_threadpool_2() {
+        let _ = ThreadPool::new(NonZeroUsize::new(8).unwrap(), || Ok(()));
+    }
+}

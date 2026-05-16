@@ -184,3 +184,28 @@ macro_rules! print_error {
         }
     };
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_flag_1() {
+        let flag = Flag::default();
+        assert!(flag.stop_process().is_ok());
+        assert!(flag.stop_process().is_ok());
+        assert!(matches!(flag.abort_process(), Err(UpdateError)));
+    }
+
+    #[test]
+    fn test_flag_2() {
+        let flag = Flag::default();
+        assert!(flag.abort_process().is_ok());
+        assert!(flag.abort_process().is_ok());
+        assert!(matches!(flag.stop_process(), Err(UpdateError)));
+    }
+}
