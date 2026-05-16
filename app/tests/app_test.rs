@@ -1243,7 +1243,7 @@ fn test_file_error_4a() {
     let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_read.so");
     assert!(fs::exists(&ld_path).unwrap_or(false));
     let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
-    let output = run_binary_with_env([OsStr::new("/proc/version")], env, false, true);
+    let output = run_binary_with_env([OsStr::new("/proc/sys/kernel/version")], env, false, true);
     assert!(REGEX_FILE_READ.is_match(&output));
 }
 
@@ -1253,7 +1253,7 @@ fn test_file_error_4b() {
     let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_read.so");
     assert!(fs::exists(&ld_path).unwrap_or(false));
     let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
-    let output = run_binary_with_env([OsStr::new("--multi-threading"), OsStr::new("/proc/version")], env, false, true);
+    let output = run_binary_with_env([OsStr::new("--multi-threading"), OsStr::new("/proc/sys/kernel/version")], env, false, true);
     assert!(REGEX_FILE_READ.is_match(&output));
 }
 
@@ -1500,7 +1500,7 @@ fn test_check_error_8a() {
     let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_read.so");
     assert!(fs::exists(&ld_path).unwrap_or(false));
     let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
-    let output = run_binary_with_env([OsStr::new("--check"), OsStr::new("/proc/version")], env, false, true);
+    let output = run_binary_with_env([OsStr::new("--check"), OsStr::new("/proc/sys/kernel/version")], env, false, true);
     assert!(REGEX_CHECK_READ.is_match(&output))
 }
 
@@ -1510,7 +1510,7 @@ fn test_check_error_8b() {
     let ld_path = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("platform").join(format!("{ARCH}-linux-gnu")).join("override_read.so");
     assert!(fs::exists(&ld_path).unwrap_or(false));
     let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
-    let output = run_binary_with_env([OsStr::new("--check"), OsStr::new("--multi-threading"), OsStr::new("/proc/version")], env, false, true);
+    let output = run_binary_with_env([OsStr::new("--check"), OsStr::new("--multi-threading"), OsStr::new("/proc/sys/kernel/version")], env, false, true);
     assert!(REGEX_CHECK_READ.is_match(&output))
 }
 
@@ -1521,7 +1521,7 @@ fn test_check_error_8c() {
     assert!(fs::exists(&ld_path).unwrap_or(false));
     let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
-    File::create(&check_file).unwrap().write_all(b"00000000 /proc/version\n").unwrap();
+    File::create(&check_file).unwrap().write_all(b"00000000 /proc/sys/kernel/version\n").unwrap();
     let output = run_binary_with_env([OsStr::new("--check"), check_file.as_os_str()], env, false, true);
     assert!(REGEX_TARGET_READ.is_match(&output))
 }
@@ -1533,7 +1533,7 @@ fn test_check_error_8d() {
     assert!(fs::exists(&ld_path).unwrap_or(false));
     let env = HashMap::from([("LD_PRELOAD", ld_path.to_str().unwrap().to_owned())]);
     let check_file = Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("checksums_{:016X}.txt", random_u64()));
-    File::create(&check_file).unwrap().write_all(b"00000000 /proc/version\n").unwrap();
+    File::create(&check_file).unwrap().write_all(b"00000000 /proc/sys/kernel/version\n").unwrap();
     let output = run_binary_with_env([OsStr::new("--check"), OsStr::new("--multi-threading"), check_file.as_os_str()], env, false, true);
     assert!(REGEX_TARGET_READ.is_match(&output))
 }
