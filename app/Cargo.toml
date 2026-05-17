@@ -29,7 +29,7 @@ tinyvec = { version = "1.11.0", default-features = false, features = ["alloc"] }
 wild = { version = "2.2.1", default-features = false }
 
 # Optional dependencies
-mimalloc = { version = "0.1.50", default-features = false, optional = true }
+mimalloc = { version = "0.1.51", default-features = false, optional = true }
 simple_logger = { version = "5.2.0", default-features = false, optional = true }
 
 [features]
