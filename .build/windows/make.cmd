@@ -164,7 +164,7 @@ for %%t in (x86_64 i686 aarch64) do (
 	cargo clean || goto:error
 	cargo build --release --target %%~t-pc-windows-msvc --features with-mimalloc --verbose || goto:error
 	if "%%~t" == "i686" (
-		copy /B /Y "%CARGO_TARGET_DIR%\%%t-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-i686-sse2.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%t-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-i686+sse2.exe" || goto:error
 	) else (
 		copy /B /Y "%CARGO_TARGET_DIR%\%%t-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-%%~t.exe" || goto:error
 	)
@@ -175,9 +175,9 @@ for %%t in (x86_64 i686) do (
 	cargo clean || goto:error
 	cargo build --release --target %%~t-pc-windows-msvc --features with-mimalloc --verbose || goto:error
 	if "%%~t" == "i686" (
-		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-i686-sse2-aes.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-i686+sse2+aes.exe" || goto:error
 	) else (
-		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-%%~t-aes.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-%%~t+aes.exe" || goto:error
 	)
 )
 
@@ -190,9 +190,9 @@ for %%t in ("" aes) do (
 	cargo clean || goto:error
 	cargo build --release --target x86_64-pc-windows-msvc --features with-mimalloc --verbose || goto:error
 	if "%%~t" == "aes" (
-		copy /B /Y "%CARGO_TARGET_DIR%\x86_64-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-x86_64-v3-aes.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\x86_64-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-x86_64v3+aes.exe" || goto:error
 	) else (
-		copy /B /Y "%CARGO_TARGET_DIR%\x86_64-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-x86_64-v3.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\x86_64-pc-windows-msvc\release\sponge256sum.exe" "out\target\release\sponge256sum-x86_64v3.exe" || goto:error
 	)
 )
 
@@ -209,7 +209,7 @@ for %%t in (x86_64 i686) do (
 	cargo clean || goto:error
 	cargo build -Zbuild-std=std,panic_abort --release --target %%~t-win7-windows-msvc --verbose || goto:error
 	if "%%~t" == "i686" (
-		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\legacy-compat\sponge256sum-win7-i686-sse2.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\legacy-compat\sponge256sum-win7-i686+sse2.exe" || goto:error
 	) else (
 		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\legacy-compat\sponge256sum-win7-%%~t.exe" || goto:error
 	)
@@ -220,9 +220,9 @@ for %%t in (x86_64 i686) do (
 	cargo clean || goto:error
 	cargo build -Zbuild-std=std,panic_abort --release --target %%~t-win7-windows-msvc --verbose || goto:error
 	if "%%~t" == "i686" (
-		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\legacy-compat\sponge256sum-win7-i686-sse2-aes.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\legacy-compat\sponge256sum-win7-i686+sse2+aes.exe" || goto:error
 	) else (
-		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\legacy-compat\sponge256sum-win7-%%~t-aes.exe" || goto:error
+		copy /B /Y "%CARGO_TARGET_DIR%\%%~t-win7-windows-msvc\release\sponge256sum.exe" "out\target\release\legacy-compat\sponge256sum-win7-%%~t+aes.exe" || goto:error
 	)
 )
 
@@ -240,7 +240,7 @@ sed.exe "/shields.io/d;/codecov.io/d" ..\..\README.md | pandoc.exe --standalone 
 
 cargo --version --verbose > "%CARGO_TARGET_DIR%\.RUSTC_VERSION"
 >> "%CARGO_TARGET_DIR%\.RUSTC_VERSION" echo.
-cargo rustc --manifest-path "%CD%\..\.auxiliary-files\blank-project/Cargo.toml" -- --version --verbose >> "%CARGO_TARGET_DIR%\.RUSTC_VERSION"
+cargo rustc --manifest-path "%CD%\..\common\blank-project/Cargo.toml" -- --version --verbose >> "%CARGO_TARGET_DIR%\.RUSTC_VERSION"
 
 REM --------------------------------------------------------------------------
 REM Create info

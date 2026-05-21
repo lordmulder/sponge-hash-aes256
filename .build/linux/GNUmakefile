@@ -31,7 +31,7 @@ build:
 		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-22/lib/LLVMgold.so -Ctarget-feature=+crt-static -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
 		TARGET_CC=/usr/local/musl/$$t/bin/musl-gcc \
 		cargo build --release --target $$t-unknown-linux-musl --features with-mimalloc --verbose
-		[ "$$t" = "i686" ] && suffix=i686-sse2 || suffix=$$t
+		[ "$$t" = "i686" ] && suffix=i686+sse2 || suffix=$$t
 		install -v --mode 555 $${CARGO_TARGET_DIR}/$$t-unknown-linux-musl/release/sponge256sum out/target/release/sponge256sum-$$suffix
 		rm -rf $${CARGO_TARGET_DIR}
 	done
@@ -43,7 +43,7 @@ vbuild:
 		RUSTFLAGS="-Dwarnings -Clinker=$$t-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-22/lib/LLVMgold.so -Ctarget-feature=+crt-static,+aes -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast" \
 		TARGET_CC=/usr/local/musl/$$t/bin/musl-gcc \
 		cargo build --release --target $$t-unknown-linux-musl --features with-mimalloc --verbose
-		[ "$$t" = "i686" ] && suffix=i686-sse2-aes || suffix=$$t-aes
+		[ "$$t" = "i686" ] && suffix=i686+sse2+aes || suffix=$$t+aes
 		install -v --mode 555 $${CARGO_TARGET_DIR}/$$t-unknown-linux-musl/release/sponge256sum out/target/release/sponge256sum-$$suffix
 		rm -rf $${CARGO_TARGET_DIR}
 	done
@@ -55,8 +55,8 @@ wbuild:
 		RUSTFLAGS="-Dwarnings -Clinker=x86_64-linux-gnu-gcc -Clinker-plugin-lto=/usr/lib/llvm-22/lib/LLVMgold.so -Ctarget-feature=+crt-static$${a:+,+}$$a -Copt-level=3 -Cdebuginfo=none -Ccodegen-units=1 -Clto=fat -Cpanic=abort -Clink-arg=-s -Clink-arg=-flto=fat -Clink-arg=-Ofast -Ctarget-cpu=x86-64-v3" \
 		TARGET_CC=/usr/local/musl/x86_64/bin/musl-gcc \
 		cargo build --release --target x86_64-unknown-linux-musl --features with-mimalloc --verbose
-		[ "$$a" = "aes" ] && suffix=v3-aes || suffix=v3
-		install -v --mode 555 $${CARGO_TARGET_DIR}/x86_64-unknown-linux-musl/release/sponge256sum out/target/release/sponge256sum-x86_64-$$suffix
+		[ "$$a" = "aes" ] && suffix=v3+aes || suffix=v3
+		install -v --mode 555 $${CARGO_TARGET_DIR}/x86_64-unknown-linux-musl/release/sponge256sum out/target/release/sponge256sum-x86_64$$suffix
 		rm -rf $${CARGO_TARGET_DIR}
 	done
 
@@ -79,7 +79,7 @@ doc:
 	sed '/shields.io/d;/codecov.io/d' ../../README.md | pandoc --standalone --embed-resources --resource-path=../.. -t html5 -M title="sponge256sum - README" -V maxwidth=48em -o out/target/release/README.html
 	RUSTFLAGS=-Dwarnings cargo pkgid --package sponge256sum | grep -Eo '[^@]+$$' | sed 's/^[[:space:]]*//;s/[[:space:]]*$$//' > out/target/.PKG_VERSION
 	printf '%s\n\n' "$$(RUSTFLAGS=-Dwarnings cargo --version --verbose)" > out/target/.RUSTC_VERSION
-	printf '%s\n' "$$(RUSTFLAGS=-Dwarnings cargo rustc --manifest-path ../.auxiliary-files/blank-project/Cargo.toml -- --version --verbose)" >> out/target/.RUSTC_VERSION
+	printf '%s\n' "$$(RUSTFLAGS=-Dwarnings cargo rustc --manifest-path ../common/blank-project/Cargo.toml -- --version --verbose)" >> out/target/.RUSTC_VERSION
 	rm -rf $${CARGO_TARGET_DIR}
 
 dist: build vbuild wbuild xbuild doc
