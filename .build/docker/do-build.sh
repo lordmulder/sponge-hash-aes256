@@ -2,7 +2,7 @@
 set -eo pipefail
 cd -- "$(realpath -- "$(dirname -- "${BASH_SOURCE[0]}")")"
 
-for name in i686-sse2 x86_64 aarch64; do
+for name in i686+sse2 x86_64 aarch64; do
 	if [ ! -e "../linux/out/target/release/sponge256sum-${name}" ]; then
 		echo "Error: Linux binaries not found!"
 		exit 1

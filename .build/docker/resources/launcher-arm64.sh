@@ -1,8 +1,7 @@
 #!/bin/sh
 set -eu
-LSCPU_FLAGS=undefined
 
-if [ "${DOCKER_SPONGE256SUM_ARCH:=:undefined}" = ":undefined" ]; then
+if [ "${DOCKER_SPONGE256SUM_ARCH:=undefined}" = "undefined" ]; then
     DOCKER_SPONGE256SUM_ARCH="aarch64"
     case "$(uname -m)" in
         aarch64 | arm64)
