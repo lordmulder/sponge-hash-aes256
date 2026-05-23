@@ -68,15 +68,15 @@ pub struct Args {
     pub check: bool,
 
     /// Enable processing of directories as arguments
-    #[arg(short, long, conflicts_with = "check")]
+    #[arg(short, long, conflicts_with = "check", requires = "files")]
     pub dirs: bool,
 
     /// Recursively process the provided directories (implies -d)
-    #[arg(short, long, conflicts_with = "check")]
+    #[arg(short, long, conflicts_with = "check", requires = "files")]
     pub recursive: bool,
 
     /// Descend into directories on other devices (implies -r)
-    #[arg(short = 'x', long, conflicts_with = "check")]
+    #[arg(short = 'x', long, conflicts_with = "check", requires = "files")]
     pub cross_dev: bool,
 
     /// Iterate all kinds of files, instead of just regular files

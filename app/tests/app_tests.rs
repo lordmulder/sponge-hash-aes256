@@ -1179,6 +1179,14 @@ fn test_invalid_args_5a() {
 
 #[test]
 fn test_invalid_args_5b() {
+    for arg_1 in ["--dirs", "--recursive", "--cross-dev"] {
+        let output = run_binary([OsStr::new(arg_1)], false, true);
+        assert!(REGEX_MISSING_ARG.is_match(&output))
+    }
+}
+
+#[test]
+fn test_invalid_args_5c() {
     #[cfg(not(windows))]
     let invalid_string = unsafe { OsString::from_encoded_bytes_unchecked(b"\xE9".to_vec()) };
     #[cfg(windows)]

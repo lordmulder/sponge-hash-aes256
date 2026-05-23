@@ -8,5 +8,6 @@ COPY resources/data/*.txt resources/data/LICENSE /data/
 COPY bin/$TARGETARCH/sponge256sum-* /usr/libexec/
 COPY resources/launcher-$TARGETARCH.sh /bin/sponge256sum
 
+WORKDIR /data
 ENTRYPOINT ["/bin/sponge256sum"]
-CMD ["-rkm", "/data"]
+CMD ["-rkm", "."]
