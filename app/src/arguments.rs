@@ -3,14 +3,15 @@
 // Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>
 
 use build_time::build_time_utc;
-use clap::{error::ErrorKind, ArgAction, ArgGroup, Error, Parser};
+use clap::{builder::TypedValueParser, error::ErrorKind, Arg, ArgAction, ArgGroup, Command, Error, Parser};
 use const_format::formatcp;
 use rustc_version_const::rustc_version_full;
 use sponge_hash_aes256::version;
 use std::{
     env::consts::{ARCH, OS},
+    ffi::OsStr,
     num::NonZeroUsize,
-    path::PathBuf,
+    path::{Component, Path, PathBuf},
     sync::OnceLock,
 };
 use wild::args_os;
@@ -43,6 +44,26 @@ pub const HELP_TEXT: &str = "If no input files are specified, reads input data f
     For details please refer to: <https://crates.io/crates/sponge-hash-aes256>";
 
 // ---------------------------------------------------------------------------
+// Normalize paths
+// ---------------------------------------------------------------------------
+
+#[derive(Clone)]
+struct NormalizingFileParser;
+
+impl TypedValueParser for NormalizingFileParser {
+    type Value = PathBuf;
+
+    #[inline]
+    fn parse_ref(&self, _cmd: &Command, _arg: Option<&Arg>, value: &OsStr) -> Result<Self::Value, Error> {
+        let mut components = Path::new(value).components().peekable();
+        if components.next_if(|component| matches!(component, Component::CurDir)).is_some() && components.peek().is_none() {
+            return Ok(PathBuf::from(&Component::CurDir));
+        }
+        Ok(components.collect())
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Command-line arguments
 // ---------------------------------------------------------------------------
 
@@ -68,15 +89,15 @@ pub struct Args {
     pub check: bool,
 
     /// Enable processing of directories as arguments
-    #[arg(short, long, conflicts_with = "check", requires = "files")]
+    #[arg(short, long, conflicts_with = "check")]
     pub dirs: bool,
 
     /// Recursively process the provided directories (implies -d)
-    #[arg(short, long, conflicts_with = "check", requires = "files")]
+    #[arg(short, long, conflicts_with = "check")]
     pub recursive: bool,
 
     /// Descend into directories on other devices (implies -r)
-    #[arg(short = 'x', long, conflicts_with = "check", requires = "files")]
+    #[arg(short = 'x', long, conflicts_with = "check")]
     pub cross_dev: bool,
 
     /// Iterate all kinds of files, instead of just regular files
@@ -128,7 +149,7 @@ pub struct Args {
     pub self_test: bool,
 
     /// Files to be processed
-    #[arg()]
+    #[arg(value_parser = NormalizingFileParser)]
     pub files: Vec<PathBuf>,
 }
 
@@ -155,5 +176,53 @@ pub fn parse_command_line() -> Result<&'static Args, ExitStatus> {
                 _ => Err(ExitStatus::Failure),
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn do_test_parser(input: &str, expected: &str) {
+        let cmd = Command::new("");
+        assert_eq!(NormalizingFileParser.parse_ref(&cmd, None, OsStr::new(input)).unwrap().to_str().unwrap(), expected);
+    }
+
+    #[cfg(target_family = "unix")]
+    #[test]
+    fn test_parser() {
+        do_test_parser("", "");
+        do_test_parser(".", ".");
+        do_test_parser("..", "..");
+        do_test_parser("/", "/");
+        do_test_parser("a", "a");
+        do_test_parser("a/", "a");
+        do_test_parser("/a", "/a");
+        do_test_parser("a/b", "a/b");
+        do_test_parser("a/b/", "a/b");
+        do_test_parser("a///b", "a/b");
+        do_test_parser("a/./b", "a/b");
+    }
+
+    #[cfg(target_family = "windows")]
+    #[test]
+    fn test_parser() {
+        do_test_parser("", "");
+        do_test_parser(".", ".");
+        do_test_parser("..", "..");
+        do_test_parser("/", r"\");
+        do_test_parser("a", "a");
+        do_test_parser("a/", "a");
+        do_test_parser("/a", r"\a");
+        do_test_parser("a/b", r"a\b");
+        do_test_parser("a/b/", r"a\b");
+        do_test_parser("a///b", r"a\b");
+        do_test_parser("a/./b", r"a\b");
+        do_test_parser(r"c:\a\.\b", r"c:\a\b");
+        do_test_parser(r"\\a\b\c", r"\\a\b\c");
     }
 }

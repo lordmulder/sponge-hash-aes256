@@ -6,7 +6,7 @@ mod common;
 
 use crate::common::{
     random::random_u64,
-    utils::{digest_eq, get_file_name, run_binary, run_binary_and_exit, run_binary_to_file, run_binary_with_data, run_binary_with_env},
+    utils::{digest_eq, get_file_name, run_binary, run_binary_and_exit, run_binary_to_file, run_binary_with_cwd, run_binary_with_data, run_binary_with_env},
 };
 
 use regex::Regex;
@@ -353,6 +353,50 @@ fn do_test_dir(expected_map: &HashMap<&str, &str>, recursive: Option<bool>, mult
     } else {
         REGEX_LINE.captures_iter(&output)
     };
+
+    for caps in matches {
+        let digest = caps.get(1).unwrap().as_str();
+        if !force_plain {
+            let file_name = get_file_name(caps.get(2).unwrap().as_str());
+            if !["LICENSE", "SHA512SUMS", "next"].iter().any(|str| file_name.eq_ignore_ascii_case(str)) {
+                let expected_name = expected_map.get(digest).expect("Unknown digest!");
+                assert!(digest_set.insert(digest));
+                assert_eq!(file_name, *expected_name);
+            }
+        } else {
+            assert!(digest_set.insert(digest)); /* no file name available */
+        }
+    }
+
+    expected_map.keys().for_each(|digest| assert!(digest_set.contains(digest)));
+}
+
+fn do_test_cwd(expected_map: &HashMap<&str, &str>, text_mode: bool, multi_threading: bool, force_plain: bool) {
+    let path = if !text_mode {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("binary")
+    } else {
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("data").join("text")
+    };
+
+    let mut parameters = Vec::with_capacity(4usize);
+    let mut digest_set = HashSet::with_capacity(expected_map.len());
+
+    if text_mode {
+        parameters.push(OsStr::new("--text"));
+    }
+
+    if force_plain {
+        parameters.push(OsStr::new("--plain"));
+    }
+
+    if multi_threading {
+        parameters.push(OsStr::new("--multi-threading"));
+    }
+
+    parameters.push(OsStr::new("--recursive"));
+
+    let output = run_binary_with_cwd(parameters.as_slice(), &path, true, false);
+    let matches = if force_plain { REGEX_PLAIN.captures_iter(&output) } else { REGEX_LINE.captures_iter(&output) };
 
     for caps in matches {
         let digest = caps.get(1).unwrap().as_str();
@@ -898,6 +942,58 @@ fn test_dir_3j() {
 }
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+// Current directory tests
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+#[test]
+fn test_cwd_1a() {
+    let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf"), (EXPECTED[36usize], "dorian.pdf")]);
+    do_test_cwd(&expected, false, false, false);
+}
+
+#[test]
+fn test_cwd_1b() {
+    let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf"), (EXPECTED[36usize], "dorian.pdf")]);
+    do_test_cwd(&expected, false, false, true);
+}
+
+#[test]
+fn test_cwd_1c() {
+    let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf"), (EXPECTED[36usize], "dorian.pdf")]);
+    do_test_cwd(&expected, false, true, false);
+}
+
+#[test]
+fn test_cwd_1d() {
+    let expected = HashMap::from([(EXPECTED[0usize], "frank.pdf"), (EXPECTED[5usize], "dracula.pdf"), (EXPECTED[36usize], "dorian.pdf")]);
+    do_test_cwd(&expected, false, true, true);
+}
+
+#[test]
+fn test_cwd_2a() {
+    let expected = HashMap::from([(EXPECTED[26usize], "alice29.txt"), (EXPECTED[31usize], "asyoulik.txt")]);
+    do_test_cwd(&expected, true, false, false);
+}
+
+#[test]
+fn test_cwd_2b() {
+    let expected = HashMap::from([(EXPECTED[26usize], "alice29.txt"), (EXPECTED[31usize], "asyoulik.txt")]);
+    do_test_cwd(&expected, true, false, true);
+}
+
+#[test]
+fn test_cwd_2c() {
+    let expected = HashMap::from([(EXPECTED[26usize], "alice29.txt"), (EXPECTED[31usize], "asyoulik.txt")]);
+    do_test_cwd(&expected, true, true, false);
+}
+
+#[test]
+fn test_cwd_2d() {
+    let expected = HashMap::from([(EXPECTED[26usize], "alice29.txt"), (EXPECTED[31usize], "asyoulik.txt")]);
+    do_test_cwd(&expected, true, true, true);
+}
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Data (stdin) tests
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -1179,14 +1275,6 @@ fn test_invalid_args_5a() {
 
 #[test]
 fn test_invalid_args_5b() {
-    for arg_1 in ["--dirs", "--recursive", "--cross-dev"] {
-        let output = run_binary([OsStr::new(arg_1)], false, true);
-        assert!(REGEX_MISSING_ARG.is_match(&output))
-    }
-}
-
-#[test]
-fn test_invalid_args_5c() {
     #[cfg(not(windows))]
     let invalid_string = unsafe { OsString::from_encoded_bytes_unchecked(b"\xE9".to_vec()) };
     #[cfg(windows)]

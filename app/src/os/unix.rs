@@ -4,13 +4,13 @@
 
 use libc::{fstat, stat};
 use std::{
-    ffi::OsString,
     fs::Metadata,
     mem::zeroed,
     os::{
         fd::{AsRawFd, RawFd},
         unix::fs::MetadataExt,
     },
+    path::Path,
     sync::LazyLock,
 };
 
@@ -20,7 +20,7 @@ use crate::io::DataSource;
 // Pipe functions
 // ---------------------------------------------------------------------------
 
-pub static STDIN_NAME: LazyLock<OsString> = LazyLock::new(|| OsString::from("/dev/stdin"));
+pub static STDIN_NAME: LazyLock<&Path> = LazyLock::new(|| Path::new("/dev/stdin"));
 
 pub fn is_pipe(data_source: &DataSource) -> bool {
     let mut info: stat = unsafe { zeroed() };

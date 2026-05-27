@@ -282,7 +282,7 @@ fn reader_thread(checksum_tx: &Sender<ReadResult>, args: &Args, halt: &Flag) -> 
         }
     } else {
         let mut stdin_stream = DataSource::from_stdin();
-        read_checksum_data(checksum_tx, &mut stdin_stream, PathBuf::from(&*STDIN_NAME), args, halt)?;
+        read_checksum_data(checksum_tx, &mut stdin_stream, STDIN_NAME.to_owned(), args, halt)?;
     }
 
     Ok(())

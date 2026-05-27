@@ -3,9 +3,9 @@
 // Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>
 
 use std::{
-    ffi::OsString,
     fs::Metadata,
     os::windows::io::{AsRawHandle, RawHandle},
+    path::Path,
     sync::LazyLock,
 };
 use windows_sys::Win32::Storage::FileSystem::{GetFileType, FILE_TYPE_PIPE};
@@ -16,7 +16,7 @@ use crate::io::DataSource;
 // Pipe functions
 // ---------------------------------------------------------------------------
 
-pub static STDIN_NAME: LazyLock<OsString> = LazyLock::new(|| OsString::from("CONIN$"));
+pub static STDIN_NAME: LazyLock<&Path> = LazyLock::new(|| Path::new("CONIN$"));
 
 pub fn is_pipe(data_source: &DataSource) -> bool {
     let file_type = unsafe { GetFileType(data_source.as_raw_handle()) };

@@ -8,12 +8,13 @@ use imbl::{ordset, OrdSet};
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
 use std::{
     borrow::Cow,
-    ffi::OsStr,
     fs::{self, DirEntry, Metadata},
     io::{Result as IoResult, Write},
+    iter,
     num::NonZeroUsize,
-    path::PathBuf,
+    path::{Component, Path, PathBuf},
     str::from_utf8_unchecked,
+    sync::LazyLock,
     thread::{self, JoinHandle},
 };
 use tinyvec::TinyVec;
@@ -81,6 +82,16 @@ fn append(visited: &'_ IdSet, file_id: Option<FileId>) -> Cow<'_, IdSet> {
     file_id.map_or(Cow::Borrowed(visited), |uid| Cow::Owned(visited.update(uid)))
 }
 
+/// Get the path from the given `DirEntry` instance
+#[inline]
+fn path(dir_entry: &DirEntry, fname_only: bool) -> PathBuf {
+    if fname_only {
+        dir_entry.file_name().into()
+    } else {
+        dir_entry.path()
+    }
+}
+
 /// Check if the computation has been cancelled
 macro_rules! check_cancelled {
     ($halt:ident) => {
@@ -117,7 +128,7 @@ fn exit_status(file_errors: u64, args: &Args) -> ExitStatus {
 
 /// Print a single digest
 #[inline]
-fn print_digest(output: &mut dyn Write, file_name: &OsStr, digest: &Digest, args: &Args) -> IoResult<()> {
+fn print_digest(output: &mut dyn Write, file_name: &Path, digest: &Digest, args: &Args) -> IoResult<()> {
     let hex_length = digest.len().checked_mul(2usize).unwrap();
     let mut hex_buffer: TinyVec<[u8; 2usize * DEFAULT_DIGEST_SIZE]> = TinyVec::with_length(hex_length);
 
@@ -147,7 +158,7 @@ fn print_digest(output: &mut dyn Write, file_name: &OsStr, digest: &Digest, args
 #[inline]
 fn print_result(output: &mut OutStream, digest_result: &DigestResult, args: &Args) -> bool {
     match digest_result {
-        Ok(digest) => print_digest(output.out(), digest.1.as_os_str(), &digest.0, args).is_ok(),
+        Ok(digest) => print_digest(output.out(), &digest.1, &digest.0, args).is_ok(),
         Err(error) => {
             match error {
                 Error::FileOpen(path) => print_error!(output, args, "Failed to open input file: {:?}", path),
@@ -217,11 +228,17 @@ fn compute_thread(path_rx: &Receiver<PathResult>, digest_tx: &Sender<DigestResul
 // Iterate input files/directories
 // ---------------------------------------------------------------------------
 
+/// Path result type
 type PathResult = Result<PathBuf, Error>;
 
+/// The "current" directory
+static CURRENT_DIR: LazyLock<&Path> = LazyLock::new(|| Path::new(&Component::CurDir));
+
 /// Iterate all files and sub-directories in a directory
-fn do_iterate(path_tx: &Sender<PathResult>, dir_name: PathBuf, fs_id: FsId, visited: &IdSet, bfs: bool, args: &Args, halt: &Flag) -> Result<bool, Cancelled> {
-    let dir_iter = match fs::read_dir(&dir_name) {
+fn do_iterate(path_tx: &Sender<PathResult>, dir_name: &Path, fs_id: FsId, visited: &IdSet, bfs: bool, args: &Args, halt: &Flag) -> Result<bool, Cancelled> {
+    let cwd = CURRENT_DIR.eq(dir_name);
+
+    let dir_iter = match fs::read_dir(dir_name) {
         Ok(dir_iter) => dir_iter,
         Err(_) => {
             path_tx.send(Err(Error::WalkOpen(dir_name.to_path_buf())))?;
@@ -241,18 +258,18 @@ fn do_iterate(path_tx: &Sender<PathResult>, dir_name: PathBuf, fs_id: FsId, visi
                         let unique_id = file_id(unsafe { meta_data.unwrap_unchecked() });
                         if unique_id.is_none_or(|uid| (args.cross_dev || fs_id.is_none_or(|dev| uid.same_dev(dev))) && !visited.contains(&uid)) {
                             if bfs {
-                                dir_queue.push((unique_id, dir_entry.path()));
-                            } else if !(do_iterate(path_tx, dir_entry.path(), fs_id, &append(visited, unique_id), bfs, args, halt)? || args.keep_going) {
+                                dir_queue.push((unique_id, path(&dir_entry, cwd)));
+                            } else if !(do_iterate(path_tx, &path(&dir_entry, cwd), fs_id, &append(visited, unique_id), bfs, args, halt)? || args.keep_going) {
                                 return Ok(false);
                             }
                         }
                     }
                 } else if args.all || meta_data.is_none_or(|meta| meta.is_file()) {
-                    path_tx.send(Ok(dir_entry.path()))?;
+                    path_tx.send(Ok(path(&dir_entry, cwd)))?;
                 }
             }
             Err(_) => {
-                path_tx.send(Err(Error::WalkRead(dir_name)))?;
+                path_tx.send(Err(Error::WalkRead(dir_name.to_owned())))?;
                 return Ok(false);
             }
         }
@@ -260,7 +277,7 @@ fn do_iterate(path_tx: &Sender<PathResult>, dir_name: PathBuf, fs_id: FsId, visi
 
     for (unique_id, dir_name) in dir_queue.into_iter() {
         check_cancelled!(halt);
-        if !(do_iterate(path_tx, dir_name, fs_id, &append(visited, unique_id), bfs, args, halt)? || args.keep_going) {
+        if !(do_iterate(path_tx, &dir_name, fs_id, &append(visited, unique_id), bfs, args, halt)? || args.keep_going) {
             return Ok(false);
         }
     }
@@ -269,13 +286,13 @@ fn do_iterate(path_tx: &Sender<PathResult>, dir_name: PathBuf, fs_id: FsId, visi
 }
 
 /// Iterate a list of input files
-fn iterate_thread(path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &Flag) -> TaskResult {
-    for file_name in args.files.iter().cloned() {
+fn iterate_loop(input_files: impl Iterator<Item = PathBuf>, path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &Flag) -> TaskResult {
+    for file_name in input_files {
         check_cancelled!(halt);
         let directory = if args.dirs { fs::metadata(&file_name).ok().filter(|meta| meta.is_dir()) } else { None };
         if let Some(meta_data) = directory {
             let (visited, fs_id) = file_id(meta_data).map_or_else(Default::default, |uid| (ordset![uid], Some(uid.dev())));
-            if !(do_iterate(path_tx, file_name, fs_id, &visited, bfs, args, halt)? || args.keep_going) {
+            if !(do_iterate(path_tx, &file_name, fs_id, &visited, bfs, args, halt)? || args.keep_going) {
                 break;
             }
         } else {
@@ -284,6 +301,15 @@ fn iterate_thread(path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &F
     }
 
     Ok(())
+}
+
+/// Iterate thread entry point
+fn iterate_thread(path_tx: &Sender<PathResult>, bfs: bool, args: &Args, halt: &Flag) -> TaskResult {
+    if !args.files.is_empty() {
+        iterate_loop(args.files.iter().cloned(), path_tx, bfs, args, halt)
+    } else {
+        iterate_loop(iter::once(CURRENT_DIR.to_owned()), path_tx, bfs, args, halt)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -297,7 +323,7 @@ fn start_iteration(bfs: bool, args: &'static Args, halt: &'static Flag) -> (Rece
         (path_rx, Some(thread::spawn(move || iterate_thread(&path_tx, bfs, args, halt))))
     } else {
         let (path_tx, path_rx) = bounded::<PathResult>(args.files.len());
-        args.files.iter().cloned().for_each(|path| path_tx.try_send(Ok(path)).unwrap());
+        args.files.iter().for_each(|path| path_tx.try_send(Ok(path.clone())).unwrap());
         (path_rx, None)
     }
 }
@@ -429,7 +455,7 @@ fn process_stdin(output: &mut OutStream, digest_size: usize, args: &Args, halt: 
     let mut digest = TinyVec::with_length(digest_size);
 
     match compute_digest(&mut stdin, digest.as_mut_slice(), args, halt) {
-        Ok(_) => match print_digest(output.out(), &STDIN_NAME, &digest, args) {
+        Ok(_) => match print_digest(output.out(), *STDIN_NAME, &digest, args) {
             Ok(_) => Ok(ExitStatus::Success),
             Err(_) => {
                 print_error!(output, args, "Error: Failed to write to standard output stream!");
@@ -446,8 +472,8 @@ fn process_stdin(output: &mut OutStream, digest_size: usize, args: &Args, halt: 
 
 /// Process all input files
 pub fn process_files(output: &mut OutStream, digest_size: usize, args: &'static Args, env: &Env, halt: &'static Flag) -> Result<ExitStatus, Aborted> {
-    // Read input datat from 'stdin' stream?
-    if args.files.is_empty() {
+    // Read input datat from the standard input stream?
+    if !args.dirs && args.files.is_empty() {
         return process_stdin(output, digest_size, args, halt).map_err(|_| Aborted);
     }
 
