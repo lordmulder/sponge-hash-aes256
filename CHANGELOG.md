@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 1.10.2
+
+### Added
+
+- In the CLI application, perform a basic *lexical* normalization of the given input paths (file names).
+- When enumerating the "current" directory, avoid adding a superfluous `./` prefix.
+- Use a custom "hooking" library to implement various test cases, some of which were *not* possible before.
+
+### Changed
+
+- Updated GitHub workflow (CI) to create builds with Rust version 1.96.0 (2026-05-29).
+- Small improvement to the CPU feature detection code in the AppImage and Docker launcher scripts.
+- Github workflow (CI): Updated various actions to the latest version.
+- Github workflow (CI): Updated OpenBSD builder to version 7.9 and OminiOS builder to r151058.
+
 ## Version 1.10.1
 
 ### Added
