@@ -265,10 +265,11 @@ jobs:
           version: '15.0'
           shell: bash
           image_url: 'https://github.com/lordmulder/cross-platform-actions-freebsd-builder/releases/download/v9/freebsd-15.0-x86-64.qcow2'
-          run: |
-            git config --global --add safe.directory '*'
-            . /opt/rust/cargo/env
-            ( cd .build/bsd-unix && ./build-freebsd.sh )
+      - run: |
+          git config --global --add safe.directory '*'
+          . /opt/rust/cargo/env
+          ( cd .build/bsd-unix && ./build-freebsd.sh )
+        shell: cpa.sh {0}
       - uses: actions/upload-artifact@v7
         with:
           name: sponge256sum-freebsd
@@ -288,10 +289,11 @@ jobs:
           version: '10.1'
           shell: bash
           image_url: 'https://github.com/lordmulder/cross-platform-actions-netbsd-builder/releases/download/v7/netbsd-10.1-x86-64.qcow2'
-          run: |
-            git config --global --add safe.directory '*'
-            . /opt/rust/cargo/env
-            ( cd .build/bsd-unix && ./build-netbsd.sh )
+      - run: |
+          git config --global --add safe.directory '*'
+          . /opt/rust/cargo/env
+          ( cd .build/bsd-unix && ./build-netbsd.sh )
+        shell: cpa.sh {0}
       - uses: actions/upload-artifact@v7
         with:
           name: sponge256sum-netbsd
@@ -311,9 +313,10 @@ jobs:
           version: '7.9'
           shell: bash
           image_url: 'https://github.com/lordmulder/cross-platform-actions-openbsd-builder/releases/download/v4/openbsd-7.9-x86-64.qcow2'
-          run: |
-            git config --global --add safe.directory '*'
-            ( cd .build/bsd-unix && ./build-openbsd.sh )
+      - run: |
+          git config --global --add safe.directory '*'
+          ( cd .build/bsd-unix && ./build-openbsd.sh )
+        shell: cpa.sh {0}
       - uses: actions/upload-artifact@v7
         with:
           name: sponge256sum-openbsd
@@ -333,10 +336,11 @@ jobs:
           version: 'r151058'
           shell: bash
           image_url: 'https://github.com/lordmulder/cross-platform-actions-omnios-builder/releases/download/v9/omnios-r151058-x86-64.qcow2'
-          run: |
-            git config --global --add safe.directory '*'
-            . /opt/rust/cargo/env
-            ( cd .build/bsd-unix && ./build-solaris.sh )
+      - run: |
+          git config --global --add safe.directory '*'
+          . /opt/rust/cargo/env
+          ( cd .build/bsd-unix && ./build-solaris.sh )
+        shell: cpa.sh {0}
       - uses: actions/upload-artifact@v7
         with:
           name: sponge256sum-illumos
@@ -356,9 +360,10 @@ jobs:
           version: 'r1beta5'
           shell: bash
           image_url: 'https://github.com/lordmulder/cross-platform-actions-haiku-builder/releases/download/v2/haiku-r1beta5-x86-64.qcow2'
-          run: |
-            git config --global --add safe.directory '*'
-            ( cd .build/bsd-unix && ./build-haiku.sh )
+      - run: |
+          git config --global --add safe.directory '*'
+          ( cd .build/bsd-unix && ./build-haiku.sh )
+        shell: cpa.sh {0}
       - uses: actions/upload-artifact@v7
         with:
           name: sponge256sum-haiku
