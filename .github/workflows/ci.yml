@@ -308,9 +308,9 @@ jobs:
       - uses: cross-platform-actions/action@v0.32.0
         with:
           operating_system: openbsd
-          version: '7.8'
+          version: '7.9'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-openbsd-builder/releases/download/v3/openbsd-7.8-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-openbsd-builder/releases/download/v4/openbsd-7.9-x86-64.qcow2'
           run: |
             git config --global --add safe.directory '*'
             ( cd .build/bsd-unix && ./build-openbsd.sh )

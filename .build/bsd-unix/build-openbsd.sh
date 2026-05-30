@@ -16,12 +16,12 @@ if [ "$(uname -m)" != "amd64" ]; then
     exit 1
 fi
 
-if [ ! -f "/opt/sysroot/i386/usr/lib/libc.so.102.0" ]; then
+if [ ! -f "/opt/sysroot/i386/usr/lib/libc.so.103.0" ]; then
     echo "Error: Sysroot for 'i386' not found!"
    exit 1
 fi
 
-if [ ! -f "/opt/sysroot/arm64/usr/lib/libc.so.102.0" ]; then
+if [ ! -f "/opt/sysroot/arm64/usr/lib/libc.so.103.0" ]; then
     echo "Error: Sysroot for 'arm64' not found!"
    exit 1
 fi
