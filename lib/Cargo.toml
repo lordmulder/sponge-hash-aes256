@@ -15,11 +15,11 @@ no_std = true
 
 [dependencies]
 aes = "0.9.1"
-wide = "1.4.0"
-zeroize = "1.8.2"
+wide = "1.5.0"
+zeroize = "1.9.0"
 
 # Optional dependencies
-log = { version = "0.4.30", default-features = false, optional = true }
+log = { version = "0.4.32", default-features = false, optional = true }
 
 [dev-dependencies]
 hex = { version = "0.4.3", default-features = false }

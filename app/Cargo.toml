@@ -40,7 +40,7 @@ with-mimalloc = ["dep:mimalloc"]
 [dev-dependencies]
 drop-root-caps = { version = "1.2.1", default-features = false, features = ["ctor"] }
 nix = { version = "0.31.3", default-features = false, features = ["signal"] }
-regex = { version = "1.12.3", default-features = false, features = ["unicode"] }
+regex = { version = "1.12.4", default-features = false, features = ["unicode"] }
 
 [target.'cfg(unix)'.dependencies]
 libc = { version = "0.2.186", default-features = false }
