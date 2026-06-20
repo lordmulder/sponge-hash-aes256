@@ -262,9 +262,9 @@ jobs:
       - uses: cross-platform-actions/action@v1
         with:
           operating_system: freebsd
-          version: '15.0'
+          version: '15.1'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-freebsd-builder/releases/download/v10/freebsd-15.0-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-freebsd-builder/releases/download/v11/freebsd-15.1-x86-64.qcow2'
       - run: |
           git config --global --add safe.directory '*'
           . /opt/rust/cargo/env
@@ -288,7 +288,7 @@ jobs:
           operating_system: netbsd
           version: '10.1'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-netbsd-builder/releases/download/v7/netbsd-10.1-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-netbsd-builder/releases/download/v8/netbsd-10.1-x86-64.qcow2'
       - run: |
           git config --global --add safe.directory '*'
           . /opt/rust/cargo/env
