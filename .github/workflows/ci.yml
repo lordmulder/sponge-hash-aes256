@@ -60,16 +60,17 @@ jobs:
           toolchain: ${{ matrix.rust }}
           target: ${{ matrix.arch }}-unknown-linux-gnu
           cache: false
-      - run: |
+      - if: ${{ matrix.arch == 'i686'}}
+        run: |
           export DEBIAN_FRONTEND=noninteractive
-          sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends ${{ matrix.arch == 'i686' && 'gcc-multilib libc6-dev-i386' || '' }}
+          sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends gcc-multilib libc6-dev-i386
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
       - run: |
           cargo test --workspace --target ${{ matrix.arch }}-unknown-linux-gnu --verbose
-          cargo test --workspace --target ${{ matrix.arch }}-unknown-linux-gnu --verbose --release -- ${{ matrix.arch != 'aarch64' && '--include-ignored' || '' }}
+          cargo test --workspace --target ${{ matrix.arch }}-unknown-linux-gnu --verbose --release ${{ matrix.arch != 'aarch64' && '-- --include-ignored' || '' }}
         env:
           CARGO_TARGET_DIR: /tmp/sponge256sum-test
 
@@ -94,7 +95,7 @@ jobs:
       - run: |
           $PSNativeCommandUseErrorActionPreference = $true
           iex "cargo test --workspace --target ${{ matrix.arch }}-pc-windows-msvc --verbose"
-          iex "cargo test --workspace --target ${{ matrix.arch }}-pc-windows-msvc --verbose --release -- ${{ matrix.arch != 'aarch64' && '--include-ignored' || '' }}"
+          iex "cargo test --workspace --target ${{ matrix.arch }}-pc-windows-msvc --verbose --release ${{ matrix.arch != 'aarch64' && '-- --include-ignored' || '' }}"
         env:
           CARGO_TARGET_DIR: ${{ runner.temp }}\sponge256sum-test
 
