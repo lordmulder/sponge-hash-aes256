@@ -312,7 +312,7 @@ jobs:
           operating_system: openbsd
           version: '7.9'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-openbsd-builder/releases/download/v4/openbsd-7.9-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-openbsd-builder/releases/download/v5/openbsd-7.9-x86-64.qcow2'
       - run: |
           git config --global --add safe.directory '*'
           ( cd .build/bsd-unix && ./build-openbsd.sh )
