@@ -86,7 +86,8 @@ dist: build vbuild wbuild xbuild doc
 	cp -f ../../.assets/html/index.html out/target/release/doc/index.html
 	cp -f ../../LICENSE out/target/release/LICENSE
 	printf 'Revision: %s\n' "$$(git describe --long --tags --always --dirty)" > out/target/release/BUILD_INFO
-	printf 'Built: %s\n\n' "$$(date +'%Y-%m-%d %H:%M:%S')" >> out/target/release/BUILD_INFO
+	printf 'Built: %s\n' "$$(date +'%Y-%m-%d %H:%M:%S')" >> out/target/release/BUILD_INFO
+	printf 'Platform: %s\n\n' "$$(uname -mrsvo)" >> out/target/release/BUILD_INFO
 	cat out/target/.RUSTC_VERSION >> out/target/release/BUILD_INFO
 	find out/target/release -type f -not -name 'sponge256sum-*' -exec chmod 444 {} \;
 	find out/target/release -type d -exec chmod 755 {} \;

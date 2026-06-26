@@ -45,7 +45,8 @@ dist: build xbuild doc
 	cp -f ../../.assets/html/index.html out/target/release/doc/index.html; \
 	cp -f ../../README.md ../../LICENSE out/target/release/; \
 	printf 'Revision: %s\n' "`git describe --long --tags --always --dirty`" > out/target/release/BUILD_INFO; \
-	printf 'Built: %s\n\n' "`date +'%Y-%m-%d %H:%M:%S'`" >> out/target/release/BUILD_INFO; \
+	printf 'Built: %s\n' "`date +'%Y-%m-%d %H:%M:%S'`" >> out/target/release/BUILD_INFO; \
+	printf 'Platform: %s\n\n' "$$(uname -mrsv)" >> out/target/release/BUILD_INFO; \
 	cat out/target/.RUSTC_VERSION >> out/target/release/BUILD_INFO; \
 	find out/target/release -type f ! -name 'sponge256sum-*' -exec chmod 444 {} \;; \
 	find out/target/release -type d -exec chmod 755 {} \;

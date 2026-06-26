@@ -176,6 +176,7 @@ jobs:
     container:
       image: lordmulder/rust-xbuild:1.96-trixie-r2
     steps:
+      - run: git config --global --add safe.directory '*'
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
