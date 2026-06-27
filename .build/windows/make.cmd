@@ -250,7 +250,11 @@ for /F "usebackq tokens=*" %%i in (`git describe --long --tags --always --dirty`
 	> "out\target\release\BUILD_INFO.txt" echo Revision: %%i
 )
 
->> "out\target\release\BUILD_INFO.txt" echo Built: %DATE% %TIME%
+for /F "usebackq tokens=*" %%i in (`cmd /c ver`) do (
+	>> "out\target\release\BUILD_INFO.txt" echo Platform: %%i
+)
+
+>> "out\target\release\BUILD_INFO.txt" echo Built at: %DATE% %TIME%
 >> "out\target\release\BUILD_INFO.txt" echo.
 
 type "%CARGO_TARGET_DIR%\.RUSTC_VERSION" >> "out\target\release\BUILD_INFO.txt"
