@@ -33,7 +33,7 @@ default = []
 tracing = ["dep:log"]
 
 [[bench]]
-name = "perf_test"
+name = "lib_bench"
 harness = false
 
 [[bench]]

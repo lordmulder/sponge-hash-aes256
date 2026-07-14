@@ -9,6 +9,7 @@ use crate::common::{
     utils::{digest_eq, get_file_name, run_binary, run_binary_and_exit, run_binary_to_file, run_binary_with_cwd, run_binary_with_data, run_binary_with_env},
 };
 
+use cfg_if::cfg_if;
 use regex::Regex;
 use std::{
     collections::{HashMap, HashSet},
@@ -22,17 +23,18 @@ use std::{
     sync::LazyLock,
 };
 
-#[cfg(unix)]
-use std::{
-    fs::{set_permissions, Permissions},
-    os::unix::fs::PermissionsExt,
-};
+cfg_if! {
+    if #[cfg(unix)] {
+        use crate::common::utils::{run_binary_from_file, run_binary_with_signal};
+        use std::{
+            fs::{set_permissions, Permissions},
+            os::unix::fs::PermissionsExt,
+        };
+    }
+}
 
 #[cfg(target_os = "linux")]
 use std::fs;
-
-#[cfg(unix)]
-use crate::common::utils::{run_binary_from_file, run_binary_with_signal};
 
 #[cfg(windows)]
 use std::os::windows::ffi::OsStringExt;
@@ -98,23 +100,18 @@ static EXPECTED: [&str; 47usize] = [
     "3e948059e44ebe75efd4c4359853ecff5f337c96c23e9bc72f346eae8d05b8f2",
 ];
 
-// Path to a non-existing file
-#[cfg(windows)]
-const FILE_PATH: &str = r#"C:\this\file\does\not\exist"#;
-#[cfg(not(windows))]
-const FILE_PATH: &str = "/this/file/does/not/exist";
-
-// Path to a directory (not a file)
-#[cfg(windows)]
-const DIRECTORY_PATH: &str = r#"C:\Windows"#;
-#[cfg(not(windows))]
-const DIRECTORY_PATH: &str = "/usr";
-
-// The standard input stream device file path
-#[cfg(windows)]
-const STDIN_DEV_FILE: &str = "CONIN$";
-#[cfg(not(windows))]
-const STDIN_DEV_FILE: &str = "/dev/stdin";
+// OS-specific constants
+cfg_if! {
+    if #[cfg(windows)] {
+        const NOT_FOUND_PATH: &str = r#"C:\this\file\does\not\exist"#;
+        const DIRECTORY_PATH: &str = r#"C:\Windows"#;
+        const STDIN_DEV_FILE: &str = "CONIN$";
+    } else {
+        const NOT_FOUND_PATH: &str = "/this/file/does/not/exist";
+        const DIRECTORY_PATH: &str = "/usr";
+        const STDIN_DEV_FILE: &str = "/dev/stdin";
+    }
+}
 
 // Target processor architecture
 #[cfg(target_os = "linux")]
@@ -152,32 +149,32 @@ static REGEX_TARGET_NOENT: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Targ
 static REGEX_TARGET_FOPEN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to open target file: "([^"]+)"#).unwrap());
 static REGEX_ENVIRON: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Error: Value "([^"]+)" for environment variable "([^"]+)" is invalid!"#).unwrap());
 
-#[cfg(unix)]
-static REGEX_ABORTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)\bAborted: The process has been interrupted").unwrap());
-#[cfg(unix)]
-static REGEX_CHECK_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Checksum file is a directory: "([^"]+)""#).unwrap());
-#[cfg(unix)]
-static REGEX_FILE_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Input file is a directory: "([^"]+)""#).unwrap());
-#[cfg(unix)]
-static REGEX_STDIN_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read data from the standard input stream!"#).unwrap());
-#[cfg(unix)]
-static REGEX_TARGET_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Target file is a directory: "([^"]+)"#).unwrap());
+cfg_if! {
+    if #[cfg(unix)] {
+        static REGEX_ABORTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)\bAborted: The process has been interrupted").unwrap());
+        static REGEX_CHECK_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Checksum file is a directory: "([^"]+)""#).unwrap());
+        static REGEX_FILE_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Input file is a directory: "([^"]+)""#).unwrap());
+        static REGEX_STDIN_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read data from the standard input stream!"#).unwrap());
+        static REGEX_TARGET_ISDIR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Target file is a directory: "([^"]+)"#).unwrap());
+    }
+}
 
-#[cfg(target_os = "linux")]
-static REGEX_SELF_IOERR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Self-test encountered an error: IoError"#).unwrap());
-#[cfg(target_os = "linux")]
-static REGEX_STDOUT_WRITE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to write to standard output stream!"#).unwrap());
+cfg_if! {
+    if #[cfg(target_os = "linux")] {
+        static REGEX_SELF_IOERR: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Self-test encountered an error: IoError"#).unwrap());
+        static REGEX_STDOUT_WRITE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to write to standard output stream!"#).unwrap());
+    }
+}
 
-#[cfg(all(target_os = "linux", target_env = "gnu"))]
-static REGEX_CHECK_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read checksum file: "([^"]+)""#).unwrap());
-#[cfg(all(target_os = "linux", target_env = "gnu"))]
-static REGEX_DIR_OPEN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to open directory: "([^"]+)""#).unwrap());
-#[cfg(all(target_os = "linux", target_env = "gnu"))]
-static REGEX_DIR_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read directory: "([^"]+)""#).unwrap());
-#[cfg(all(target_os = "linux", target_env = "gnu"))]
-static REGEX_FILE_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read input file: "([^"]+)""#).unwrap());
-#[cfg(all(target_os = "linux", target_env = "gnu"))]
-static REGEX_TARGET_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read target file: "([^"]+)""#).unwrap());
+cfg_if! {
+    if #[cfg(all(target_os = "linux", target_env = "gnu"))] {
+        static REGEX_CHECK_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read checksum file: "([^"]+)""#).unwrap());
+        static REGEX_DIR_OPEN: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to open directory: "([^"]+)""#).unwrap());
+        static REGEX_DIR_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read directory: "([^"]+)""#).unwrap());
+        static REGEX_FILE_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read input file: "([^"]+)""#).unwrap());
+        static REGEX_TARGET_READ: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"Failed to read target file: "([^"]+)""#).unwrap());
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Miscellaneous functions
@@ -1285,13 +1282,13 @@ fn test_invalid_args_5b() {
 
 #[test]
 fn test_file_error_1a() {
-    let output = run_binary([OsStr::new(FILE_PATH)], false, true);
+    let output = run_binary([OsStr::new(NOT_FOUND_PATH)], false, true);
     assert!(REGEX_FILE_NOENT.is_match(&output))
 }
 
 #[test]
 fn test_file_error_1b() {
-    let output = run_binary([OsStr::new("--multi-threading"), OsStr::new(FILE_PATH)], false, true);
+    let output = run_binary([OsStr::new("--multi-threading"), OsStr::new(NOT_FOUND_PATH)], false, true);
     assert!(REGEX_FILE_NOENT.is_match(&output))
 }
 
@@ -1448,13 +1445,13 @@ fn test_stdio_error_2f() {
 
 #[test]
 fn test_check_error_1a() {
-    let output = run_binary([OsStr::new("--check"), OsStr::new(FILE_PATH)], false, true);
+    let output = run_binary([OsStr::new("--check"), OsStr::new(NOT_FOUND_PATH)], false, true);
     assert!(REGEX_CHECK_NOENT.is_match(&output))
 }
 
 #[test]
 fn test_check_error_1b() {
-    let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), OsStr::new(FILE_PATH)], false, true);
+    let output = run_binary([OsStr::new("--check"), OsStr::new("--multi-threading"), OsStr::new(NOT_FOUND_PATH)], false, true);
     assert!(REGEX_CHECK_NOENT.is_match(&output))
 }
 
@@ -1700,7 +1697,7 @@ fn test_help() {
 #[test]
 fn test_color_1a() {
     let env = HashMap::from([("CLICOLOR_FORCE", "1".to_owned())]);
-    let output = run_binary_with_env([OsStr::new(FILE_PATH)], env, false, true);
+    let output = run_binary_with_env([OsStr::new(NOT_FOUND_PATH)], env, false, true);
     assert!(output.trim_ascii_start().starts_with("\u{1b}[1;31m[sponge256sum]\u{1b}[22;31m Input file not found:"));
 }
 
@@ -1708,7 +1705,7 @@ fn test_color_1a() {
 #[test]
 fn test_color_1b() {
     let env = HashMap::from([("NO_COLOR", "1".to_owned())]);
-    let output = run_binary_with_env([OsStr::new(FILE_PATH)], env, false, true);
+    let output = run_binary_with_env([OsStr::new(NOT_FOUND_PATH)], env, false, true);
     assert!(output.trim_ascii_start().starts_with("[sponge256sum] Input file not found:"));
 }
 
@@ -1716,7 +1713,7 @@ fn test_color_1b() {
 #[test]
 fn test_color_2() {
     let env = HashMap::from([("CLICOLOR_FORCE", "1".to_owned())]);
-    let output = run_binary_with_env([OsStr::new("--no-color"), OsStr::new(FILE_PATH)], env, false, true);
+    let output = run_binary_with_env([OsStr::new("--no-color"), OsStr::new(NOT_FOUND_PATH)], env, false, true);
     assert!(output.trim_ascii_start().starts_with("[sponge256sum] Input file not found:"));
 }
 

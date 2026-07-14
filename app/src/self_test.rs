@@ -2,6 +2,7 @@
 // sponge256sum
 // Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>
 
+use cfg_if::cfg_if;
 use hex_literal::hex;
 use rand_pcg::{
     rand_core::{Rng, SeedableRng},
@@ -83,19 +84,20 @@ macro_rules! check_cancelled {
 // Seed values
 const PCG64_SEEDVALUE: [u64; 2usize] = [18446744073709551557u64, 18446744073709551533u64];
 
-// Number of iterations to perform
-#[cfg(any(debug_assertions, coverage))]
-const ITERATIONS: usize = 1499usize;
-#[cfg(not(any(debug_assertions, coverage)))]
-const ITERATIONS: usize = 249989usize;
-
 // Expected hash values
-#[cfg(any(debug_assertions, coverage))]
-const DIGEST_EXPECTED: [[u8; DEFAULT_DIGEST_SIZE]; 2usize] =
-    [hex!("743f54562887e0687fed4a75b57d596aa5438604b1bda7ef799836d0810d6276"), hex!("66a83c441436d8e90f152b850f94e9e582c50337265dbded21bd72746fe24067")];
-#[cfg(not(any(debug_assertions, coverage)))]
-const DIGEST_EXPECTED: [[u8; DEFAULT_DIGEST_SIZE]; 2usize] =
-    [hex!("fbb2f74509d78f4ac30da4a9ed0769efff7fbe5367e363b75572820b8aa83fe0"), hex!("87dac84f3f485a61bc6cb73f5cf236d68831c7bb8a0cef15cce500cf17a5690e")];
+cfg_if! {
+    if #[cfg(not(any(debug_assertions, coverage)))] {
+        const ITERATIONS: usize = 249989usize;
+        const DIGEST_EXPECTED: [[u8; DEFAULT_DIGEST_SIZE]; 2usize] = [
+            hex!("fbb2f74509d78f4ac30da4a9ed0769efff7fbe5367e363b75572820b8aa83fe0"),
+            hex!("87dac84f3f485a61bc6cb73f5cf236d68831c7bb8a0cef15cce500cf17a5690e")];
+    } else {
+        const ITERATIONS: usize = 1499usize;
+        const DIGEST_EXPECTED: [[u8; DEFAULT_DIGEST_SIZE]; 2usize] = [
+            hex!("743f54562887e0687fed4a75b57d596aa5438604b1bda7ef799836d0810d6276"),
+            hex!("66a83c441436d8e90f152b850f94e9e582c50337265dbded21bd72746fe24067")];
+    }
+}
 
 // Buffer size, in bytes
 const BUFFER_SIZE: usize = 4093usize;
@@ -122,11 +124,12 @@ fn do_self_test(_output: &mut dyn Write, halt: &Flag) -> Result<bool, Error> {
 
         let digest_computed: [u8; DEFAULT_DIGEST_SIZE] = hasher.digest();
 
-        #[cfg(debug_assertions)]
-        {
-            let mut hex_buffer = [0u8; DEFAULT_DIGEST_SIZE * 2usize];
-            writeln!(_output, "> Computed: {}", format_digest(digest_computed, &mut hex_buffer))?;
-            writeln!(_output, "> Expected: {}", format_digest(digest_expected, &mut hex_buffer))?;
+        cfg_if! {
+            if #[cfg(debug_assertions)] {
+                let mut hex_buffer = [0u8; DEFAULT_DIGEST_SIZE * 2usize];
+                writeln!(_output, "> Computed: {}", format_digest(digest_computed, &mut hex_buffer))?;
+                writeln!(_output, "> Expected: {}", format_digest(digest_expected, &mut hex_buffer))?;
+            }
         }
 
         success &= digest_equal(&digest_computed, digest_expected);

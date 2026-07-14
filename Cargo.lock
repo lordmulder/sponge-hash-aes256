@@ -823,6 +823,7 @@ version = "1.10.3"
 dependencies = [
  "anstream",
  "build-time",
+ "cfg-if",
  "clap",
  "const_format",
  "crossbeam-channel",
