@@ -6,7 +6,7 @@ cargo clean
 cargo upgrade --recursive --incompatible
 cargo update
 cargo fmt --all
-cargo clippy --all-targets --all-features
+cargo clippy --all-targets --all-features -- -D warnings
 cargo audit
 cargo build --release
 

@@ -150,6 +150,7 @@ impl Default for Scratch {
 ///
 /// Following the final input block, a 128-bit block filled entirely with `0x6A` bytes is absorbed into the state.
 #[repr(align(32))]
+#[derive(Clone, Debug)]
 pub struct SpongeHash256<const R: usize = DEFAULT_PERMUTE_ROUNDS> {
     state: (BlockType, BlockType, BlockType),
     offset: usize,
@@ -159,6 +160,7 @@ impl<const R: usize> SpongeHash256<R> {
     /// Creates a new SpongeHash-AES256 instance and initializes the hash computation.
     ///
     /// **Note:** This function implies an *empty* [`info`](Self::with_info()) string.
+    #[inline]
     pub fn new() -> Self {
         Self::with_info(Default::default())
     }
@@ -166,6 +168,7 @@ impl<const R: usize> SpongeHash256<R> {
     /// Creates a new SpongeHash-AES256 instance and initializes the hash computation with the given `info` string.
     ///
     /// **Note:** The length of the `info` string **must not** exceed a length of 255 characters!
+    #[inline]
     pub fn with_info(info: &str) -> Self {
         let () = NoneZeroArg::<R>::OK;
         let mut hash = Self { state: (BlockType::zero(), BlockType::zero(), BlockType::zero()), offset: 0usize };
@@ -316,6 +319,7 @@ impl<const R: usize> SpongeHash256<R> {
 }
 
 impl Default for SpongeHash256 {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }

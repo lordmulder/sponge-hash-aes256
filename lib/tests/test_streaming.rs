@@ -67,6 +67,17 @@ fn do_test_r<const R: usize>(expected: &[u8; DEFAULT_DIGEST_SIZE], message: &str
     assert_digest_eq(&digest, expected);
 }
 
+fn do_test_c(message_1: &str, message_2: &str) {
+    let mut hash_1 = SpongeHash256::default();
+    hash_1.update(message_1.as_bytes());
+    let mut hash_2 = hash_1.clone();
+    hash_1.update(message_2.as_bytes());
+    hash_2.update(message_2.as_bytes());
+    let digest_1: [u8; DEFAULT_DIGEST_SIZE] = hash_1.digest();
+    let digest_2: [u8; DEFAULT_DIGEST_SIZE] = hash_2.digest();
+    assert_digest_eq(&digest_1, &digest_2);
+}
+
 // ---------------------------------------------------------------------------
 // Test vectors
 // ---------------------------------------------------------------------------
@@ -125,4 +136,14 @@ pub fn test_case_7d() {
         &hex!("af2281df4ad2a2a989c5f750723754d2a2d823d6bfcc0b91058e629d4eda5f74"),
         "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
     );
+}
+
+#[test]
+pub fn test_case_8a() {
+    do_test_c("abc", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
+}
+
+#[test]
+pub fn test_case_8b() {
+    do_test_c("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", "abc");
 }
