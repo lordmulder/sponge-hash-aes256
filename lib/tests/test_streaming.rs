@@ -67,15 +67,16 @@ fn do_test_r<const R: usize>(expected: &[u8; DEFAULT_DIGEST_SIZE], message: &str
     assert_digest_eq(&digest, expected);
 }
 
-fn do_test_c(message_1: &str, message_2: &str) {
-    let mut hash_1 = SpongeHash256::default();
+fn do_test_c(expected: &[u8; DEFAULT_DIGEST_SIZE], info: Option<&str>, message_1: &str, message_2: &str) {
+    let mut hash_1 = create_instance(info);
     hash_1.update(message_1.as_bytes());
     let mut hash_2 = hash_1.clone();
     hash_1.update(message_2.as_bytes());
     hash_2.update(message_2.as_bytes());
-    let digest_1: [u8; DEFAULT_DIGEST_SIZE] = hash_1.digest();
-    let digest_2: [u8; DEFAULT_DIGEST_SIZE] = hash_2.digest();
-    assert_digest_eq(&digest_1, &digest_2);
+    let digest_1 = hash_1.digest();
+    let digest_2 = hash_2.digest();
+    assert_digest_eq(&digest_1, expected);
+    assert_digest_eq(&digest_2, expected);
 }
 
 // ---------------------------------------------------------------------------
@@ -140,10 +141,20 @@ pub fn test_case_7d() {
 
 #[test]
 pub fn test_case_8a() {
-    do_test_c("abc", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq");
+    do_test_c(
+        &hex!("8bd72fc391b6ae4ed1fe352be88cf3d8e496ab8283a4131233a9635d8db10855"),
+        None,
+        "aabcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno",
+        "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
+    );
 }
 
 #[test]
 pub fn test_case_8b() {
-    do_test_c("abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq", "abc");
+    do_test_c(
+        &hex!("fd9830187ce1b95c674e829c35e603496ec8df0f0a2788f76c1ffd9d804b6f23"),
+        Some("thingamajig"),
+        "aabcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmno",
+        "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu",
+    );
 }

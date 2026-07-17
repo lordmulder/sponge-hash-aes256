@@ -40,7 +40,7 @@ jobs:
           [ "$(cd lib && cargo pkgid | grep -Po '@\K[\d.]+$')" = "${{ github.event.release.tag_name}}" ]
       - run: |
           cargo check --workspace --all-targets --all-features --verbose
-          cargo clippy --workspace --all-targets --all-features
+          cargo clippy --workspace --all-targets --all-features -- -D warnings
           cargo fmt --all --check --verbose
 
   # --------------------------------------------------------------------------
