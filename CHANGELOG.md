@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 1.10.4
+
+### Added
+
+- The `SpongeHash256` struct now implements the [`Clone`](https://doc.rust-lang.org/std/clone/trait.Clone.html) trait.
+
+### Changed
+
+- Updated GitHub workflow (CI) to create builds with Rust version 1.97.1 (2026-07-16).
+- Updated various dependencies to the latest version.
+- Some conditional code has been simplified by using the [`cfg_if`](https://crates.io/crates/cfg-if) crate.
+
 ## Version 1.10.3
 
 ### Changed
