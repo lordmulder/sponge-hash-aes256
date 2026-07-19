@@ -13,7 +13,7 @@ use crate::{
     arguments::Args,
     common::{Flag, MAX_SNAIL_LEVEL},
     io::DataSource,
-    os::{is_pipe, IO_BUFFER_SIZE},
+    os::{is_pipe, IO_READ_BUFFER_SIZE},
 };
 
 // ---------------------------------------------------------------------------
@@ -54,8 +54,8 @@ impl<const CAPACITY: usize> AlignedBuffer<CAPACITY> {
 #[repr(align(32))]
 #[allow(clippy::large_enum_variant)]
 enum ReadBuffer {
-    Small(AlignedBuffer<IO_BUFFER_SIZE>),
-    Large(AlignedBuffer<{ 4usize * IO_BUFFER_SIZE }>),
+    Small(AlignedBuffer<IO_READ_BUFFER_SIZE>),
+    Large(AlignedBuffer<{ 4usize * IO_READ_BUFFER_SIZE }>),
 }
 
 impl ReadBuffer {
@@ -182,7 +182,7 @@ pub fn compute_digest(input: &mut DataSource, digest_out: &mut [u8], args: &Args
             }
         }
     } else {
-        let mut lines = BufReader::with_capacity(IO_BUFFER_SIZE, input).lines();
+        let mut lines = BufReader::with_capacity(IO_READ_BUFFER_SIZE, input).lines();
         if let Some(line) = lines.next() {
             hasher.update(&(line?));
             for line in lines {

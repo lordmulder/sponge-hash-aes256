@@ -5,7 +5,7 @@
 use cfg_if::cfg_if;
 
 cfg_if! {
-    if #[cfg(unix)] {
+    if #[cfg(target_family = "unix")] {
         mod unix;
         pub use unix::*;
     } else if #[cfg(target_family = "windows")] {
@@ -18,8 +18,10 @@ cfg_if! {
 
 cfg_if! {
     if #[cfg(target_pointer_width = "64")] {
-        pub const IO_BUFFER_SIZE: usize = 16384usize;
+        pub const IO_READ_BUFFER_SIZE: usize = 16384usize;
+    } else if #[cfg(target_pointer_width = "32")] {
+        pub const IO_READ_BUFFER_SIZE: usize = 8192usize;
     } else {
-        pub const IO_BUFFER_SIZE: usize = 8192usize;
+        compile_error!("Platform not currently supported!");
     }
 }
