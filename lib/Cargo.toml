@@ -14,8 +14,8 @@ keywords = ["hash", "digest", "sponge", "crypto", "aes"]
 no_std = true
 
 [dependencies]
-aes = "0.9.1"
-wide = "1.5.0"
+aes = "0.9.2"
+wide = "1.6.1"
 zeroize = "1.9.0"
 
 # Optional dependencies
