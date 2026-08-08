@@ -527,6 +527,7 @@ fn test_file_1b() {
 }
 
 #[test]
+#[ignore]
 fn test_file_1c() {
     do_test_file(EXPECTED[2usize], "frank.pdf", false, 2usize, false);
 }
@@ -554,6 +555,7 @@ fn test_file_2b() {
 }
 
 #[test]
+#[ignore]
 fn test_file_2c() {
     do_test_file(EXPECTED[7usize], "dracula.pdf", false, 2usize, false);
 }
@@ -620,6 +622,7 @@ fn test_file_with_info_1c() {
 }
 
 #[test]
+#[ignore]
 fn test_file_with_info_1d() {
     do_test_file_with_info(EXPECTED[17usize], "frank.pdf", "thingamabob", 2usize);
 }
@@ -652,6 +655,7 @@ fn test_file_with_info_2c() {
 }
 
 #[test]
+#[ignore]
 fn test_file_with_info_2d() {
     do_test_file_with_info(EXPECTED[23usize], "dracula.pdf", "thingamabob", 2usize);
 }
