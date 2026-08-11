@@ -6,7 +6,7 @@ cargo upgrade --recursive --incompatible || goto:error
 cargo update || goto:error
 cargo fmt --all || goto:error
 cargo clippy --all-targets --all-features -- -D warnings || goto:error
-cargo audit || goto:error
+cargo audit -Dwarnings || goto:error
 cargo build --release || goto:error
 
 echo.
