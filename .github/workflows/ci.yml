@@ -164,7 +164,7 @@ jobs:
           ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
       - run: |
           cargo install cargo-audit --locked
-          cargo audit
+          cargo audit -Dwarnings
 
   # --------------------------------------------------------------------------
   # Build
