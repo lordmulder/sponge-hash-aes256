@@ -290,7 +290,7 @@ jobs:
           operating_system: netbsd
           version: '11.0'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-netbsd-builder/releases/download/v12/netbsd-11.0-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-netbsd-builder/releases/download/v13/netbsd-11.0-x86-64.qcow2'
       - run: |
           git config --global --add safe.directory '*'
           . /opt/rust/cargo/env
@@ -314,7 +314,7 @@ jobs:
           operating_system: openbsd
           version: '7.9'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-openbsd-builder/releases/download/v8/openbsd-7.9-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-openbsd-builder/releases/download/v9/openbsd-7.9-x86-64.qcow2'
       - run: |
           git config --global --add safe.directory '*'
           ( cd .build/bsd-unix && ./build-openbsd.sh )
