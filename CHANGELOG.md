@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 1.10.5
+
+### Changed
+
+- Updated GitHub workflow (CI) to create builds with Rust version 1.98.0 (2026-08-20).
+- Updated `aes` dependency from version 0.9.1 to 0.9.2 (2026-07-27).
+- Updated `wide` dependency from version 1.5.0 to 1.6.1 (2026-08-07).
+
 ## Version 1.10.4
 
 ### Added
