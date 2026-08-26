@@ -4,7 +4,7 @@
 
 use crossbeam_channel::{bounded, Receiver, Sender};
 use hex::encode_to_slice;
-use imbl::{ordset, OrdSet};
+use rpds::{rbt_set, RedBlackTreeSet};
 use sponge_hash_aes256::DEFAULT_DIGEST_SIZE;
 use std::{
     borrow::Cow,
@@ -31,7 +31,7 @@ use crate::{
 };
 
 type FsId = Option<DevId>;
-type IdSet = OrdSet<FileId>;
+type IdSet = RedBlackTreeSet<FileId>;
 type Count = NonZeroUsize;
 
 // ---------------------------------------------------------------------------
@@ -76,10 +76,10 @@ fn get_metadata(dir_entry: &DirEntry) -> Option<Metadata> {
     }
 }
 
-/// Appends a directory id to the set of visited directories
+/// Appends an id to the set of visited ids (or returns a reference to the original set)
 #[inline]
 fn append(visited: &'_ IdSet, file_id: Option<FileId>) -> Cow<'_, IdSet> {
-    file_id.map_or(Cow::Borrowed(visited), |uid| Cow::Owned(visited.update(uid)))
+    file_id.map_or(Cow::Borrowed(visited), |value| Cow::Owned(visited.insert(value)))
 }
 
 /// Get the path from the given `DirEntry` instance
@@ -291,7 +291,7 @@ fn iterate_loop(input_files: impl Iterator<Item = PathBuf>, path_tx: &Sender<Pat
         check_cancelled!(halt);
         let directory = if args.dirs { fs::metadata(&file_name).ok().filter(|meta| meta.is_dir()) } else { None };
         if let Some(meta_data) = directory {
-            let (visited, fs_id) = file_id(meta_data).map_or_else(Default::default, |uid| (ordset![uid], Some(uid.dev())));
+            let (visited, fs_id) = file_id(meta_data).map_or_else(Default::default, |uid| (rbt_set![uid], Some(uid.dev())));
             if !(do_iterate(path_tx, &file_name, fs_id, &visited, bfs, args, halt)? || args.keep_going) {
                 break;
             }
