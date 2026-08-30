@@ -290,7 +290,7 @@ jobs:
           operating_system: netbsd
           version: '11.0'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-netbsd-builder/releases/download/v16/netbsd-11.0-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-netbsd-builder/releases/download/v17/netbsd-11.0-x86-64.tar.zst'
       - run: |
           git config --global --add safe.directory '*'
           . /opt/rust/cargo/env
@@ -314,7 +314,7 @@ jobs:
           operating_system: openbsd
           version: '7.9'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-openbsd-builder/releases/download/v9/openbsd-7.9-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-openbsd-builder/releases/download/v10/openbsd-7.9-x86-64.qcow2'
       - run: |
           git config --global --add safe.directory '*'
           ( cd .build/bsd-unix && ./build-openbsd.sh )
@@ -359,9 +359,9 @@ jobs:
       - uses: cross-platform-actions/action@v1
         with:
           operating_system: haiku
-          version: 'r1beta5'
+          version: 'r1beta6'
           shell: bash
-          image_url: 'https://github.com/lordmulder/cross-platform-actions-haiku-builder/releases/download/v4/haiku-r1beta5-x86-64.qcow2'
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-haiku-builder/releases/download/v5/haiku-r1beta6-x86-64.qcow2'
       - run: |
           git config --global --add safe.directory '*'
           ( cd .build/bsd-unix && ./build-haiku.sh )
