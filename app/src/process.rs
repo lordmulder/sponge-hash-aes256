@@ -21,7 +21,7 @@ use tinyvec::TinyVec;
 
 use crate::{
     arguments::Args,
-    common::{get_capacity, increment, Aborted, Digest, ExitStatus, Flag, TinyVecEx},
+    common::{get_capacity, increment, Aborted, Digest, ExitStatus, Flag},
     digest::{compute_digest, Error as DigestError},
     environment::Env,
     io::{DataSource, Error as IoError, OutStream},
@@ -139,7 +139,7 @@ fn exit_status(file_errors: u64, args: &Args) -> ExitStatus {
 #[inline]
 fn print_digest(output: &mut dyn Write, file_name: &Path, digest: &Digest, args: &Args) -> IoResult<()> {
     let hex_length = digest.len().checked_mul(2usize).unwrap();
-    let mut hex_buffer: TinyVec<[u8; 2usize * DEFAULT_DIGEST_SIZE]> = TinyVec::with_length(hex_length);
+    let mut hex_buffer: TinyVec<[u8; 2usize * DEFAULT_DIGEST_SIZE]> = TinyVec::with_initial_len(hex_length);
 
     encode_to_slice(digest.as_slice(), hex_buffer.as_mut_slice()).unwrap();
     let hex_string = unsafe { from_utf8_unchecked(hex_buffer.as_slice()) };
@@ -203,7 +203,7 @@ type DigestResult = Result<(Digest, PathBuf), Error>;
 fn compute_file_digest(file_name: PathBuf, digest_size: usize, args: &Args, halt: &Flag) -> Result<DigestResult, Cancelled> {
     match DataSource::from_path(&file_name) {
         Ok(mut source) => {
-            let mut digest = TinyVec::with_length(digest_size);
+            let mut digest = TinyVec::with_initial_len(digest_size);
             match compute_digest(&mut source, digest.as_mut_slice(), args, halt) {
                 Ok(_) => Ok(Ok((digest, file_name))),
                 Err(DigestError::IoError) => Ok(Err(Error::FileRead(file_name))),
@@ -461,7 +461,7 @@ fn process_st(output: &mut OutStream, out_size: usize, bfs: bool, args: &'static
 /// Process data from 'stdin' stream
 fn process_stdin(output: &mut OutStream, digest_size: usize, args: &Args, halt: &Flag) -> Result<ExitStatus, Cancelled> {
     let mut stdin = DataSource::from_stdin();
-    let mut digest = TinyVec::with_length(digest_size);
+    let mut digest = TinyVec::with_initial_len(digest_size);
 
     match compute_digest(&mut stdin, digest.as_mut_slice(), args, halt) {
         Ok(_) => match print_digest(output.out(), *STDIN_NAME, &digest, args) {

@@ -9,7 +9,7 @@ use std::{
     process::ExitCode,
     sync::atomic::{AtomicUsize, Ordering},
 };
-use tinyvec::{ArrayVec, TinyVec};
+use tinyvec::TinyVec;
 
 // ---------------------------------------------------------------------------
 // Common definitions
@@ -107,25 +107,6 @@ impl Flag {
                 true => Ok(()),
                 false => Err(UpdateError),
             },
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// TinyVec extension
-// ---------------------------------------------------------------------------
-
-pub trait TinyVecEx {
-    fn with_length(length: usize) -> Self;
-}
-
-impl<const N: usize, T: Copy + Default> TinyVecEx for TinyVec<[T; N]> {
-    #[inline(always)]
-    fn with_length(length: usize) -> Self {
-        if length <= N {
-            TinyVec::Inline(ArrayVec::from_array_len([T::default(); N], length))
-        } else {
-            TinyVec::Heap(vec![T::default(); length])
         }
     }
 }
