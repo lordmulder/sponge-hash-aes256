@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 1.10.7
+
+### Changed
+
+- Reverted to using `imbl`, now that its dependency on the unmaintained `bitmaps` crate has been removed.
+- Github workflow (CI): Updated Rust toolchain to version 1.98.1 (2026-09-09).
+- Updated `tinyvec` dependency from version 1.12.0 to 1.13.2 (2026-09-04) and use `with_initial_len()`.
+
 ## Version 1.10.6
 
 ### Fixed
