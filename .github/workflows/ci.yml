@@ -348,6 +348,30 @@ jobs:
           name: sponge256sum-illumos
           path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
 
+  build-dragonfly:
+    runs-on: ubuntu-latest
+    needs: [test-linux, test-windows, test-macos]
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
+      - uses: cross-platform-actions/action@v1
+        with:
+          operating_system: dragonflybsd
+          version: '6.4.2'
+          shell: bash
+          image_url: 'https://github.com/lordmulder/cross-platform-actions-dragonflybsd-builder/releases/download/v2/dragonflybsd-6.4.2-x86-64.qcow2'
+      - run: |
+          git config --global --add safe.directory '*'
+          export PATH=/raven/bin:/raven/sbin:$PATH
+          ( cd .build/bsd-unix && ./build-dragonfly.sh )
+        shell: cpa.sh {0}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: sponge256sum-dragonfly
+          path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
+
   build-haikuos:
     runs-on: ubuntu-latest
     needs: [test-linux, test-windows, test-macos]
@@ -374,31 +398,6 @@ jobs:
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
   # vmactions
   # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-  build-dragonfly:
-    runs-on: ubuntu-latest
-    needs: [test-linux, test-windows, test-macos]
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.release.tag_name && format('refs/tags/{0}', github.event.release.tag_name) || github.sha }}
-      - uses: vmactions/dragonflybsd-vm@v1
-        with:
-          release: "6.4.2"
-          usesh: true
-          prepare: |
-            fetch http://www.ravenports.com/repository/ravenports-downloader.sh -o - | /bin/sh
-            /raven/sbin/rvn install -y rust
-            git config --global --add safe.directory '*'
-          run: |
-            export PATH=/raven/bin:/raven/sbin:$PATH
-            cd .build/bsd-unix
-            ./build-dragonfly.sh
-      - uses: actions/upload-artifact@v7
-        with:
-          name: sponge256sum-dragonfly
-          path: ${{ github.workspace }}/.build/bsd-unix/out/target/*.tar.xz
 
   build-solaris:
     runs-on: ubuntu-latest
