@@ -15,7 +15,7 @@ no_std = true
 
 [dependencies]
 aes = "0.9.3"
-wide = "1.7.0"
+wide = "1.7.1"
 zeroize = "1.9.0"
 
 # Optional dependencies
