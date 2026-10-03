@@ -44,7 +44,7 @@ nix = { version = "0.31.3", default-features = false, features = ["signal"] }
 regex = { version = "1.13.1", default-features = false, features = ["unicode"] }
 
 [target.'cfg(unix)'.dependencies]
-libc = { version = "0.2.189", default-features = false }
+libc = { version = "0.2.190", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61.2", default-features = false, features = ["Win32_Storage_FileSystem"] }
