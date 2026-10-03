@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 1.10.8
+
+### Changed
+
+- Github workflow (CI): Updated Rust toolchain to version 1.99.0 (2026-10-02).
+- Updated `clap` dependency from version 4.6.6 to 4.6.7 (2026-09-14).
+- Updated `tinyvec` dependency from version 1.13.2 to 1.13.3 (2026-09-14).
+- Updated `wide` dependency from version 1.7.0 to 1.7.1 (2026-09-14).
+
 ## Version 1.10.7
 
 ### Changed
