@@ -1,0 +1,25 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: codeberg-medium
+    container:
+      image: cimg/rust:1.100.0-node
+    steps:
+      - name: Checkout
+        uses: https://data.forgejo.org/actions/checkout@v7
+
+      - name: Check
+        run: |
+          cargo check --workspace --all-targets --all-features --verbose
+          cargo clippy --workspace --all-targets --all-features -- -D warnings
+          cargo fmt --all --check --verbose
+
+      - name: Build
+        run: RUSTFLAGS="-D warnings" cargo build --locked --release
