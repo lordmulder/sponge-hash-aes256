@@ -14,12 +14,12 @@ keywords = ["hash", "digest", "sponge", "crypto", "aes"]
 no_std = true
 
 [dependencies]
-aes = "0.9.3"
+aes = "0.9.4"
 wide = "1.7.1"
-zeroize = "1.9.0"
+zeroize = "1.9.1"
 
 # Optional dependencies
-log = { version = "0.4.34", default-features = false, optional = true }
+log = { version = "0.4.35", default-features = false, optional = true }
 
 [dev-dependencies]
 hex = { version = "0.4.3", default-features = false }
