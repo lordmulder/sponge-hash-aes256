@@ -2,7 +2,7 @@
 // sponge256sum
 // Copyright (C) 2025-2026 by LoRd_MuldeR <mulder2@gmx.de>
 
-use build_time::build_time_utc;
+use build_time_macros::{build_date, build_time};
 use clap::{builder::TypedValueParser, error::ErrorKind, Arg, ArgAction, ArgGroup, Command, Error, Parser};
 use const_format::formatcp;
 use rustc_version_const::rustc_version_full;
@@ -25,11 +25,14 @@ use crate::common::ExitStatus;
 /// Build profile
 pub const BUILD_PROFILE: &str = if cfg!(debug_assertions) { "debug" } else { "release" };
 
+/// Build date/time
+pub const BUILD_DATETIME: &str = formatcp!("{}, {}", build_date!(), build_time!());
+
 /// Version string
 pub const VERSION: &str = formatcp!("v{} [SpongeHash-AES256 v{}] [{OS}] [{ARCH}] [{BUILD_PROFILE}]", env!("CARGO_PKG_VERSION"), version());
 
 /// Full version string
-pub const LONG_VERSION: &str = formatcp!("{VERSION}\nBuilt on: {}\nCompiled using rustc version: {}", build_time_utc!("%F, %T"), rustc_version_full());
+pub const LONG_VERSION: &str = formatcp!("{VERSION}\nBuilt on: {BUILD_DATETIME}\nCompiled using rustc version: {}", rustc_version_full());
 
 /// Header line
 pub const HEADER_LINE: &str = formatcp!("{} v{} (with SpongeHash-AES256 v{})", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"), version());

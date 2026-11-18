@@ -16,7 +16,7 @@ no_std = true
 [dependencies]
 aes = "0.9.4"
 wide = "1.7.1"
-zeroize = "1.9.1"
+zeroize = "1.9.2"
 
 # Optional dependencies
 log = { version = "0.4.35", default-features = false, optional = true }
