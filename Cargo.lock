@@ -625,9 +625,9 @@ checksum = "b20679bcd32728ca2a0fd2c3cde7cba36595e3eea021d7cb9ef83206365f15e0"
 
 [[package]]
 name = "rustc-version-const"
-version = "1.1.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c9938b3fc97a35fa69c3c2eed001b19769b6f48ccd243660fc60d3c04fed86f"
+checksum = "44c724e992cdbf70dc5ba582c78fc71c98b47e4cef56df6cc8743f49fdfa8bd0"
 
 [[package]]
 name = "safe_arch"
