@@ -7,7 +7,6 @@ use aes::{
     Aes256Enc,
 };
 use core::{
-    hint::unreachable_unchecked,
     mem::MaybeUninit,
     ops::{Index, IndexMut, RangeTo},
     ptr,
@@ -91,8 +90,8 @@ impl Index<usize> for BlockType {
     type Output = u8;
 
     #[inline(always)]
-    fn index(&self, _index: usize) -> &Self::Output {
-        unsafe { unreachable_unchecked() }
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.0.as_array()[index]
     }
 }
 
@@ -381,6 +380,24 @@ mod tests {
         #[test]
         fn test_concat_keys_2b() {
             do_concat_keys(&BlockType::from_array(hex!("0F1F2F3F4F5F6F7F8F9FAFBFCFDFEFFF")), &BlockType::from_array(hex!("00102030405060708090A0B0C0D0E0F0")));
+        }
+    }
+
+    mod index {
+        use super::super::*;
+
+        #[test]
+        fn test_block_index() {
+            let mut block = BlockType::new::<0u8>();
+            block[0usize] = 1u8;
+            assert_eq!(block[0usize], 1u8);
+        }
+
+        #[test]
+        fn test_block_range() {
+            let block = BlockType::new::<0u8>();
+            let range = &block[..4usize];
+            assert_eq!(range, &[0u8, 0u8, 0u8, 0u8]);
         }
     }
 }

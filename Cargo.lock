@@ -703,7 +703,7 @@ dependencies = [
 
 [[package]]
 name = "sponge-hash-aes256"
-version = "1.10.8"
+version = "1.10.9"
 dependencies = [
  "aes",
  "hex",
@@ -718,7 +718,7 @@ dependencies = [
 
 [[package]]
 name = "sponge256sum"
-version = "1.10.8"
+version = "1.10.9"
 dependencies = [
  "anstream",
  "build-time-macros",

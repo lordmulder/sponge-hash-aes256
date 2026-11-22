@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Version 1.10.9
+
+### Changed
+
+- Github workflow (CI): Updated Rust toolchain to version 1.100.0 (2026-11-17).
+- Updated `aes` dependency from version 0.9.3 to 0.9.4 (2026-11-02).
+- Updated `zeroize` dependency from version 1.9.0 to 1.9.2 (2026-11-17).
+- Updated `clap` dependency from version 4.6.7 to 4.6.9 (2026-11-20).
+- Updated `rand_pcg` dependency from version 0.10.2 to 0.10.3 (2026-11-18).
+- Updated `ctrlc` dependency from version 3.5.2 to 3.5.3 (2026-11-18).
+- Updated `const_format` dependency from version 0.2.36 to 0.2.37 (2026-10-23).
+
+### Added
+
+- Codeberg workflow (CI): Added Forgejo-based CI/CD workflow for Codeberg.org mirror.
+
 ## Version 1.10.8
 
 ### Changed
